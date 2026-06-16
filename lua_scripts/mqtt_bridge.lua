@@ -1,4 +1,4 @@
--- Sinapse MQTT Bridge v0.2
+-- Sinapse MQTT Bridge v0.3 (Hardened)
 -- Upload this script to the Sinum hub:
 --   Settings → Lua Scripts → New Script → paste this code → Save → Enable
 --
@@ -6,6 +6,13 @@
 --   1. Sinum hub: Integrations → Add MQTT client → point to your HA Mosquitto broker
 --   2. Set CLIENT_ID below to the ID assigned by Sinum (shown after saving the client)
 --   3. Optionally change TOPIC_PREFIX (default: "sinum")
+--
+-- Changes in v0.3:
+--   - All device property access now uses safe getValue() wrappers
+--   - Publishes initial snapshots for virtual, wtp, AND sbus device classes
+--   - Includes fan coil fields: work_mode, available_work_modes, working_state, fan
+--   - Includes parent_id and schedule_id for device associations
+--   - Safer error handling on device state changes
 --
 -- Topic schema:
 --   sinum/state/<device_id>    Device state JSON     (Sinum → HA)
@@ -30,43 +37,86 @@ local function publish(subtopic, data)
     client:publish(TOPIC_PREFIX .. "/" .. subtopic, payload, QOS, RETAIN)
 end
 
+-- ── Helper: safe getValue wrapper ───────────────────────────────────────────
+
+local function safe_get(obj, key)
+    local ok, val = pcall(function() return obj:getValue(key) end)
+    if ok then return val end
+    return nil
+end
+
 -- ── Helper: safe device state snapshot ───────────────────────────────────────
 
 local function device_snapshot(device, source)
     local snap = {
-        id          = device.id,
-        type        = device.type,
-        name        = device.name,
-        room_id     = device.room_id,
-        state       = device.state,
+        id          = safe_get(device, "id"),
+        type        = safe_get(device, "type"),
+        name        = safe_get(device, "name"),
+        room_id     = safe_get(device, "room_id"),
+        parent_id   = safe_get(device, "parent_id"),
+        state       = safe_get(device, "state"),
         source      = source or "virtual",
         updated_at  = os.time(),
     }
-    -- Virtual thermostat / heat pump
-    if device.temperature        ~= nil then snap.temperature        = device.temperature        end
-    if device.target_temperature ~= nil then snap.target_temperature = device.target_temperature end
-    if device.humidity           ~= nil then snap.humidity           = device.humidity           end
-    if device.mode               ~= nil then snap.mode               = device.mode               end
+    -- Virtual thermostat / heat pump / temperature regulator
+    local temp = safe_get(device, "temperature")
+    if temp ~= nil then snap.temperature = temp end
+    local target_temp = safe_get(device, "target_temperature")
+    if target_temp ~= nil then snap.target_temperature = target_temp end
+    local humidity = safe_get(device, "humidity")
+    if humidity ~= nil then snap.humidity = humidity end
+    local mode = safe_get(device, "mode")
+    if mode ~= nil then snap.mode = mode end
     -- Relay
     -- (state already covered above)
     -- Blind controller
-    if device.last_set_target_opening ~= nil then snap.last_set_target_opening = device.last_set_target_opening end
-    if device.action_in_progress      ~= nil then snap.action_in_progress      = device.action_in_progress      end
-    if device.last_set_target_tilt    ~= nil then snap.last_set_target_tilt    = device.last_set_target_tilt    end
+    local opening = safe_get(device, "last_set_target_opening")
+    if opening ~= nil then snap.last_set_target_opening = opening end
+    local action = safe_get(device, "action_in_progress")
+    if action ~= nil then snap.action_in_progress = action end
+    local tilt = safe_get(device, "last_set_target_tilt")
+    if tilt ~= nil then snap.last_set_target_tilt = tilt end
     -- Dimmer/RGB
-    if device.brightness        ~= nil then snap.brightness        = device.brightness        end
-    if device.led_color         ~= nil then snap.led_color         = device.led_color         end
-    if device.white_temperature ~= nil then snap.white_temperature = device.white_temperature end
-    if device.color_mode        ~= nil then snap.color_mode        = device.color_mode        end
+    local brightness = safe_get(device, "brightness")
+    if brightness ~= nil then snap.brightness = brightness end
+    local led_color = safe_get(device, "led_color")
+    if led_color ~= nil then snap.led_color = led_color end
+    local white_temp = safe_get(device, "white_temperature")
+    if white_temp ~= nil then snap.white_temperature = white_temp end
+    local color_mode = safe_get(device, "color_mode")
+    if color_mode ~= nil then snap.color_mode = color_mode end
     -- WTP sensors
-    if device.co2               ~= nil then snap.co2               = device.co2               end
-    if device.pm1               ~= nil then snap.pm1               = device.pm1               end
-    if device.pm25              ~= nil then snap.pm25              = device.pm25              end
-    if device.pm10              ~= nil then snap.pm10              = device.pm10              end
-    if device.illuminance       ~= nil then snap.illuminance       = device.illuminance       end
-    if device.pressure          ~= nil then snap.pressure          = device.pressure          end
-    if device.total_active_power    ~= nil then snap.total_active_power    = device.total_active_power    end
-    if device.energy_consumed_total ~= nil then snap.energy_consumed_total = device.energy_consumed_total end
+    local co2 = safe_get(device, "co2")
+    if co2 ~= nil then snap.co2 = co2 end
+    local pm1 = safe_get(device, "pm1")
+    if pm1 ~= nil then snap.pm1 = pm1 end
+    local pm25 = safe_get(device, "pm25")
+    if pm25 ~= nil then snap.pm25 = pm25 end
+    local pm10 = safe_get(device, "pm10")
+    if pm10 ~= nil then snap.pm10 = pm10 end
+    local illuminance = safe_get(device, "illuminance")
+    if illuminance ~= nil then snap.illuminance = illuminance end
+    local pressure = safe_get(device, "pressure")
+    if pressure ~= nil then snap.pressure = pressure end
+    local power = safe_get(device, "total_active_power")
+    if power ~= nil then snap.total_active_power = power end
+    local energy = safe_get(device, "energy_consumed_total")
+    if energy ~= nil then snap.energy_consumed_total = energy end
+    -- Fan coil fields
+    local work_mode = safe_get(device, "work_mode")
+    if work_mode ~= nil then snap.work_mode = work_mode end
+    local available_work_modes = safe_get(device, "available_work_modes")
+    if available_work_modes ~= nil then snap.available_work_modes = available_work_modes end
+    local working_state = safe_get(device, "working_state")
+    if working_state ~= nil then snap.working_state = working_state end
+    -- Fan coil fan sub-object: {"current_gear", "manual_fan_gear", "mode"}
+    local fan = safe_get(device, "fan")
+    if fan ~= nil then snap.fan = fan end
+    local fan_mode = safe_get(device, "fan_operation_mode")
+    if fan_mode ~= nil then snap.fan_operation_mode = fan_mode end
+    -- Schedule association (thermal schedules)
+    local schedule_id = safe_get(device, "schedule_id")
+    if schedule_id ~= nil then snap.schedule_id = schedule_id end
     return snap
 end
 
@@ -168,12 +218,31 @@ end)
 -- ── Startup: publish all current device states ───────────────────────────────
 
 automation:onEvent("application_initialized", function()
-    -- Virtual devices
-    for id, device in pairs(wtp) do
-        local snap = device_snapshot(device, "wtp")
-        publish("state/" .. tostring(id), snap)
+    -- Virtual devices (thermostats, relays, blinds, dimmers, etc.)
+    if virtual and type(virtual) == "table" then
+        for id, device in pairs(virtual) do
+            local snap = device_snapshot(device, "virtual")
+            publish("state/" .. tostring(id), snap)
+        end
+        print("[Sinapse] Initial virtual device state published")
     end
-    print("[Sinapse] Initial WTP state published")
+    -- WTP devices (sensors, fan coils, regulators, etc.)
+    if wtp and type(wtp) == "table" then
+        for id, device in pairs(wtp) do
+            local snap = device_snapshot(device, "wtp")
+            publish("state/" .. tostring(id), snap)
+        end
+        print("[Sinapse] Initial WTP device state published")
+    end
+    -- SBUS devices (fan coils, sensors, etc.)
+    if sbus and type(sbus) == "table" then
+        for id, device in pairs(sbus) do
+            local snap = device_snapshot(device, "sbus")
+            publish("state/" .. tostring(id), snap)
+        end
+        print("[Sinapse] Initial SBUS device state published")
+    end
+    print("[Sinapse] MQTT bridge startup complete")
 end)
 
-print("[Sinapse] MQTT bridge v0.2 started. Client ID: " .. tostring(CLIENT_ID))
+print("[Sinapse] MQTT bridge v0.3 started. Client ID: " .. tostring(CLIENT_ID))
