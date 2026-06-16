@@ -1,0 +1,7 @@
+{
+  "name": "Sinum (Sinapse)",
+  "render_readme": true,
+  "zip_release": false,
+  "filename": "sinum.zip",
+  "homeassistant": "2024.1.0"
+}

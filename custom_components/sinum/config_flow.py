@@ -1,0 +1,216 @@
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow  # type: ignore[attr-defined]
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .api import SinumAuthError, SinumClient, SinumConnectionError
+from .const import (
+    AUTH_MODE_PASSWORD,
+    AUTH_MODE_TOKEN,
+    CONF_API_TOKEN,
+    CONF_AUTH_MODE,
+    CONF_MQTT_ENABLED,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+STEP_AUTH_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_HOST): str,
+        vol.Required(CONF_AUTH_MODE, default=AUTH_MODE_TOKEN): vol.In(
+            [AUTH_MODE_TOKEN, AUTH_MODE_PASSWORD]
+        ),
+    }
+)
+
+STEP_TOKEN_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_API_TOKEN): str,
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
+            int, vol.Range(min=10, max=300)
+        ),
+    }
+)
+
+STEP_PASSWORD_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_USERNAME): str,
+        vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
+            int, vol.Range(min=10, max=300)
+        ),
+    }
+)
+
+
+class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
+    VERSION = 1
+
+    def __init__(self) -> None:
+        self._host: str = ""
+        self._auth_mode: str = AUTH_MODE_TOKEN
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._host = user_input[CONF_HOST].strip()
+            self._auth_mode = user_input[CONF_AUTH_MODE]
+            if self._auth_mode == AUTH_MODE_TOKEN:
+                return await self.async_step_token()
+            return await self.async_step_password()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=STEP_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={"token_mode": AUTH_MODE_TOKEN, "password_mode": AUTH_MODE_PASSWORD},
+        )
+
+    async def async_step_token(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            token = user_input[CONF_API_TOKEN].strip()
+            client = self._make_client(api_token=token)
+            try:
+                await client.test_connection()
+            except SinumAuthError:
+                errors["base"] = "invalid_auth"
+            except SinumConnectionError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error connecting to Sinum")
+                errors["base"] = "unknown"
+            else:
+                return self._create_entry(
+                    {
+                        CONF_HOST: self._host,
+                        CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+                        CONF_API_TOKEN: token,
+                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    }
+                )
+
+        return self.async_show_form(
+            step_id="token",
+            data_schema=STEP_TOKEN_SCHEMA,
+            errors=errors,
+            description_placeholders={"host": self._host},
+        )
+
+    async def async_step_password(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = self._make_client(
+                username=user_input[CONF_USERNAME],
+                password=user_input[CONF_PASSWORD],
+            )
+            try:
+                await client.login()
+                await client.test_connection()
+            except SinumAuthError:
+                errors["base"] = "invalid_auth"
+            except SinumConnectionError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error connecting to Sinum")
+                errors["base"] = "unknown"
+            else:
+                return self._create_entry(
+                    {
+                        CONF_HOST: self._host,
+                        CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
+                        CONF_USERNAME: user_input[CONF_USERNAME],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    }
+                )
+
+        return self.async_show_form(
+            step_id="password",
+            data_schema=STEP_PASSWORD_SCHEMA,
+            errors=errors,
+            description_placeholders={"host": self._host},
+        )
+
+    def _create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
+        unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
+        self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=f"Sinum ({self._host})", data=data)
+
+    def _make_client(self, **kwargs: Any) -> SinumClient:
+        session = async_get_clientsession(self.hass, verify_ssl=False)
+        return SinumClient(self._host, session, **kwargs)
+
+    # ----------------------------------------------------------------- reauth
+
+    @staticmethod
+    def async_get_options_flow(config_entry: Any) -> "SinumOptionsFlow":
+        return SinumOptionsFlow(config_entry)
+
+    # ----------------------------------------------------------------- reauth
+
+    async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        entry = self._get_reauth_entry()
+        auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_PASSWORD)
+        schema = STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
+
+        if user_input is not None:
+            self._host = entry.data[CONF_HOST]
+            if auth_mode == AUTH_MODE_TOKEN:
+                client = self._make_client(api_token=user_input[CONF_API_TOKEN])
+            else:
+                client = self._make_client(
+                    username=user_input[CONF_USERNAME],
+                    password=user_input[CONF_PASSWORD],
+                )
+            try:
+                await client.test_connection()
+            except SinumAuthError:
+                errors["base"] = "invalid_auth"
+            except SinumConnectionError:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_update_reload_and_abort(entry, data={**entry.data, **user_input})
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=schema,
+            errors=errors,
+        )
+
+
+class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
+    """Options flow: change scan interval and MQTT toggle."""
+
+    def __init__(self, config_entry: Any) -> None:
+        self._entry = config_entry
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        current_interval = self._entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_mqtt = self._entry.data.get(CONF_MQTT_ENABLED, False)
+
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_SCAN_INTERVAL, default=current_interval): vol.All(
+                    int, vol.Range(min=10, max=300)
+                ),
+                vol.Optional(CONF_MQTT_ENABLED, default=current_mqtt): bool,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

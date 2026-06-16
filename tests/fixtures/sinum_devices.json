@@ -1,0 +1,113 @@
+{
+  "rooms": [
+    {
+      "id": 1,
+      "name": "Living Room",
+      "devices": [
+        {"id": 10, "name": "Thermostat", "class": "virtual"},
+        {"id": 11, "name": "Ceiling Light", "class": "virtual"},
+        {"id": 20, "name": "Temp Sensor", "class": "wtp"},
+        {"id": 21, "name": "Motion", "class": "wtp"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Kitchen",
+      "devices": [
+        {"id": 12, "name": "Relay", "class": "virtual"},
+        {"id": 13, "name": "Blind", "class": "virtual"}
+      ]
+    }
+  ],
+  "virtual_thermostat": {
+    "id": 10,
+    "name": "Thermostat",
+    "type": "thermostat",
+    "state": true,
+    "mode": "heating",
+    "temperature": 215,
+    "target_temperature": 220,
+    "humidity": 450,
+    "room_id": 1,
+    "class": "virtual"
+  },
+  "virtual_light": {
+    "id": 11,
+    "name": "Ceiling Light",
+    "type": "dimmer_rgb_controller_integrator",
+    "state": true,
+    "brightness": 80,
+    "led_color": "#FF8800",
+    "white_temperature": 4000,
+    "color_mode": "rgb",
+    "room_id": 1,
+    "class": "virtual"
+  },
+  "virtual_relay": {
+    "id": 12,
+    "name": "Relay",
+    "type": "relay_integrator",
+    "state": false,
+    "room_id": 2,
+    "class": "virtual"
+  },
+  "virtual_blind": {
+    "id": 13,
+    "name": "Blind",
+    "type": "blind_controller_integrator",
+    "state": false,
+    "last_set_target_opening": 75,
+    "last_set_target_tilt": 30,
+    "action_in_progress": false,
+    "room_id": 2,
+    "class": "virtual"
+  },
+  "wtp_temp": {
+    "id": 20,
+    "name": "Temp Sensor",
+    "type": "temperature_sensor",
+    "temperature": 213,
+    "humidity": 480,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "wtp_motion": {
+    "id": 21,
+    "name": "Motion",
+    "type": "motion_sensor",
+    "state": false,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "scenes": [
+    {"id": 1, "name": "Good Morning"},
+    {"id": 2, "name": "Good Night"}
+  ],
+  "variables": [
+    {"id": 1, "name": "brightness_level", "value": 50, "type": "number"},
+    {"id": 2, "name": "mode", "value": 1, "type": "number"}
+  ],
+  "weather": {
+    "temperature": 185,
+    "humidity": 620,
+    "pressure": 10130,
+    "wind_speed": 35,
+    "wind_degrees": 270,
+    "uv_index": 3,
+    "solar_irradiance": 450,
+    "cloud_coverage": 40
+  },
+  "energy": {
+    "consumption": 1230,
+    "production": 800,
+    "storage": 500
+  },
+  "alarm_devices": [
+    {
+      "id": 1,
+      "name": "Main Alarm",
+      "type": "virtual_alarm",
+      "state": "disarmed"
+    }
+  ]
+}

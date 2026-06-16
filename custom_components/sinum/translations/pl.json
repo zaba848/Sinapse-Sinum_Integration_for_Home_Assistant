@@ -1,0 +1,112 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Połącz z centralą Sinum",
+        "description": "Podaj adres IP lub nazwę hosta centrali Sinum EH-01 i wybierz metodę uwierzytelniania.",
+        "data": {
+          "host": "Adres IP lub nazwa hosta",
+          "auth_mode": "Metoda uwierzytelniania"
+        },
+        "data_description": {
+          "auth_mode": "**Token API** (zalecane) — bezpieczniejszy, nie wymaga hasła. Utwórz token w aplikacji Sinum. **Hasło** — standardowe logowanie login + hasło."
+        }
+      },
+      "token": {
+        "title": "Token API Sinum",
+        "description": "Utwórz statyczny token API w aplikacji Sinum (Ustawienia → Integracje → Tokeny API) i wklej go poniżej.",
+        "data": {
+          "api_token": "Token API",
+          "scan_interval": "Interwał odświeżania (sekundy)"
+        }
+      },
+      "password": {
+        "title": "Dane logowania Sinum",
+        "description": "Podaj dane logowania do centrali Sinum.",
+        "data": {
+          "username": "Nazwa użytkownika",
+          "password": "Hasło",
+          "scan_interval": "Interwał odświeżania (sekundy)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne uwierzytelnienie Sinum",
+        "description": "Zaktualizuj dane uwierzytelniania do centrali Sinum.",
+        "data": {
+          "api_token": "Token API",
+          "username": "Nazwa użytkownika",
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się z centralą. Sprawdź adres IP i dostępność w sieci.",
+      "invalid_auth": "Nieprawidłowy token lub dane logowania.",
+      "unknown": "Wystąpił nieoczekiwany błąd."
+    },
+    "abort": {
+      "already_configured": "Ta centrala Sinum jest już skonfigurowana."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje integracji Sinum",
+        "data": {
+          "scan_interval": "Interwał odświeżania (sekundy)",
+          "mqtt_enabled": "Włącz transport MQTT (real-time)"
+        },
+        "data_description": {
+          "mqtt_enabled": "Wymaga skryptu Lua na centrali i działającego brokera MQTT w Home Assistant."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "parent_online": {
+        "name": "Online",
+        "state": {
+          "on": "Online",
+          "off": "Offline"
+        }
+      },
+      "parent_problem": {
+        "name": "Problem",
+        "state": {
+          "on": "Problem",
+          "off": "OK"
+        }
+      }
+    },
+    "sensor": {
+      "hub_uptime": {
+        "name": "Czas pracy"
+      },
+      "hub_wifi_signal": {
+        "name": "Sygnał Wi-Fi"
+      }
+    },
+    "update": {
+      "parent_firmware": {
+        "name": "Oprogramowanie"
+      }
+    }
+  },
+  "services": {
+    "send_notification": {
+      "name": "Wyślij powiadomienie",
+      "description": "Wysyła powiadomienie push przez centralę Sinum do aplikacji mobilnej.",
+      "fields": {
+        "title": {
+          "name": "Tytuł",
+          "description": "Tytuł powiadomienia."
+        },
+        "message": {
+          "name": "Wiadomość",
+          "description": "Treść powiadomienia."
+        }
+      }
+    }
+  }
+}

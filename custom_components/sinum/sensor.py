@@ -1,0 +1,569 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Any
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import (
+    CONCENTRATION_PARTS_PER_MILLION,
+    DEGREE,
+    LIGHT_LUX,
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfEnergy,
+    UnitOfIrradiance,
+    UnitOfPower,
+    UnitOfPressure,
+    UnitOfSpeed,
+    UnitOfTemperature,
+    UnitOfTime,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from . import SinumConfigEntry
+from .api import SinumConnectionError
+from .const import DOMAIN
+from .coordinator import SinumCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, kw_only=True)
+class SinumSensorDescription(SensorEntityDescription):
+    api_key: str
+    scale: float = 1.0
+    source: str = "virtual"
+
+
+# ── Virtual thermostat sensors ─────────────────────────────────────────────────
+
+VIRTUAL_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="temperature",
+        api_key="temperature",
+        source="virtual",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="humidity",
+        api_key="humidity",
+        source="virtual",
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.1,
+        suggested_display_precision=0,
+    ),
+)
+
+# ── WTP device sensors ─────────────────────────────────────────────────────────
+
+WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="temperature",
+        api_key="temperature",
+        source="wtp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="humidity",
+        api_key="humidity",
+        source="wtp",
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.1,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="co2",
+        api_key="co2",
+        source="wtp",
+        device_class=SensorDeviceClass.CO2,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="pm1",
+        api_key="pm1",
+        source="wtp",
+        device_class=SensorDeviceClass.PM1,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="µg/m³",
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="pm25",
+        api_key="pm25",
+        source="wtp",
+        device_class=SensorDeviceClass.PM25,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="µg/m³",
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="pm10",
+        api_key="pm10",
+        source="wtp",
+        device_class=SensorDeviceClass.PM10,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="µg/m³",
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="illuminance",
+        api_key="illuminance",
+        source="wtp",
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=LIGHT_LUX,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="pressure",
+        api_key="pressure",
+        source="wtp",
+        device_class=SensorDeviceClass.PRESSURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPressure.HPA,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="total_active_power",
+        api_key="total_active_power",
+        source="wtp",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="energy_consumed_total",
+        api_key="energy_consumed_total",
+        source="wtp",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+    ),
+)
+
+# ── SBUS device sensors ────────────────────────────────────────────────────────
+
+SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="temperature",
+        api_key="temperature",
+        source="sbus",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="humidity",
+        api_key="humidity",
+        source="sbus",
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.1,
+        suggested_display_precision=0,
+    ),
+)
+
+# ── Weather sensors ────────────────────────────────────────────────────────────
+
+WEATHER_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="weather_temperature",
+        api_key="temperature",
+        source="weather",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="weather_temperature",
+    ),
+    SinumSensorDescription(
+        key="weather_humidity",
+        api_key="humidity",
+        source="weather",
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.1,
+        suggested_display_precision=0,
+        translation_key="weather_humidity",
+    ),
+    SinumSensorDescription(
+        key="weather_pressure",
+        api_key="pressure",
+        source="weather",
+        device_class=SensorDeviceClass.PRESSURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPressure.HPA,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="weather_pressure",
+    ),
+    SinumSensorDescription(
+        key="weather_wind_speed",
+        api_key="wind_speed",
+        source="weather",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="weather_wind_speed",
+    ),
+    SinumSensorDescription(
+        key="weather_uv_index",
+        api_key="uv_index",
+        source="weather",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="UV index",
+        icon="mdi:sun-wireless",
+        translation_key="weather_uv_index",
+    ),
+    SinumSensorDescription(
+        key="weather_solar_irradiance",
+        api_key="solar_irradiance",
+        source="weather",
+        device_class=SensorDeviceClass.IRRADIANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfIrradiance.WATTS_PER_SQUARE_METER,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="weather_solar_irradiance",
+    ),
+    SinumSensorDescription(
+        key="weather_cloud_coverage",
+        api_key="cloud_coverage",
+        source="weather",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        icon="mdi:cloud-percent",
+        translation_key="weather_cloud_coverage",
+    ),
+    SinumSensorDescription(
+        key="weather_wind_degrees",
+        api_key="wind_degrees",
+        source="weather",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=DEGREE,
+        icon="mdi:compass",
+        translation_key="weather_wind_degrees",
+    ),
+)
+
+# ── Energy Center sensors ──────────────────────────────────────────────────────
+
+ENERGY_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="energy_consumption",
+        api_key="consumption",
+        source="energy",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumption",
+    ),
+    SinumSensorDescription(
+        key="energy_production",
+        api_key="production",
+        source="energy",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_production",
+    ),
+    SinumSensorDescription(
+        key="energy_storage",
+        api_key="storage",
+        source="energy",
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_storage",
+    ),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: SinumConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    coordinator: SinumCoordinator = entry.runtime_data
+    entities: list[SensorEntity] = []
+
+    # Virtual thermostat sensors
+    for device_id, device in coordinator.virtual_devices.items():
+        for desc in VIRTUAL_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+
+    # WTP device sensors
+    for device_id, device in coordinator.wtp_devices.items():
+        for desc in WTP_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+
+    # SBUS device sensors
+    for device_id, device in coordinator.sbus_devices.items():
+        for desc in SBUS_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+
+    # Weather sensors (best-effort)
+    try:
+        weather = await coordinator.client.get_weather()
+        for desc in WEATHER_SENSORS:
+            if desc.api_key in weather:
+                entities.append(SinumWeatherSensor(coordinator.client, weather, desc, entry.entry_id))
+    except SinumConnectionError:
+        _LOGGER.debug("Weather endpoint not available on this hub")
+
+    # Energy Center sensors (best-effort)
+    try:
+        energy = await coordinator.client.get_energy()
+        for desc in ENERGY_SENSORS:
+            if desc.api_key in energy:
+                entities.append(SinumEnergySensor(coordinator.client, energy, desc, entry.entry_id))
+    except SinumConnectionError:
+        _LOGGER.debug("Energy endpoint not available on this hub")
+
+    # Hub diagnostic sensors (from /api/v1/info — always available)
+    if coordinator.hub_info:
+        entities.append(SinumHubUptimeSensor(coordinator, entry.entry_id))
+        # Wi-Fi sensor requires sinapse_api.lua Lua extension (optional)
+        wifi = coordinator.hub_info.get("wifi", {})
+        if isinstance(wifi, dict) and wifi.get("signal") is not None:
+            entities.append(SinumHubWifiSensor(coordinator, entry.entry_id))
+
+    async_add_entities(entities)
+
+
+# ── Entity classes ─────────────────────────────────────────────────────────────
+
+class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+    entity_description: SinumSensorDescription
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        description: SinumSensorDescription,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._source = description.source
+        self.entity_description = description
+        self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
+
+        device = self._get_device_dict(coordinator)
+        room = device.get("_room", "")
+        name = device.get("_device_name", str(device_id))
+        label = f"{room} {name}".strip() if room else name
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model=_model_for_source(self._source),
+            suggested_area=device.get("_area") or None,
+        )
+
+    def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
+        if self._source == "virtual":
+            return coordinator.virtual_devices.get(self._device_id, {})
+        if self._source == "sbus":
+            return coordinator.sbus_devices.get(self._device_id, {})
+        return coordinator.wtp_devices.get(self._device_id, {})
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self._get_device_dict(self.coordinator)
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._device.get(self.entity_description.api_key)
+        if raw is None:
+            return None
+        return raw * self.entity_description.scale
+
+
+def _model_for_source(source: str) -> str:
+    if source == "virtual":
+        return "Sinum Virtual Device"
+    if source == "sbus":
+        return "Sinum SBUS Sensor"
+    return "Sinum WTP Sensor"
+
+
+class SinumWeatherSensor(SensorEntity):
+    """Weather sensor — polled once at startup; not coordinator-backed (hub fetches from API)."""
+
+    _attr_has_entity_name = True
+    entity_description: SinumSensorDescription
+
+    def __init__(self, client: Any, initial: dict[str, Any], description: SinumSensorDescription, entry_id: str) -> None:
+        self._client = client
+        self._data = initial
+        self.entity_description = description
+        self._attr_unique_id = f"{entry_id}_weather_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_weather")},
+            name="Sinum Weather",
+            manufacturer="TECH Sterowniki",
+            model="Sinum EH-01 Weather",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._data.get(self.entity_description.api_key)
+        if raw is None:
+            return None
+        return raw * self.entity_description.scale
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._client.get_weather()
+        except SinumConnectionError as err:
+            _LOGGER.warning("Weather update failed: %s", err)
+
+
+class SinumEnergySensor(SensorEntity):
+    """Energy Center sensor."""
+
+    _attr_has_entity_name = True
+    entity_description: SinumSensorDescription
+
+    def __init__(self, client: Any, initial: dict[str, Any], description: SinumSensorDescription, entry_id: str) -> None:
+        self._client = client
+        self._data = initial
+        self.entity_description = description
+        self._attr_unique_id = f"{entry_id}_energy_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_energy")},
+            name="Sinum Energy Center",
+            manufacturer="TECH Sterowniki",
+            model="Sinum EH-01 Energy",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._data.get(self.entity_description.api_key)
+        if raw is None:
+            return None
+        return raw * self.entity_description.scale
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._client.get_energy()
+        except SinumConnectionError as err:
+            _LOGGER.warning("Energy update failed: %s", err)
+
+
+# ── Hub diagnostic sensors ─────────────────────────────────────────────────────
+
+def _hub_device_info(entry_id: str, hub_info: dict[str, Any]) -> DeviceInfo:
+    # device_type field: "sinum", "sinum_pro", "sinum_lite" or similar
+    device_type = hub_info.get("device_type", "")
+    name = hub_info.get("name", "Sinum Hub")
+    model_map = {
+        "sinum_pro": "Sinum Pro",
+        "sinum_lite": "Sinum Lite",
+        "sinum": "Sinum EH-01",
+    }
+    model = model_map.get(device_type, "Sinum EH-01")
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_hub")},
+        name=name or "Sinum Hub",
+        manufacturer="TECH Sterowniki",
+        model=model,
+        sw_version=hub_info.get("version"),
+        hw_version=hub_info.get("uid"),
+        configuration_url=f"http://{hub_info.get('ip', '')}" if hub_info.get("ip") else None,
+    )
+
+
+class SinumHubUptimeSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    """Hub uptime sensor — seconds since last reboot."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "hub_uptime"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:timer-outline"
+
+    def __init__(self, coordinator: SinumCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_hub_uptime"
+        self._attr_device_info = _hub_device_info(entry_id, coordinator.hub_info)
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.hub_info.get("uptime")
+
+
+class SinumHubWifiSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    """Hub Wi-Fi signal strength sensor."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "hub_wifi_signal"
+    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SinumCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_hub_wifi_signal"
+        self._attr_device_info = _hub_device_info(entry_id, coordinator.hub_info)
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.hub_info.get("wifi", {}).get("signal")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        wifi = self.coordinator.hub_info.get("wifi", {})
+        attrs: dict[str, Any] = {}
+        if ssid := wifi.get("ssid"):
+            attrs["ssid"] = ssid
+        if ip := wifi.get("ip"):
+            attrs["ip"] = ip
+        return attrs
