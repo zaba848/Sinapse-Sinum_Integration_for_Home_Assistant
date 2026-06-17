@@ -72,7 +72,7 @@ local OPTIONAL_FIELDS = {
 
 local client = mqtt_client[CLIENT_ID]
 
-print("[Sinapse] MQTT bridge v0.7 started. Creator: zaba848. Client ID: " .. tostring(CLIENT_ID))
+-- print("[Sinapse] MQTT bridge ID: " .. tostring(CLIENT_ID))
 
 local function safe_get(obj, key)
     local ok, val = pcall(function() return obj:getValue(key) end)

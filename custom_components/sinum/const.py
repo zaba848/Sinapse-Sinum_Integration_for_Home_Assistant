@@ -71,6 +71,9 @@ WTYPE_MOTION_SENSOR = "motion_sensor"
 WTYPE_OPENING_SENSOR = "opening_sensor"
 WTYPE_SMOKE_SENSOR = "smoke_sensor"
 WTYPE_TWO_STATE_INPUT_SENSOR = "two_state_input_sensor"
+WTYPE_TEMPERATURE_REGULATOR = "temperature_regulator"
+WTYPE_FAN_COIL = "fan_coil"
+WTYPE_FAN_COIL_V2 = "fan_coil_v2"
 
 # ── SBUS device types ──────────────────────────────────────────────────────────
 STYPE_FAN_COIL = "fan_coil"

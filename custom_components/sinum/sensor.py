@@ -368,6 +368,16 @@ async def async_setup_entry(
         if isinstance(wifi, dict) and wifi.get("signal") is not None:
             entities.append(SinumHubWifiSensor(coordinator, entry.entry_id))
 
+    # Thermal schedule sensors are coordinator-backed, so values refresh with polling/MQTT updates.
+    for schedule in coordinator.schedules:
+        schedule_id = schedule.get("id")
+        if schedule_id is None:
+            continue
+        entities.append(SinumScheduleTargetTempSensor(coordinator, schedule, entry.entry_id))
+        entities.append(SinumScheduleFallbackTempSensor(coordinator, schedule, entry.entry_id))
+        entities.append(SinumScheduleActivePeriodSensor(coordinator, schedule, entry.entry_id))
+        entities.append(SinumScheduleAssociationCountSensor(coordinator, schedule, entry.entry_id))
+
     async_add_entities(entities)
 
 
@@ -567,3 +577,190 @@ class SinumHubWifiSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         if ip := wifi.get("ip"):
             attrs["ip"] = ip
         return attrs
+
+
+# ── Schedule sensors ──────────────────────────────────────────────────────────
+
+class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    """Base class for coordinator-backed schedule sensors."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        schedule: dict[str, Any],
+        entry_id: str,
+        unique_suffix: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._initial_schedule = schedule
+        self._schedule_id = schedule.get("id")
+        self._attr_unique_id = f"{entry_id}_schedule_{self._schedule_id}_{unique_suffix}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"schedule_{self._schedule_id}_{entry_id}")},
+            name=f"Sinum Schedule {schedule.get('name', self._schedule_id)}",
+            manufacturer="TECH Sterowniki",
+            model="Thermal Schedule",
+        )
+
+    @property
+    def _schedule(self) -> dict[str, Any]:
+        schedules = getattr(self.coordinator, "schedules", [])
+        for schedule in schedules:
+            if str(schedule.get("id")) == str(self._schedule_id):
+                return schedule
+        return self._initial_schedule
+
+
+class SinumScheduleTargetTempSensor(SinumScheduleSensor):
+    """Current target temperature from schedule."""
+
+    _attr_name = "Current Target Temperature"
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:thermometer"
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        schedule: dict[str, Any],
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, schedule, entry_id, "target_temp")
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._schedule.get("current_target_temperature")
+        return raw / 10 if raw is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "schedule_id": self._schedule.get("id"),
+            "schedule_name": self._schedule.get("name"),
+            "modes": self._schedule.get("modes", []),
+        }
+
+
+class SinumScheduleFallbackTempSensor(SinumScheduleSensor):
+    """Fallback temperature for schedule."""
+
+    _attr_name = "Fallback Temperature"
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:thermometer-low"
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        schedule: dict[str, Any],
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, schedule, entry_id, "fallback_temp")
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._schedule.get("fallback")
+        return raw / 10 if raw is not None else None
+
+
+class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
+    """Active schedule period (current time entry)."""
+
+    _attr_name = "Active Period"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        schedule: dict[str, Any],
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, schedule, entry_id, "active_period")
+
+    @property
+    def native_value(self) -> str:
+        """Return 'Active' if in scheduled period, else 'Fallback'."""
+        from datetime import datetime
+
+        now = datetime.now()
+        current_minutes = now.hour * 60 + now.minute
+        weekday_names = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        weekday = weekday_names[now.weekday()]
+
+        day_schedule = self._schedule.get(weekday, [])
+        for entry in day_schedule:
+            if entry.get("start", 0) <= current_minutes < entry.get("end", 0):
+                return "Active"
+
+        return "Fallback"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        from datetime import datetime
+
+        now = datetime.now()
+        weekday_names = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        weekday = weekday_names[now.weekday()]
+        day_schedule = self._schedule.get(weekday, [])
+
+        return {
+            "entries_today": len(day_schedule),
+            "schedule_entries": [
+                {
+                    "start": e.get("start"),
+                    "end": e.get("end"),
+                    "target_temp": e.get("target_temperature", 0) / 10,
+                }
+                for e in day_schedule
+            ],
+        }
+
+
+class SinumScheduleAssociationCountSensor(SinumScheduleSensor):
+    """Count of devices associated with schedule."""
+
+    _attr_name = "Associated Devices"
+    _attr_icon = "mdi:link"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        schedule: dict[str, Any],
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, schedule, entry_id, "assoc_count")
+
+    @property
+    def native_value(self) -> int:
+        """Return count of associated thermostats and fan coils."""
+        assoc = self._schedule.get("associations", {})
+        return len(assoc.get("thermostats", [])) + len(assoc.get("fan_coils", []))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        assoc = self._schedule.get("associations", {})
+        return {
+            "thermostats": assoc.get("thermostats", []),
+            "fan_coils": assoc.get("fan_coils", []),
+        }

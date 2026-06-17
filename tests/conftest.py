@@ -49,6 +49,7 @@ def fixture_mock_client(fixtures: dict[str, Any]) -> MagicMock:
     client.set_variable = AsyncMock(return_value={"id": 1, "value": 50})
     client.get_weather = AsyncMock(return_value=fixtures["weather"])
     client.get_energy = AsyncMock(return_value=fixtures["energy"])
+    client.get_schedules = AsyncMock(return_value=fixtures["schedules"])
     client.get_alarm_devices = AsyncMock(return_value=fixtures["alarm_devices"])
     client.login = AsyncMock(return_value=None)
     client.test_connection = AsyncMock(return_value=None)

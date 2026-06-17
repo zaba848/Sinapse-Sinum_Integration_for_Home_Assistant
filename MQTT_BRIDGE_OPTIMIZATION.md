@@ -48,7 +48,7 @@ if event.type == "minute_changed" then
     publish("event/heartbeat", ...)
 ```
 
-**After v0.6:**
+**After optimized bridge:**
 ```lua
 local EVENTS = { INIT = "application_initialized", CHANGE = "device_state_changed", TICK = "minute_changed" }
 local TOPICS = { STATE = "state", HB = "event/heartbeat" }
@@ -77,7 +77,7 @@ if humidity ~= nil then snap.humidity = humidity end
 -- ... repeated 6 more times
 ```
 
-**After v0.6:**
+**After optimized bridge:**
 ```lua
 local OPTIONAL_FIELDS = {
     "temperature", "target_temperature", "humidity", "mode",
@@ -118,7 +118,7 @@ if sbus then
     -- ... identical block
 ```
 
-**After v0.6:**
+**After optimized bridge:**
 ```lua
 local CONTAINERS = { { "virtual", virtual }, { "wtp", wtp }, { "sbus", sbus } }
 
@@ -149,7 +149,7 @@ end
 print("[Sinapse] Initial device snapshots published")
 ```
 
-**After v0.6:**
+**After optimized bridge:**
 ```lua
 print("[Sinapse] Published 5 virtual, 12 wtp, 3 sbus devices")
 ```
@@ -163,7 +163,7 @@ print("[Sinapse] Published 5 virtual, 12 wtp, 3 sbus devices")
 
 ## Code Metrics
 
-| Metric | v0.5 | v0.6 | Change |
+| Metric | v0.5 | v0.7.1 | Change |
 |--------|------|------|--------|
 | **Lines of code** | 115 | 96 | -17% |
 | **Magic strings** | 7 | 0 | ✅ Eliminated |
@@ -228,7 +228,7 @@ work_mode, available_work_modes, working_state, fan, schedule_id
 
 ## Next Steps (Phase 7E Quality Gate)
 
-1. Upload v0.6 to Sinum hub automation #7
+1. Upload v0.7.1 to Sinum hub automation #7
 2. Monitor MQTT broker: `mosquitto_sub -t 'sinum/#'`
 3. Check HA logs for successful message parsing
 4. Run pytest for Python integration tests
@@ -239,18 +239,18 @@ work_mode, available_work_modes, working_state, fan, schedule_id
 
 ## Rollback Plan
 
-If v0.6 causes issues:
+If v0.7.1 causes issues:
 ```bash
-git revert --no-edit ade5fd4
+restore the previously deployed bridge script from the hub backup or git history
 ```
 
-Then upload previous v0.5 to hub.
+Then upload the previous known-good bridge script to the hub.
 
 ---
 
 ## Code Quality Summary
 
-**v0.6 achieves:**
+**v0.7.1 achieves:**
 - ✅ Zero magic strings
 - ✅ No code duplication (DRY)
 - ✅ Generic device extraction (future-proof)

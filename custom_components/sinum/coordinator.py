@@ -36,6 +36,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.floors: dict[int, dict[str, Any]] = {}       # floor_id → {id, name, level}
         self.hub_info: dict[str, Any] = {}                # from /api/v1/info
         self.parent_devices: list[dict[str, Any]] = []    # flat list from /api/v1/parent-devices
+        self.schedules: list[dict[str, Any]] = []         # thermal schedules from /api/v1/schedules
         self.mqtt_bridge: Any | None = None               # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -72,6 +73,12 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except SinumConnectionError as err:
             _LOGGER.debug("Failed to fetch parent devices: %s", err)
 
+        # ── Thermal schedules (/api/v1/schedules) ────────────────────────────
+        try:
+            self.schedules = await self.client.get_schedules()
+        except SinumConnectionError as err:
+            _LOGGER.debug("Failed to fetch schedules: %s", err)
+
         # ── Classify device IDs from rooms (fallback for older firmware) ──────
         virtual_ids, wtp_ids, sbus_ids = _collect_device_ids(rooms)
 
@@ -103,7 +110,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.virtual_devices = virtual
         self.wtp_devices = wtp
         self.sbus_devices = sbus
-        return {"virtual": virtual, "wtp": wtp, "sbus": sbus}
+        return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "schedules": self.schedules}
 
     async def _fetch_device_collection(
         self,

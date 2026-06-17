@@ -52,6 +52,11 @@ SinumConfigEntry = ConfigEntry[SinumCoordinator]
 _MQTT_BRIDGES: dict[str, SinumMqttBridge] = {}
 
 
+async def _async_update_listener(hass: HomeAssistant, entry: SinumConfigEntry) -> None:
+    """Reload the integration when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 def _build_client(hass: HomeAssistant, entry: SinumConfigEntry) -> SinumClient:
     session = async_get_clientsession(hass, verify_ssl=False)
     auth_mode = entry.data.get(CONF_AUTH_MODE, "password")
@@ -87,9 +92,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
     # Start MQTT bridge if enabled
     if opts.get(CONF_MQTT_ENABLED, False):
         bridge = SinumMqttBridge(hass, coordinator)
-        await bridge.async_start()
-        _MQTT_BRIDGES[entry.entry_id] = bridge
-        coordinator.mqtt_bridge = bridge
+        if await bridge.async_start():
+            _MQTT_BRIDGES[entry.entry_id] = bridge
+            coordinator.mqtt_bridge = bridge
+
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     # Push notification service
     async def handle_send_notification(call: ServiceCall) -> None:

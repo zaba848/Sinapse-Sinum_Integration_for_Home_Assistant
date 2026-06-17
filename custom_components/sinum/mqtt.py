@@ -4,13 +4,12 @@ When configured, this module:
   - Subscribes to sinum/state/# and sinum/event/#
   - Updates coordinator data in-place on each incoming message
   - Triggers entity state refresh without waiting for the poll cycle
-  - Publishes commands to sinum/cmd/{device_id} instead of REST PATCH
+  - Keeps device commands on REST PATCH until MQTT write payloads are verified
 
 Topic schema
 ------------
 sinum/state/<device_id>     Device state JSON  (Sinum → HA)
 sinum/event/<type>          Hub event JSON     (Sinum → HA)
-sinum/cmd/<device_id>       Command JSON       (HA → Sinum)
 """
 from __future__ import annotations
 
@@ -39,11 +38,11 @@ class SinumMqttBridge:
         self._coordinator = coordinator
         self._unsub: list[Any] = []
 
-    async def async_start(self) -> None:
+    async def async_start(self) -> bool:
         """Subscribe to Sinum MQTT topics."""
         if not await mqtt.async_wait_for_mqtt_client(self._hass):
             _LOGGER.warning("MQTT client not available — real-time updates disabled")
-            return
+            return False
 
         self._unsub.append(
             await mqtt.async_subscribe(self._hass, TOPIC_STATE, self._handle_state)
@@ -52,6 +51,7 @@ class SinumMqttBridge:
             await mqtt.async_subscribe(self._hass, TOPIC_EVENT, self._handle_event)
         )
         _LOGGER.info("Sinapse MQTT bridge active — subscribed to sinum/#")
+        return True
 
     async def async_stop(self) -> None:
         """Unsubscribe from all MQTT topics."""
@@ -76,12 +76,15 @@ class SinumMqttBridge:
             return
 
         source = payload.get("source", "virtual")
-        if source == "wtp":
-            store = self._coordinator.wtp_devices
-        elif source == "sbus":
-            store = self._coordinator.sbus_devices
-        else:
-            store = self._coordinator.virtual_devices
+        stores = {
+            "virtual": self._coordinator.virtual_devices,
+            "wtp": self._coordinator.wtp_devices,
+            "sbus": self._coordinator.sbus_devices,
+        }
+        store = stores.get(source)
+        if store is None:
+            _LOGGER.debug("Ignoring MQTT state for unsupported source %s: %s", source, payload)
+            return
 
         if device_id in store:
             store[device_id].update(payload)
@@ -116,7 +119,7 @@ class SinumMqttBridge:
         _LOGGER.debug("MQTT event: sinum_%s → %s", event_type, payload)
 
     async def async_publish_command(self, device_id: int, payload: dict[str, Any]) -> None:
-        """Publish a device command to sinum/cmd/<device_id>."""
+        """Publish a device command to sinum/cmd/<device_id> when command transport is enabled."""
         topic = TOPIC_CMD.format(device_id=device_id)
         await mqtt.async_publish(
             self._hass,

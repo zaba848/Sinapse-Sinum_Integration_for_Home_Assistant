@@ -1,1 +1,6 @@
+# Local planning notes stay out of the repository.
 /PLAN.md
+
+__pycache__/
+*.py[cod]
+.vscode/

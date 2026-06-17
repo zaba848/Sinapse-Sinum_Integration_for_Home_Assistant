@@ -54,7 +54,11 @@ class TestSinumCoordinator:
     def _make_coordinator(self, mock_client):
         hass = MagicMock()
         hass.loop = MagicMock()
-        return SinumCoordinator(hass, mock_client, scan_interval=30)
+        hass.config_entries = MagicMock()
+        # Suppress HA frame/ContextVar check in newer HA versions
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            coordinator = SinumCoordinator(hass, mock_client, scan_interval=30)
+        return coordinator
 
     @pytest.mark.asyncio
     async def test_update_populates_virtual_and_wtp(self, mock_client):
@@ -65,8 +69,43 @@ class TestSinumCoordinator:
         assert 10 in data["virtual"]
         assert 20 in data["wtp"]
         assert data["sbus"] == {}
+        assert data["schedules"] == FIXTURES["schedules"]
+        assert coordinator.schedules == FIXTURES["schedules"]
         assert data["virtual"][10]["type"] == "thermostat"
         assert data["wtp"][20]["type"] == "temperature_sensor"
+
+    @pytest.mark.asyncio
+    async def test_full_collections_include_devices_not_assigned_to_rooms(self, mock_client):
+        unassigned = {
+            "id": 99,
+            "name": "Unassigned Relay",
+            "type": "relay_integrator",
+            "state": True,
+            "class": "virtual",
+        }
+        mock_client.get_virtual_devices = AsyncMock(
+            return_value=[dict(FIXTURES["virtual_thermostat"]), unassigned]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+
+        assert 99 in data["virtual"]
+        assert data["virtual"][99]["_room"] == ""
+        assert data["virtual"][99]["_device_name"] == "Unassigned Relay"
+        mock_client.get_virtual_device.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sbus_collection_is_discovered_even_without_room_reference(self, mock_client):
+        mock_client.get_sbus_devices = AsyncMock(
+            return_value=[dict(FIXTURES["sbus_temperature_sensor"])]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+
+        assert 30 in data["sbus"]
+        assert data["sbus"][30]["type"] == "temperature_sensor"
 
     @pytest.mark.asyncio
     async def test_update_injects_room_and_name_keys(self, mock_client):

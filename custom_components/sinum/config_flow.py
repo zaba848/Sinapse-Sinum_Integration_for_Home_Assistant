@@ -89,7 +89,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error connecting to Sinum")
                 errors["base"] = "unknown"
             else:
-                return self._create_entry(
+                return await self._create_entry(
                     {
                         CONF_HOST: self._host,
                         CONF_AUTH_MODE: AUTH_MODE_TOKEN,
@@ -123,7 +123,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error connecting to Sinum")
                 errors["base"] = "unknown"
             else:
-                return self._create_entry(
+                return await self._create_entry(
                     {
                         CONF_HOST: self._host,
                         CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
@@ -140,9 +140,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._host},
         )
 
-    def _create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
+    async def _create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
         unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
-        self.async_set_unique_id(unique_id)
+        await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title=f"Sinum ({self._host})", data=data)
 
@@ -199,8 +199,14 @@ class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
         self._entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        current_interval = self._entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        current_mqtt = self._entry.data.get(CONF_MQTT_ENABLED, False)
+        current_interval = self._entry.options.get(
+            CONF_SCAN_INTERVAL,
+            self._entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        )
+        current_mqtt = self._entry.options.get(
+            CONF_MQTT_ENABLED,
+            self._entry.data.get(CONF_MQTT_ENABLED, False),
+        )
 
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)

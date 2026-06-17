@@ -1,6 +1,7 @@
 """Tests for SinumClient."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -21,8 +22,14 @@ def session() -> MagicMock:
 def make_response(status: int, data: object) -> MagicMock:
     resp = MagicMock()
     resp.status = status
+    resp.content_length = 100
     resp.json = AsyncMock(return_value=data)
     return resp
+
+
+@asynccontextmanager
+async def _fake_timeout(*args, **kwargs):
+    yield
 
 
 class TestDecodeEncodeTemperature:
@@ -39,16 +46,13 @@ class TestDecodeEncodeTemperature:
 class TestLogin:
     @pytest.mark.asyncio
     async def test_login_success(self, session):
-        resp = make_response(200, {"session": "test-jwt-token"})
-        session.post = MagicMock(return_value=AsyncMock(
-            __aenter__=AsyncMock(return_value=resp),
-            __aexit__=AsyncMock(return_value=False),
-        ))
+        resp = make_response(200, {"data": {"session": "test-jwt-token", "refresh_token": "ref"}})
+        session.post = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, username="user", password="pass")
-        # patch asyncio.timeout
-        with patch("custom_components.sinum.api.asyncio.timeout"):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             await client.login()
         assert client._jwt == "test-jwt-token"
+        assert client._refresh_token == "ref"
 
     @pytest.mark.asyncio
     async def test_login_noop_for_token(self, session):
@@ -59,20 +63,17 @@ class TestLogin:
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self, session):
         resp = make_response(401, {})
-        session.post = MagicMock(return_value=AsyncMock(
-            __aenter__=AsyncMock(return_value=resp),
-            __aexit__=AsyncMock(return_value=False),
-        ))
+        session.post = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, username="user", password="wrong")
-        with patch("custom_components.sinum.api.asyncio.timeout"):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             with pytest.raises(SinumAuthError):
                 await client.login()
 
     @pytest.mark.asyncio
     async def test_login_connection_error(self, session):
-        session.post = MagicMock(side_effect=aiohttp.ClientError("unreachable"))
+        session.post = AsyncMock(side_effect=aiohttp.ClientError("unreachable"))
         client = SinumClient("192.168.1.1", session, username="user", password="pass")
-        with patch("custom_components.sinum.api.asyncio.timeout"):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             with pytest.raises(SinumConnectionError):
                 await client.login()
 
@@ -96,3 +97,51 @@ class TestTokenAuth:
     def test_base_url_without_scheme(self, session):
         client = SinumClient("192.168.1.1", session, api_token="tok")
         assert client.base_url == "http://192.168.1.1"
+
+
+class TestApiRequests:
+    @pytest.mark.asyncio
+    async def test_get_energy_raises_on_404(self, session):
+        resp = make_response(404, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            with pytest.raises(SinumConnectionError, match="API error 404"):
+                await client.get_energy()
+
+    @pytest.mark.asyncio
+    async def test_run_scene_sends_trigger_payload(self, session):
+        resp = make_response(204, {})
+        resp.content_length = 0
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.run_scene(2)
+
+        args = session.request.await_args.args
+        kwargs = session.request.await_args.kwargs
+        assert args[0] == "PATCH"
+        assert args[1] == "http://192.168.1.1/api/v1/scenes/2"
+        assert kwargs["json"] == {"trigger": True}
+
+    @pytest.mark.asyncio
+    async def test_get_parent_devices_flattens_class_collections(self, session):
+        resp = make_response(
+            200,
+            {
+                "data": {
+                    "wtp": [{"id": 1, "class": "wtp"}],
+                    "sbus": [{"id": 2, "class": "sbus"}],
+                    "metadata": {"ignored": True},
+                }
+            },
+        )
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            devices = await client.get_parent_devices()
+
+        assert devices == [{"id": 1, "class": "wtp"}, {"id": 2, "class": "sbus"}]

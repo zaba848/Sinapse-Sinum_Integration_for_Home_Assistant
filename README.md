@@ -32,12 +32,36 @@ This matters because devices do not have to be assigned to rooms. `/api/v1/rooms
 
 ---
 
+## Live Endpoint Snapshot
+
+Last read-only sweep on the local verified hub: `2026-06-17`. No device writes were performed.
+
+| Endpoint | Live result |
+|---|---|
+| `/api/v1/rooms` | 1 room |
+| `/api/v1/floors` | 0 floors |
+| `/api/v1/parent-devices` | WTP 8, SBUS 2, TECH 2, Modbus 2, system modules 9 |
+| `/api/v1/devices/virtual` | 19 devices: thermostat 8, custom device 11 |
+| `/api/v1/devices/wtp` | 34 devices: temperature regulator 8, temperature sensor 8, humidity sensor 8, fan coil 7, fan coil v2 1, two-state input 2 |
+| `/api/v1/devices/sbus` | 10 devices: temperature sensor 2, humidity sensor 2, two-state input 4, fan coil 2 |
+| `/api/v1/scenes` | 10 code scenes |
+| `/api/v1/schedules` | 8 schedules: thermal 4, temperature curve 4 |
+| `/api/v1/weather` | Available |
+| `/api/v1/energy` | `404` on verified hub |
+| `/api/v1/devices/alarm-system` | Available, empty list |
+
+Current integration live smoke result: the coordinator loads 19 virtual, 34 WTP, 10 SBUS devices and 8 schedules. The `climate` platform creates 10 entities on this hub: 8 virtual thermostats and 2 SBUS fan coils. It creates 0 WTP fan coil climate entities because the live WTP fan coil payloads do not expose both `target_temperature` and `work_mode`.
+
+The live hub therefore confirms the next implementation targets: WTP fan coil fan-only/diagnostic mapping, WTP temperature regulators, and a write-support decision for schedules. Virtual `custom_device` entries remain out of scope until their Lua module contracts are documented per device.
+
+---
+
 ## Supported Today
 
 | Platform | Sinum sources | Status |
 |---|---|---|
-| `climate` | Virtual thermostats | ✅ |
-| `sensor` | WTP temperature/humidity, WTP air/energy, SBUS temperature/humidity, weather, hub diagnostics | ✅ |
+| `climate` | Virtual thermostats, SBUS fan coil, WTP fan coil when full climate payload is exposed | ✅ / partial |
+| `sensor` | WTP temperature/humidity, WTP air/energy, SBUS temperature/humidity, weather, hub diagnostics, thermal schedule summaries | ✅ / partial |
 | `binary_sensor` | WTP/SBUS two-state sensors, parent device status | ✅ |
 | `switch` | Virtual relay, wicket | ✅ |
 | `cover` | Virtual blind, gate | ✅ |
@@ -50,11 +74,11 @@ This matters because devices do not have to be assigned to rooms. `/api/v1/rooms
 
 | Feature | Phase | Status |
 |---|---|---|
-| Fan coil climate entities (WTP + SBUS) | 7A | 33% — SBUS done, WTP pending |
-| Temperature regulator climate/sensors | 7B | Planned |
-| Thermal schedule entities | 7C | Planned |
-| MQTT bridge (v0.6) | 7D | ✅ Complete |
-| Quality gate & testing | 7E | In progress |
+| Fan coil climate entities (WTP + SBUS) | 7A | SBUS done; WTP guarded, but live WTP payload lacks temperature fields |
+| Temperature regulator climate/sensors | 7B | 8 WTP regulators present on live hub |
+| Thermal schedule entities | 7C | Sensor-only, coordinator-backed; write support pending |
+| MQTT bridge (v0.7.1) | 7D | ✅ Complete |
+| Quality gate & testing | 7E | In progress: pytest/compile/live Sinum pass, ruff/mypy and HA deploy checks pending |
 | TECH RS ventilation sensors | 8 | Future |
 | Modbus heat pump / DHW | 9 | Future |
 
@@ -64,7 +88,7 @@ This matters because devices do not have to be assigned to rooms. `/api/v1/rooms
 - Energy Center (API endpoint not available on verified hub)
 - Custom device types (complex Lua modules)
 
-See [PLAN.md](PLAN.md) for detailed roadmap and verified device counts.
+Roadmap and next work are tracked in this README. Local planning notes may live in an ignored `PLAN.md`, but that file is intentionally not part of the repository.
 
 ---
 
@@ -133,7 +157,7 @@ MQTT is optional. REST polling works without it and is the supported baseline.
 3. Copy full contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua) 
 4. **Important**: Set `CLIENT_ID = <the ID from Step 1>` at line 17
 5. Save and Enable the script
-6. Check Sinum logs for startup message: `[Sinapse] MQTT bridge v0.7 started`
+6. Check Sinum logs for `[Sinapse] Published:` entries and heartbeat publishes
 
 **Step 3: Enable in Home Assistant**
 1. Go to Sinum integration settings → Options
@@ -239,7 +263,7 @@ pip install -r requirements-dev.txt
 ### Running Tests
 
 ```bash
-# Run all tests (51 tests, ~0.3s)
+# Run all tests (75 tests, ~0.5s)
 pytest tests/
 
 # Run specific test file
@@ -252,7 +276,7 @@ pytest -vv tests/
 pytest --cov=custom_components/sinum tests/
 ```
 
-**Expected output**: All 51 tests passing
+**Expected output**: All 75 tests passing
 
 ### Code Quality Checks
 
@@ -278,11 +302,11 @@ python3 -m compileall custom_components/sinum tests
 ```
 custom_components/sinum/
   ├── __init__.py           # Integration entry point
-  ├── api.py                # REST API client (334 LOC)
+  ├── api.py                # REST API client
   ├── climate.py            # Climate entities (fan coil, thermostat)
   ├── coordinator.py        # DataUpdateCoordinator (device discovery)
   ├── config_flow.py        # Configuration UI
-  ├── sensor.py             # Sensor entities (763 LOC)
+  ├── sensor.py             # Sensor entities
   ├── binary_sensor.py      # Binary sensor entities
   ├── switch.py, cover.py, light.py, button.py, number.py, update.py
   ├── strings.json          # UI strings (EN)
@@ -296,10 +320,16 @@ tests/
   ├── conftest.py           # Pytest fixtures
   ├── fixtures/             # Test data
   ├── test_api.py           # API client tests
+  ├── test_alarm_control_panel.py # Alarm setup tests
+  ├── test_binary_sensor.py # Binary sensor tests
+  ├── test_button.py        # Scene button tests
   ├── test_config_flow.py   # Config flow tests
   ├── test_climate.py       # Climate entity tests
   ├── test_coordinator.py   # Coordinator tests
-  └── test_fan_coil.py      # Fan coil tests (22 tests)
+  ├── test_fan_coil.py      # Fan coil tests (21 tests)
+  ├── test_mqtt.py          # MQTT bridge tests
+  ├── test_schedule_sensors.py # Thermal schedule sensor tests
+  └── test_sensor.py        # Sensor entity tests
 ```
 
 ### Adding a New Entity Type
@@ -311,22 +341,23 @@ tests/
 5. Add tests in `tests/test_new_platform.py`
 6. Add translation keys to `strings.json` and `translations/pl.json`
 
-See [PLAN.md](PLAN.md) for upcoming entity work (fan coil, regulators, schedules).
+Use the roadmap below for upcoming entity work (fan coil, regulators, schedules).
 
 ---
 
 ## Roadmap
-
-See [PLAN.md](PLAN.md) for detailed timeline and device counts.
 
 ### Current Phase: 7E — Quality Gate
 
 - ✅ Fix JSON translation bugs
 - ✅ Create pyproject.toml with ruff/mypy config
 - ✅ Add test fixtures for SBUS sensors
-- ⏳ Add Phase 7E tests (collection discovery, SBUS sensors, scene trigger, Energy 404, alarm empty)
-- ⏳ Run mypy type checking
-- ⏳ Run ruff linting
+- ✅ Add fan coil climate tests
+- ✅ Add MQTT bridge transport tests
+- ✅ Add thermal schedule refresh tests
+- ✅ Add Phase 7E tests (collection discovery, SBUS sensors, scene trigger, Energy 404, alarm empty)
+- ⏳ Run mypy type checking (requires dev dependencies installed)
+- ⏳ Run ruff linting (requires dev dependencies installed)
 - ⏳ Verify HA custom integration checks
 
 ### Completed Phases
@@ -334,15 +365,16 @@ See [PLAN.md](PLAN.md) for detailed timeline and device counts.
 | Phase | Feature | Status |
 |---|---|---|
 | 7D | MQTT Bridge Hardening | ✅ v0.7.1 complete |
+| 7A partial | Fan coil climate | ✅ SBUS active; WTP guarded for full payloads |
 | Previous | Device discovery, sensors, binary sensors, switches, covers, lights, buttons, numbers, updates | ✅ |
 
 ### Planned Phases
 
 | Phase | Feature | ETA |
 |---|---|---|
-| 7A | Fan coil climate entities (WTP + SBUS) | Next |
+| 7A | Decide WTP fan coil fan-only/diagnostic mapping for live payloads | Next |
 | 7B | Temperature regulator support | Q3 |
-| 7C | Thermal schedule entities | Q3 |
+| 7C | Thermal schedule write support decision | Q3 |
 | 8 | TECH RS ventilation/heat pump | Q3/Q4 |
 | 9 | Modbus DHW / energy integration | Q4 |
 | 10 | Energy Center (if endpoint available) | Future |

@@ -19,16 +19,16 @@
 | **blind/roller** | id, type, name, state, last_set_target_opening, action_in_progress, last_set_target_tilt, room_id, parent_id | ✅ Fully supported |
 | **dimmer** | id, type, name, state, brightness, room_id, parent_id | ✅ Fully supported |
 | **RGB light** | id, type, name, state, brightness, led_color, white_temperature, color_mode, room_id, parent_id | ✅ Fully supported |
-| **custom_device** | Generic properties via safe_get() | ✅ Auto-supported (large Lua payloads OK) |
+| **custom_device** | Generic properties via safe_get() | ⚠️ MQTT-published, but HA entity mapping depends on the custom Lua module contract |
 
 #### WTP Devices (Wired Terminal Panel)
 | Type | Properties | Status |
 |------|-----------|--------|
 | **temperature_sensor** | id, type, name, temperature, room_id, parent_id | ✅ Fully supported |
 | **humidity_sensor** | id, type, name, humidity, room_id, parent_id | ✅ Fully supported |
-| **temperature_regulator** | id, type, name, temperature, target_temperature, mode, state, room_id, parent_id, schedule_id | ✅ Fully supported |
-| **fan_coil** | id, type, name, room_temperature, target_temperature, target_temperature_minimum, target_temperature_maximum, state, work_mode, available_work_modes, working_state, fan, mode_mutable, room_id, parent_id, schedule_id | ✅ Fully supported |
-| **fan_coil_v2** | Same as fan_coil + additional work modes | ✅ Fully supported |
+| **temperature_regulator** | id, type, name, target_temperature, target_temperature_minimum, target_temperature_maximum, system_mode, target_temperature_mode, room_id, parent_id | ⚠️ MQTT-published; HA climate/sensor mapping pending |
+| **fan_coil** | id, type, name, status and metadata on verified hub | ⚠️ MQTT-published; live payload lacks climate temperature/work fields |
+| **fan_coil_v2** | id, type, name, state, work_mode, fan, fan_operation_mode and metadata on verified hub | ⚠️ MQTT-published; HA fan-only/diagnostic mapping pending |
 | **two_state_input_sensor** | id, type, name, state, room_id, parent_id | ✅ Fully supported |
 | **Air quality sensors** | temperature, humidity, co2, pm1, pm25, pm10, illuminance, pressure | ✅ Fully supported |
 | **Power monitoring** | total_active_power, energy_consumed_total | ✅ Fully supported |
@@ -36,31 +36,31 @@
 #### SBUS Devices (Serial Bus)
 | Type | Properties | Status |
 |------|-----------|--------|
-| **fan_coil** | Same as WTP fan_coil | ✅ Fully supported |
+| **fan_coil** | room_temperature, target_temperature, target_temperature_minimum, target_temperature_maximum, state, work_mode, available_work_modes, working_state, fan, mode_mutable, room_id, parent_id, schedule_id | ✅ Fully supported when full climate payload is exposed |
 | **temperature_sensor** | id, type, name, temperature, room_id, parent_id | ✅ Fully supported |
 | **humidity_sensor** | id, type, name, humidity, room_id, parent_id | ✅ Fully supported |
 | **two_state_input_sensor** | id, type, name, state, room_id, parent_id | ✅ Fully supported |
 
 ---
 
-### ⚠️ Not on Verified Hub (But Will Auto-Support if Present)
+### ⚠️ Lua-Published But Not HA-Mapped Yet
 
 #### LoRa Devices
 **Status**: Not present on `sinumTablicaDomin` hub  
-**If present**: MQTT bridge will auto-publish to `sinum/state/<device_id>` with all available properties
+**If present**: Lua bridge may publish `sinum/state/<device_id>`, but the HA MQTT bridge currently ignores unsupported `source` values until a matching HA platform/store exists.
 
 #### SLINK Devices  
 **Status**: Not present on `sinumTablicaDomin` hub  
-**If present**: MQTT bridge will auto-publish to `sinum/state/<device_id>` with all available properties
+**If present**: Lua bridge may publish `sinum/state/<device_id>`, but the HA MQTT bridge currently ignores unsupported `source` values until a matching HA platform/store exists.
 
 #### Video Devices
 **Status**: Not present on `sinumTablicaDomin` hub  
-**If present**: MQTT bridge will auto-publish to `sinum/state/<device_id>` with all available properties
+**If present**: Lua bridge may publish `sinum/state/<device_id>`, but the HA MQTT bridge currently ignores unsupported `source` values until a matching HA platform/store exists.
 
 #### Alarm System Devices
 **Status**: Not present on `sinumTablicaDomin` hub  
 (REST API `/api/v1/alarm-system` returns empty list)  
-**If present**: MQTT bridge will auto-publish to `sinum/state/<device_id>` with all available properties
+**If present**: Lua bridge may publish `sinum/state/<device_id>`, but the HA MQTT bridge currently ignores unsupported `source` values until alarm entities are mapped into coordinator-backed stores.
 
 ---
 
@@ -80,14 +80,16 @@
 
 ### Automatic Detection
 1. **Startup (application_initialized)**:
-   - Iterates all available containers: `virtual`, `wtp`, `sbus`, `lora`, `slink`, `video`, `alarm_system`
+   - Lua iterates available containers: `virtual`, `wtp`, `sbus`, `lora`, `slink`, `video`, `alarm_system`
    - If container exists and has devices, publishes initial snapshots
    - Logs: `[Sinapse] Published: 5 virtual, 12 wtp, 3 sbus devices`
+   - HA currently consumes only `virtual`, `wtp`, and `sbus` sources
 
 2. **Dynamic Updates (device_state_changed)**:
    - Receives device ID and finds it across all containers
    - Creates snapshot of current state
    - Publishes to `sinum/state/<device_id>`
+   - HA ignores unsupported sources instead of inserting them into the wrong device store
 
 ### Schema Extraction
 The `OPTIONAL_FIELDS` table defines all possible device properties:
@@ -114,13 +116,13 @@ The `OPTIONAL_FIELDS` table defines all possible device properties:
 "has_messages", "status", "variant"
 ```
 
-**Key advantage**: New device types automatically supported—just add fields to OPTIONAL_FIELDS if needed.
+**Key advantage**: For mapped sources (`virtual`, `wtp`, `sbus`), new fields can be added by extending `OPTIONAL_FIELDS`. New source classes still need HA coordinator/platform mapping.
 
 ---
 
 ## MQTT Message Example
 
-**Topic**: `sinum/state/123` (Fan Coil WTP device)
+**Topic**: `sinum/state/123` (full-payload fan coil device)
 
 ```json
 {
@@ -162,11 +164,12 @@ The `OPTIONAL_FIELDS` table defines all possible device properties:
 - [x] Device state changes trigger MQTT updates
 - [x] Optional fields handled gracefully (nil → omitted)
 - [x] All device types work with generic extraction
-- [x] Fan coil fields (work_mode, available_work_modes, working_state, fan) included
+- [x] Fan coil fields (work_mode, available_work_modes, working_state, fan) included when exposed by firmware
 - [x] Parent device association (parent_id) included
 - [x] Schedule association (schedule_id) included
 - [x] Heartbeat publishes every minute
-- [ ] Manual hub upload and verification
+- [x] Read-only REST verification on physical hub
+- [ ] Manual MQTT message verification in HA
 
 ---
 
@@ -174,15 +177,16 @@ The `OPTIONAL_FIELDS` table defines all possible device properties:
 
 If a new device type appears on the hub:
 
-1. **Automatic support**: MQTT bridge will publish it (already included in dynamic container lookup)
-2. **Optional**: Add fields to `OPTIONAL_FIELDS` table if new properties exist:
+1. **Lua publishing**: MQTT bridge may already publish it if the source container is included.
+2. **HA mapping**: Add or extend coordinator/platform support for the new `source` before treating it as supported in Home Assistant.
+3. **Optional**: Add fields to `OPTIONAL_FIELDS` table if new properties exist:
    ```lua
    local OPTIONAL_FIELDS = {
        -- ... existing fields
        "new_property_1", "new_property_2"  -- Add here
    }
    ```
-3. **Restart**: Reload MQTT bridge automation on hub
+4. **Restart**: Reload MQTT bridge automation on hub
 
 ---
 
@@ -192,6 +196,7 @@ If a new device type appears on the hub:
 |-------|----------|
 | Device not appearing in MQTT | Check hub logs: is device_state_changed event firing? |
 | Missing properties in MQTT message | Add to OPTIONAL_FIELDS table and reload |
+| MQTT arrives but HA ignores it | Check whether payload `source` is one of `virtual`, `wtp`, `sbus` |
 | Heartbeat not appearing | Check MQTT broker connectivity and `minute_changed` event |
 | Device found but snapshot empty | Check safe_get() error handling; some fields may not exist on device |
 

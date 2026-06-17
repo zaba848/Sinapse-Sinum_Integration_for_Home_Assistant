@@ -79,6 +79,38 @@
     "room_id": 1,
     "class": "wtp"
   },
+  "wtp_fan_coil_full": {
+    "id": 22,
+    "name": "WTP Fan Coil Full",
+    "type": "fan_coil",
+    "class": "wtp",
+    "room_id": 1,
+    "work_mode": "heating",
+    "available_work_modes": ["heating", "cooling", "automatic", "off"],
+    "target_temperature": 220,
+    "target_temperature_minimum": 50,
+    "target_temperature_maximum": 300,
+    "room_temperature": 195,
+    "working_state": "heating_active",
+    "state": "heating_demand",
+    "fan_operation_mode": "automatic",
+    "fan": {
+      "relay_fan": {
+        "current_gear": "second"
+      },
+      "manual_fan_gear": "second",
+      "output_type": "relay"
+    },
+    "status": "online"
+  },
+  "wtp_fan_coil_shell": {
+    "id": 23,
+    "name": "WTP Fan Coil Shell",
+    "type": "fan_coil",
+    "class": "wtp",
+    "room_id": 1,
+    "status": "online"
+  },
   "scenes": [
     {"id": 1, "name": "Good Morning"},
     {"id": 2, "name": "Good Night"}
@@ -102,6 +134,29 @@
     "production": 800,
     "storage": 500
   },
+  "schedules": [
+    {
+      "id": 7,
+      "name": "Living Schedule",
+      "type": "thermal",
+      "modes": ["heating"],
+      "current_target_temperature": 215,
+      "fallback": 180,
+      "associations": {
+        "thermostats": [{"id": 10, "class": "virtual"}],
+        "fan_coils": [{"id": 13, "class": "sbus"}]
+      },
+      "monday": [
+        {"start": 0, "end": 600, "target_temperature": 210}
+      ],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [],
+      "friday": [],
+      "saturday": [],
+      "sunday": []
+    }
+  ],
   "alarm_devices": [
     {
       "id": 1,

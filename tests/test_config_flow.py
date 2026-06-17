@@ -40,6 +40,7 @@ class TestConfigFlowToken:
 
             flow = SinumConfigFlow()
             flow.hass = hass
+            flow.context = {}
 
             result = await flow.async_step_user(
                 {"host": "192.168.1.100", "auth_mode": AUTH_MODE_TOKEN}
@@ -109,6 +110,7 @@ class TestConfigFlowPassword:
 
             flow = SinumConfigFlow()
             flow.hass = hass
+            flow.context = {}
             flow._host = "192.168.1.100"
 
             result = await flow.async_step_password(
@@ -134,6 +136,23 @@ class TestOptionsFlow:
         result = await flow.async_step_init(None)
         assert result["type"] == "form"
         assert result["step_id"] == "init"
+
+    @pytest.mark.asyncio
+    async def test_options_flow_prefers_saved_options_for_defaults(self, hass):
+        from custom_components.sinum.config_flow import SinumOptionsFlow
+
+        entry = MagicMock()
+        entry.data = {"scan_interval": 30, CONF_MQTT_ENABLED: False}
+        entry.options = {"scan_interval": 45, CONF_MQTT_ENABLED: True}
+
+        flow = SinumOptionsFlow(entry)
+        flow.hass = hass
+
+        result = await flow.async_step_init(None)
+
+        defaults = result["data_schema"]({})
+        assert defaults["scan_interval"] == 45
+        assert defaults[CONF_MQTT_ENABLED] is True
 
     @pytest.mark.asyncio
     async def test_options_flow_saves_values(self, hass):
