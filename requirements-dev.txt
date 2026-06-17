@@ -1,8 +1,5 @@
-pytest==8.2.2
-pytest-asyncio==0.23.7
-pytest-cov==5.0.0
-pytest-homeassistant-custom-component==0.13.189
-aiohttp==3.9.5
+# pytest, pytest-asyncio, pytest-cov and aiohttp are pinned by pytest-homeassistant-custom-component
+pytest-homeassistant-custom-component==0.13.205
 aioresponses==0.7.6
 ruff==0.4.8
 mypy==1.10.0
