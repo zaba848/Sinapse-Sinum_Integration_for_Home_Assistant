@@ -111,6 +111,43 @@
     "room_id": 1,
     "status": "online"
   },
+  "wtp_temperature_regulator_full": {
+    "id": 100,
+    "name": "Zone 1 Temperature Regulator",
+    "type": "temperature_regulator",
+    "class": "wtp",
+    "room_id": 1,
+    "temperature": 210,
+    "target_temperature": 220,
+    "target_temperature_minimum": 50,
+    "target_temperature_maximum": 300,
+    "system_mode": "heating",
+    "target_temperature_mode": "heating",
+    "mode_mutable": true,
+    "parent_id": 10,
+    "status": "online"
+  },
+  "wtp_temperature_regulator_partial": {
+    "id": 101,
+    "name": "Zone 2 Temperature Regulator",
+    "type": "temperature_regulator",
+    "class": "wtp",
+    "temperature": 205,
+    "status": "online"
+  },
+  "wtp_temperature_regulator_immutable": {
+    "id": 102,
+    "name": "Zone 3 Temperature Regulator",
+    "type": "temperature_regulator",
+    "class": "wtp",
+    "room_id": 1,
+    "temperature": 215,
+    "target_temperature": 220,
+    "system_mode": "heating",
+    "mode_mutable": false,
+    "parent_id": 10,
+    "status": "online"
+  },
   "scenes": [
     {"id": 1, "name": "Good Morning"},
     {"id": 2, "name": "Good Night"}

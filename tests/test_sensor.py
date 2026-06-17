@@ -5,7 +5,12 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from custom_components.sinum.sensor import SBUS_SENSORS, SinumSensor
+from custom_components.sinum.sensor import (
+    SBUS_SENSORS,
+    WTP_SENSORS,
+    SinumSensor,
+    SinumTemperatureRegulatorSensor,
+)
 
 FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
@@ -41,3 +46,84 @@ class TestSbusSensors:
         entity = SinumSensor(coordinator, 31, _description("humidity"), "test_entry")
 
         assert entity.native_value == 52.0
+
+
+class TestPhase7BTemperatureRegulators:
+    """Phase 7B: Temperature regulator sensors."""
+
+    def _wtp_regulator_description(self, key: str):
+        """Get WTP regulator sensor description by key."""
+        return next(
+            desc
+            for desc in WTP_SENSORS
+            if desc.key == key and desc.source == "wtp_regulator"
+        )
+
+    def _make_wtp_coordinator(self, device_id: int, device: dict):
+        """Create coordinator with WTP device."""
+        coordinator = MagicMock()
+        coordinator.virtual_devices = {}
+        coordinator.wtp_devices = {device_id: device}
+        coordinator.sbus_devices = {}
+        return coordinator
+
+    def test_regulator_temperature_sensor(self):
+        """Temperature regulator reads current room temperature."""
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        coordinator = self._make_wtp_coordinator(100, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 100, self._wtp_regulator_description("temperature"), "test_entry"
+        )
+
+        assert entity.native_value == 21.0
+
+    def test_regulator_target_temperature_sensor(self):
+        """Temperature regulator reads target temperature."""
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        coordinator = self._make_wtp_coordinator(100, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 100, self._wtp_regulator_description("target_temperature"), "test_entry"
+        )
+
+        assert entity.native_value == 22.0
+
+    def test_regulator_sensor_shows_attributes(self):
+        """Temperature regulator sensor shows mode, mode_mutable, etc. as attributes."""
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        coordinator = self._make_wtp_coordinator(100, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 100, self._wtp_regulator_description("temperature"), "test_entry"
+        )
+
+        attrs = entity.extra_state_attributes
+        assert attrs["system_mode"] == "heating"
+        assert attrs["target_temperature_mode"] == "heating"
+        assert attrs["mode_mutable"] is True
+        assert attrs["parent_id"] == 10
+
+    def test_regulator_immutable_shows_attribute(self):
+        """Temperature regulator with mode_mutable=false shows attribute."""
+        device = dict(FIXTURES["wtp_temperature_regulator_immutable"])
+        coordinator = self._make_wtp_coordinator(102, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 102, self._wtp_regulator_description("temperature"), "test_entry"
+        )
+
+        attrs = entity.extra_state_attributes
+        assert attrs["mode_mutable"] is False
+
+    def test_regulator_partial_handles_missing_fields(self):
+        """Temperature regulator with missing fields handles gracefully."""
+        device = dict(FIXTURES["wtp_temperature_regulator_partial"])
+        coordinator = self._make_wtp_coordinator(101, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 101, self._wtp_regulator_description("temperature"), "test_entry"
+        )
+
+        # Should read available fields
+        assert entity.native_value == 20.5
+
+        # Attributes should only include fields that exist
+        attrs = entity.extra_state_attributes
+        assert len(attrs) == 0  # No mode, parent_id, etc. in partial device
+

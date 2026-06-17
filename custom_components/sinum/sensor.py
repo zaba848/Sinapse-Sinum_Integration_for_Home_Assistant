@@ -166,6 +166,29 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         suggested_display_precision=0,
     ),
+    # Temperature regulator sensors (Phase 7B)
+    SinumSensorDescription(
+        key="temperature",
+        api_key="temperature",
+        source="wtp_regulator",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="regulator_temperature",
+    ),
+    SinumSensorDescription(
+        key="target_temperature",
+        api_key="target_temperature",
+        source="wtp_regulator",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="regulator_target_temperature",
+    ),
 )
 
 # ── SBUS device sensors ────────────────────────────────────────────────────────
@@ -332,8 +355,18 @@ async def async_setup_entry(
 
     # WTP device sensors
     for device_id, device in coordinator.wtp_devices.items():
+        # Temperature regulator sensors (Phase 7B)
+        if device.get("type") == "temperature_regulator":
+            for desc in WTP_SENSORS:
+                if desc.source == "wtp_regulator" and desc.api_key in device:
+                    entities.append(
+                        SinumTemperatureRegulatorSensor(
+                            coordinator, device_id, desc, entry.entry_id
+                        )
+                    )
+        # Generic WTP device sensors
         for desc in WTP_SENSORS:
-            if desc.api_key in device:
+            if desc.source == "wtp" and desc.api_key in device:
                 entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
 
     # SBUS device sensors
@@ -436,7 +469,41 @@ def _model_for_source(source: str) -> str:
         return "Sinum Virtual Device"
     if source == "sbus":
         return "Sinum SBUS Sensor"
+    if source == "wtp_regulator":
+        return "Sinum Temperature Regulator"
     return "Sinum WTP Sensor"
+
+
+class SinumTemperatureRegulatorSensor(SinumSensor):
+    """Temperature regulator sensor with attributes for mode and control state (Phase 7B)."""
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        description: SinumSensorDescription,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, device_id, description, entry_id)
+        # Override source for proper device lookup
+        self._source = "wtp"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Show regulator mode and control state as attributes."""
+        device = self._device
+        attrs: dict[str, Any] = {}
+
+        if "system_mode" in device:
+            attrs["system_mode"] = device["system_mode"]
+        if "target_temperature_mode" in device:
+            attrs["target_temperature_mode"] = device["target_temperature_mode"]
+        if "mode_mutable" in device:
+            attrs["mode_mutable"] = device["mode_mutable"]
+        if "parent_id" in device:
+            attrs["parent_id"] = device["parent_id"]
+
+        return attrs
 
 
 class SinumWeatherSensor(SensorEntity):
