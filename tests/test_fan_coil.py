@@ -75,6 +75,20 @@ class TestSinumFanCoilClimate:
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_action == HVACAction.IDLE
 
+    def test_hvac_action_none_working_state_when_off_returns_off(self):
+        """working_state='none' (live hub) with work_mode='off' must return OFF not IDLE."""
+        from homeassistant.components.climate import HVACAction
+        device = {**FIXTURES["sbus_fan_coil"], "working_state": "none", "work_mode": "off", "state": ""}
+        entity, _ = _make_fan_coil(device)
+        assert entity.hvac_action == HVACAction.OFF
+
+    def test_hvac_action_none_working_state_state_fallback(self):
+        """working_state='none' falls through to state-field fallback."""
+        from homeassistant.components.climate import HVACAction
+        device = {**FIXTURES["sbus_fan_coil"], "working_state": "none", "state": "heating_demand"}
+        entity, _ = _make_fan_coil(device)
+        assert entity.hvac_action == HVACAction.HEATING
+
     def test_fan_mode_second(self):
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, _ = _make_fan_coil(device)
@@ -295,6 +309,20 @@ class TestSinumFanCoilClimate:
             entity._attr_supported_features
             == ClimateEntityFeature.TARGET_TEMPERATURE
         )
+
+    def test_target_temperature_mode_mode_key(self):
+        """SBUS fan_coil uses 'mode' key in target_temperature_mode dict (live hub)."""
+        device = {**FIXTURES["sbus_fan_coil"], "target_temperature_mode": {"mode": "constant", "remaining_time": 0}}
+        entity, _ = _make_fan_coil(device)
+        attrs = entity.extra_state_attributes
+        assert attrs.get("target_temperature_mode") == "constant"
+
+    def test_target_temperature_mode_current_key(self):
+        """Thermostats use 'current' key in target_temperature_mode dict."""
+        device = {**FIXTURES["sbus_fan_coil"], "target_temperature_mode": {"current": "schedule", "remaining_time": 300}}
+        entity, _ = _make_fan_coil(device)
+        attrs = entity.extra_state_attributes
+        assert attrs.get("target_temperature_mode") == "schedule"
 
     def test_wtp_fan_coil_with_fan_field_enables_fan_mode(self):
         """Phase 7A: WTP fan coil with fan field enables FAN_MODE feature."""

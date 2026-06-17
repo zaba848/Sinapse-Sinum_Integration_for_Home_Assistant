@@ -498,7 +498,7 @@ class SinumTemperatureRegulatorSensor(SinumSensor):
             attrs["system_mode"] = device["system_mode"]
         if "target_temperature_mode" in device:
             ttm = device["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
         if "mode_mutable" in device:
             attrs["mode_mutable"] = device["mode_mutable"]
         if "parent_id" in device:

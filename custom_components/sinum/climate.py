@@ -208,7 +208,7 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             attrs["target_temperature_cooling"] = decode(d["target_temperature_cooling"])
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
         if "is_window_open" in d:
             attrs["is_window_open"] = d["is_window_open"]
         if "schedule_id" in d:
@@ -330,8 +330,8 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     @property
     def hvac_action(self) -> HVACAction:
         working_state = self._device.get("working_state")
-        if working_state:
-            return _WORKING_STATE_TO_ACTION.get(working_state, HVACAction.IDLE)
+        if working_state and working_state in _WORKING_STATE_TO_ACTION:
+            return _WORKING_STATE_TO_ACTION[working_state]
         # Fallback: infer from state field
         state = str(self._device.get("state", ""))
         if "heating" in state:
@@ -360,7 +360,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             attrs["mode_mutable"] = d["mode_mutable"]
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
         manual_gear = d.get("fan", {}).get("manual_fan_gear")
         if manual_gear:
             attrs["manual_fan_gear"] = manual_gear
@@ -492,7 +492,7 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             attrs["parent_id"] = d["parent_id"]
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
