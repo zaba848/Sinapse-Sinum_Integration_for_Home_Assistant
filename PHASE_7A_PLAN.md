@@ -1,6 +1,6 @@
 # Phase 7A: WTP Fan Coil Climate Control
 
-**Current Status**: 33% (SBUS ✅, WTP Climate Fields Dependent)
+**Current Status**: 50% (SBUS ✅, WTP Partial Support ✅, Live Testing Pending)
 
 ---
 
@@ -18,14 +18,46 @@
 - Detection: requires both `work_mode` AND `target_temperature`
 - Same climate entity class as SBUS: `SinumFanCoilClimate`
 
-❌ **WTP Fan Coils (Partial/Shell)**: Not yet supported
-- Some hubs expose WTP fan coils with only metadata (id, name, status)
-- No temperature, mode, or fan control fields
-- Currently skipped by the integration
+✅ **WTP Fan Coils (Partial Support) — OPTION A NOW IMPLEMENTED**:
+- Modified `_has_climate_control()` to accept source parameter
+- WTP now supports ANY temperature field: work_mode OR target_temperature OR room_temperature
+- Features scale down based on available fields:
+  - Always: TARGET_TEMPERATURE support
+  - When fan field present: FAN_MODE support
+  - When fan field absent: read-only temperature display
+- 4 new tests added: partial support, graceful degradation, dynamic features
+- 79 tests passing (75 before + 4 Phase 7A tests)
+- Backward compatible: enables more devices, doesn't disable any
+
+❌ **WTP Fan Coils (Shell Only)**: Correctly skipped
+- Shell-only devices (no temperature fields) are still skipped
+- This is correct behavior — no climate data to display
 
 ---
 
-## Phase 7A Implementation Strategy
+## ⭐ Phase 7A Option A: NOW IMPLEMENTED
+
+Option A (Partial Climate Support for WTP Fan Coils) has been **preemptively implemented** and is ready for live testing.
+
+**What Changed**:
+- WTP fan coils with ANY temperature field are now exposed as climate entities
+- Features scale dynamically based on available fields (FAN_MODE only if fan field present)
+- 4 new tests added to verify partial support & graceful degradation
+- All 79 tests passing ✅
+
+**Why Preemptively**?
+- No network access to your hub = can't run diagnostic yet
+- Option A is safe and backward-compatible (enables more devices)
+- When you run diagnostic and confirm partial WTP fan coils exist, the code is already ready
+- If diagnostic shows all WTP have full fields, Option A doesn't hurt (same result)
+
+**Next Step**:
+- Run `python3 diagnose_wtp_climate.py` on your hub network
+- Share results to confirm Phase 7A completion
+
+---
+
+## Phase 7A Implementation Status
 
 ### Step 1: Diagnostic (Run on your network)
 ```bash
