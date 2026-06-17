@@ -358,6 +358,9 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             attrs["schedule_id"] = sched
         if d.get("mode_mutable") is not None:
             attrs["mode_mutable"] = d["mode_mutable"]
+        if "target_temperature_mode" in d:
+            ttm = d["target_temperature_mode"]
+            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
         manual_gear = d.get("fan", {}).get("manual_fan_gear")
         if manual_gear:
             attrs["manual_fan_gear"] = manual_gear
