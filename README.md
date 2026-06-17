@@ -111,8 +111,8 @@ Integration is continuously tested against two live hubs with different hardware
 
 | Hub | Type | Firmware | Virtual | WTP | SBUS | HA entities |
 |---|---|---|---|---|---|---|
-| `tablica-wtp` (10.0.61.132) | sinum_plus | 1.24.0-alpha.2 | 28 | 254 | 8 | — |
-| `sinum-tablica-sbus-1` (10.0.62.167) | sinum_lite | 1.24.0-alpha.2 | 169 | 35 | 436 | ~1 200 |
+| Hub 1 | sinum_plus | 1.24.0-alpha.2 | 28 | 254 | 8 | — |
+| Hub 2 | sinum_lite | 1.24.0-alpha.2 | 169 | 35 | 436 | ~1 200 |
 
 **Hub 2 entity breakdown** (active in HA, Phase 12):
 - 137 climate (83 virtual thermostats + 51 SBUS regulators + 2 WTP regulators + 1 heat_pump_manager)

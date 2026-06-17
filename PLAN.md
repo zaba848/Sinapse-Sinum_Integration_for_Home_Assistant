@@ -33,7 +33,7 @@ Sinum EH-01 hub
 
 Two hubs verified continuously. Hub 2 is the active HA instance.
 
-### Hub 1 — `tablica-wtp` (10.0.61.132) — sinum_plus
+### Hub 1 — sinum_plus
 
 Heavy WTP installation: 28 virtual, 254 WTP, 8 SBUS, 34 rooms.
 
@@ -66,7 +66,7 @@ Heavy WTP installation: 28 virtual, 254 WTP, 8 SBUS, 34 rooms.
 | Virtual | `thermostat` (various) | ~20 | ✅ climate |
 | Virtual | `relay_integrator` | present | ✅ switch |
 
-### Hub 2 — `sinum-tablica-sbus-1` (10.0.62.167) — sinum_lite — **active in HA**
+### Hub 2 — sinum_lite — **active in HA**
 
 Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 
