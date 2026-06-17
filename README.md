@@ -111,10 +111,11 @@ Sinum integration → Options → Enable MQTT real-time transport → Save.
 | Model | EH-01 |
 | Firmware | `1.24.0-alpha.3` |
 | API version | `1.4` |
-| Virtual devices | 19 (8 thermostats, 11 custom) |
+| Virtual devices | 12 (9 thermostats, 3 custom) |
 | WTP devices | 34 (8 regulators, 8 temp sensors, 8 humidity sensors, 7 fan coils, 1 fan_coil_v2, 2 two-state inputs) |
 | SBUS devices | 10 (2 temp, 2 humidity, 4 two-state inputs, 2 fan coils) |
 | Parent devices | 23 (WTP, SBUS, TECH, Modbus, system modules) |
+| Predicted HA entities | ~153 (12 climate, 54 sensor, 59 binary, 5 button, 23 update) |
 
 **Note**: The hub runs alpha firmware. The `/api/v1/rooms` and bus list endpoints occasionally return HTTP 408 (bus timeout) — the integration handles this gracefully using cached data.
 
