@@ -80,13 +80,15 @@ async def async_setup_entry(
     for device_id, device in coordinator.sbus_devices.items():
         if device.get("type") == STYPE_FAN_COIL and _has_climate_control(device, source="sbus"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "sbus"))
+        elif device.get("type") == "temperature_regulator":
+            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "sbus"))
 
-    # WTP fan coils (Phase 7A): partial climate support for devices with any temperature field
-    # Full SBUS-like support when: work_mode + target_temperature
-    # Partial support when: only room_temperature or target_temperature (Phase 7A Option A)
+    # WTP fan coils and temperature regulators
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") in _WTP_FAN_COIL_TYPES and _has_climate_control(device, source="wtp"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "wtp"))
+        elif device.get("type") == "temperature_regulator":
+            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "wtp"))
 
     async_add_entities(entities)
 
@@ -147,17 +149,11 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
 
     @staticmethod
     def _build_name(device: dict[str, Any]) -> str:
-        room = device.get("_room", "")
-        name = device.get("name", "Thermostat")
-        return f"{room} {name}".strip() if room else name
+        return device.get("_device_name") or device.get("name", "Thermostat")
 
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
-
-    @property
-    def name(self) -> str:
-        return self._build_name(self._device)
 
     @property
     def current_temperature(self) -> float | None:
@@ -196,15 +192,15 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         d = self._device
         decode = self.coordinator.client.decode_temperature
         attrs: dict[str, Any] = {}
-        if "humidity" in d:
+        if d.get("humidity") is not None:
             attrs["humidity"] = decode(d["humidity"])
-        if "dew_point" in d:
+        if d.get("dew_point") is not None:
             attrs["dew_point"] = decode(d["dew_point"])
-        if "floor_temperature" in d:
+        if d.get("floor_temperature") is not None:
             attrs["floor_temperature"] = decode(d["floor_temperature"])
-        if "target_temperature_heating" in d:
+        if d.get("target_temperature_heating") is not None:
             attrs["target_temperature_heating"] = decode(d["target_temperature_heating"])
-        if "target_temperature_cooling" in d:
+        if d.get("target_temperature_cooling") is not None:
             attrs["target_temperature_cooling"] = decode(d["target_temperature_cooling"])
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
@@ -280,9 +276,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         self._attr_max_temp = raw_max / 10 if raw_max is not None else TEMP_MAX
 
         area = device.get("_area") or None
-        room = device.get("_room", "")
-        name = device.get("_device_name") or device.get("name", str(device_id))
-        label = f"{room} {name}".strip() if room else name
+        label = device.get("_device_name") or device.get("name", str(device_id))
 
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
@@ -300,13 +294,6 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     @property
     def _device(self) -> dict[str, Any]:
         return self._device_dict(self.coordinator)
-
-    @property
-    def name(self) -> str:
-        d = self._device
-        room = d.get("_room", "")
-        name = d.get("_device_name") or d.get("name", str(self._device_id))
-        return f"{room} {name}".strip() if room else name
 
     @property
     def current_temperature(self) -> float | None:
@@ -400,11 +387,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
 
 
 class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
-    """Optional climate entity for WTP temperature regulators (Phase 7B.2).
-
-    Disabled by default. Regulators are usually supervised by virtual thermostats.
-    Only enable if diagnostics show direct control is beneficial.
-    """
+    """Climate entity for WTP/SBUS temperature regulators."""
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -414,12 +397,14 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     _attr_min_temp = TEMP_MIN
     _attr_max_temp = TEMP_MAX
 
-    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str = "wtp") -> None:
         super().__init__(coordinator)
         self._device_id = device_id
-        self._attr_unique_id = f"{entry_id}_wtp_regulator_{device_id}"
+        self._bus = bus
+        self._attr_unique_id = f"{entry_id}_{bus}_regulator_{device_id}"
 
-        device = coordinator.wtp_devices.get(device_id, {})
+        store = coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
+        device = store.get(device_id, {})
         self._attr_hvac_modes = _available_hvac_modes(device)
 
         # Dynamic features based on mode_mutable
@@ -429,12 +414,10 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         self._attr_supported_features = features
 
         area = device.get("_area") or None
-        room = device.get("_room", "")
-        name = device.get("_device_name") or device.get("name", str(device_id))
-        label = f"{room} {name}".strip() if room else name
+        label = device.get("_device_name") or device.get("name", str(device_id))
 
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_wtp_regulator_{device_id}")},
+            identifiers={(DOMAIN, f"{entry_id}_{bus}_regulator_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
             model="Sinum Temperature Regulator",
@@ -443,14 +426,8 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
 
     @property
     def _device(self) -> dict[str, Any]:
-        return self.coordinator.wtp_devices.get(self._device_id, {})
-
-    @property
-    def name(self) -> str:
-        d = self._device
-        room = d.get("_room", "")
-        name = d.get("_device_name") or d.get("name", str(self._device_id))
-        return f"{room} {name}".strip() if room else name
+        store = self.coordinator.sbus_devices if self._bus == "sbus" else self.coordinator.wtp_devices
+        return store.get(self._device_id, {})
 
     @property
     def current_temperature(self) -> float | None:
@@ -500,15 +477,12 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         if temperature is None:
             return
         raw = round(temperature * 10)
-        updated = await self.coordinator.client.patch_wtp_device(
-            self._device_id, {"target_temperature": raw}
-        )
+        updated = await self._patch({"target_temperature": raw})
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        # Only allow mode changes if mutable
         if not self._device.get("mode_mutable", True):
             _LOGGER.warning(
                 "Temperature regulator %d does not allow mode changes (mode_mutable=false)",
@@ -516,10 +490,13 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             )
             return
         system_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
-        updated = await self.coordinator.client.patch_wtp_device(
-            self._device_id, {"system_mode": system_mode}
-        )
+        updated = await self._patch({"system_mode": system_mode})
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
+
+    async def _patch(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if self._bus == "sbus":
+            return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
+        return await self.coordinator.client.patch_wtp_device(self._device_id, payload)
 

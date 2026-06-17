@@ -1,0 +1,18 @@
+send_notification:
+  name: Send notification
+  description: Sends a push notification via the Sinum hub to the mobile app.
+  fields:
+    title:
+      name: Title
+      description: Notification title.
+      required: true
+      example: "Home Assistant"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Notification body.
+      required: true
+      example: "The front door was opened."
+      selector:
+        text:

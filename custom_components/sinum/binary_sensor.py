@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    STYPE_MOTION_SENSOR,
     WTYPE_FAN_COIL,
     WTYPE_FLOOD_SENSOR,
     WTYPE_MOTION_SENSOR,
@@ -40,7 +41,8 @@ BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         key="flood",
         wtp_type=WTYPE_FLOOD_SENSOR,
         device_class=BinarySensorDeviceClass.MOISTURE,
-        on_states=("wet", "flood", "alarm"),
+        state_key="flood_detected",
+        on_states=("true", "wet", "flood", "alarm"),
     ),
     SinumBinarySensorDescription(
         key="motion",
@@ -84,6 +86,13 @@ SBUS_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         source="sbus",
         device_class=BinarySensorDeviceClass.OPENING,
         on_states=("true", "on", "open", "alarm"),
+    ),
+    SinumBinarySensorDescription(
+        key="motion",
+        wtp_type=STYPE_MOTION_SENSOR,
+        source="sbus",
+        device_class=BinarySensorDeviceClass.MOTION,
+        on_states=("motion", "detected", "alarm", "true"),
     ),
 )
 
@@ -136,9 +145,7 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
         device = self._get_device_dict(coordinator)
-        room = device.get("_room", "")
-        name = device.get("_device_name", str(device_id))
-        label = f"{room} {name}".strip() if room else name
+        label = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,

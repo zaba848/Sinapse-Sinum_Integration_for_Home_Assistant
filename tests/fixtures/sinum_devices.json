@@ -251,5 +251,88 @@
     "state": true,
     "room_id": 1,
     "class": "sbus"
+  },
+  "wtp_relay": {
+    "id": 40,
+    "name": "WTP Relay",
+    "type": "relay",
+    "state": false,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "sbus_relay": {
+    "id": 41,
+    "name": "SBUS Relay",
+    "type": "relay",
+    "state": true,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "wtp_blind": {
+    "id": 42,
+    "name": "WTP Blind",
+    "type": "blind_controller",
+    "current_opening": 75,
+    "target_opening": 75,
+    "action_in_progress": false,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "sbus_dimmer": {
+    "id": 43,
+    "name": "SBUS Dimmer",
+    "type": "dimmer",
+    "state": true,
+    "target_level": 60,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "wtp_dimmer": {
+    "id": 44,
+    "name": "WTP Dimmer",
+    "type": "dimmer",
+    "state": false,
+    "target_level": 0,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "sbus_rgb": {
+    "id": 45,
+    "name": "SBUS RGB",
+    "type": "rgb_controller",
+    "state": true,
+    "brightness": 80,
+    "led_color": "#FF8800",
+    "white_temperature": 4000,
+    "color_mode": "rgb",
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_motion": {
+    "id": 46,
+    "name": "SBUS Motion",
+    "type": "motion_sensor",
+    "state": "motion",
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_light_sensor": {
+    "id": 47,
+    "name": "SBUS Light Sensor",
+    "type": "light_sensor",
+    "illuminance": 350,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "virtual_dimmer_rgb_integrator": {
+    "id": 14,
+    "name": "RGB Integrator",
+    "type": "dimmer_rgb_integrator",
+    "state": true,
+    "brightness": 50,
+    "led_color": "#00FF00",
+    "color_mode": "rgb",
+    "room_id": 1,
+    "class": "virtual"
   }
 }

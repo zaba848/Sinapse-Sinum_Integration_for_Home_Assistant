@@ -23,6 +23,7 @@ from .const import (
     GATE_STATE_OPENING,
     VTYPE_BLIND,
     VTYPE_GATE,
+    WTYPE_BLIND_CONTROLLER,
 )
 from .coordinator import SinumCoordinator
 
@@ -42,13 +43,15 @@ async def async_setup_entry(
         elif dev_type == VTYPE_GATE:
             entities.append(SinumGateCover(coordinator, device_id, entry.entry_id))
 
+    for device_id, device in coordinator.wtp_devices.items():
+        if device.get("type") == WTYPE_BLIND_CONTROLLER:
+            entities.append(SinumWtpBlindCover(coordinator, device_id, entry.entry_id))
+
     async_add_entities(entities)
 
 
 def _label(device: dict[str, Any]) -> str:
-    room = device.get("_room", "")
-    name = device.get("_device_name", "")
-    return f"{room} {name}".strip() if room else name
+    return (device.get("_device_name") or device.get("name", "")).strip()
 
 
 def _device_info(coordinator: SinumCoordinator, device_id: int, entry_id: str, model: str) -> DeviceInfo:
@@ -82,10 +85,6 @@ class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
         self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Blind Controller")
-
-    @property
-    def name(self) -> str:
-        return _label(self.coordinator.virtual_devices.get(self._device_id, {}))
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -173,10 +172,6 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Gate")
 
     @property
-    def name(self) -> str:
-        return _label(self.coordinator.virtual_devices.get(self._device_id, {}))
-
-    @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
 
@@ -214,4 +209,95 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             self._device_id, {"command": "stop"}
         )
         self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+    """WTP blind_controller — position 0 (closed) – 100 (open), no tilt."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_device_class = CoverDeviceClass.BLIND
+    _attr_supported_features = (
+        CoverEntityFeature.OPEN
+        | CoverEntityFeature.CLOSE
+        | CoverEntityFeature.STOP
+        | CoverEntityFeature.SET_POSITION
+    )
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_wtp_{device_id}"
+        device = coordinator.wtp_devices.get(device_id, {})
+        label = _label(device)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_wtp_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model="Sinum WTP Blind Controller",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.wtp_devices.get(self._device_id, {})
+
+    @property
+    def is_closed(self) -> bool | None:
+        pos = self._device.get("current_opening")
+        if pos is None:
+            return None
+        return int(pos) == 0
+
+    @property
+    def is_opening(self) -> bool:
+        d = self._device
+        target = d.get("target_opening")
+        current = d.get("current_opening")
+        if target is None or current is None:
+            return False
+        return bool(d.get("action_in_progress")) and int(target) > int(current)
+
+    @property
+    def is_closing(self) -> bool:
+        d = self._device
+        target = d.get("target_opening")
+        current = d.get("current_opening")
+        if target is None or current is None:
+            return False
+        return bool(d.get("action_in_progress")) and int(target) < int(current)
+
+    @property
+    def current_cover_position(self) -> int | None:
+        pos = self._device.get("current_opening")
+        return int(pos) if pos is not None else None
+
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"command": "open", "opening_percentage": 100}
+        )
+        self.coordinator.wtp_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_close_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"command": "open", "opening_percentage": 0}
+        )
+        self.coordinator.wtp_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_stop_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"command": "stop"}
+        )
+        self.coordinator.wtp_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_set_cover_position(self, **kwargs: Any) -> None:
+        position = kwargs[ATTR_POSITION]
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"command": "open", "opening_percentage": position}
+        )
+        self.coordinator.wtp_devices[self._device_id].update(updated)
         self.async_write_ha_state()

@@ -57,6 +57,7 @@ VTYPE_BLIND = "blind_controller_integrator"
 VTYPE_GATE = "gate"
 VTYPE_WICKET = "wicket"
 VTYPE_DIMMER_RGB = "dimmer_rgb_controller_integrator"
+VTYPE_DIMMER_RGB_INTEGRATOR = "dimmer_rgb_integrator"
 
 # ── WTP device types ───────────────────────────────────────────────────────────
 WTYPE_TEMP_SENSOR = "temperature_sensor"
@@ -74,12 +75,25 @@ WTYPE_TWO_STATE_INPUT_SENSOR = "two_state_input_sensor"
 WTYPE_TEMPERATURE_REGULATOR = "temperature_regulator"
 WTYPE_FAN_COIL = "fan_coil"
 WTYPE_FAN_COIL_V2 = "fan_coil_v2"
+WTYPE_RELAY = "relay"
+WTYPE_BLIND_CONTROLLER = "blind_controller"
+WTYPE_DIMMER = "dimmer"
+WTYPE_RGB_CONTROLLER = "rgb_controller"
+WTYPE_IAQ_SENSOR = "iaq_sensor"
+WTYPE_AQ_SENSOR = "aq_sensor"
 
 # ── SBUS device types ──────────────────────────────────────────────────────────
 STYPE_FAN_COIL = "fan_coil"
 STYPE_HUMIDITY_SENSOR = "humidity_sensor"
 STYPE_TEMPERATURE_SENSOR = "temperature_sensor"
 STYPE_TWO_STATE_INPUT_SENSOR = "two_state_input_sensor"
+STYPE_RELAY = "relay"
+STYPE_DIMMER = "dimmer"
+STYPE_RGB_CONTROLLER = "rgb_controller"
+STYPE_MOTION_SENSOR = "motion_sensor"
+STYPE_LIGHT_SENSOR = "light_sensor"
+STYPE_ANALOG_INPUT = "analog_input"
+STYPE_IMPULSE_METER = "impulse_meter"
 
 # ── Gate states ────────────────────────────────────────────────────────────────
 GATE_STATE_OPEN = "open"

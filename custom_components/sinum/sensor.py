@@ -17,6 +17,8 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfIrradiance,
     UnitOfPower,
@@ -43,6 +45,7 @@ class SinumSensorDescription(SensorEntityDescription):
     api_key: str
     scale: float = 1.0
     source: str = "virtual"
+    is_text: bool = False
 
 
 # ── Virtual thermostat sensors ─────────────────────────────────────────────────
@@ -104,7 +107,7 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
     ),
     SinumSensorDescription(
         key="pm1",
-        api_key="pm1",
+        api_key="pm1p0",
         source="wtp",
         device_class=SensorDeviceClass.PM1,
         state_class=SensorStateClass.MEASUREMENT,
@@ -113,7 +116,7 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
     ),
     SinumSensorDescription(
         key="pm25",
-        api_key="pm25",
+        api_key="pm2p5",
         source="wtp",
         device_class=SensorDeviceClass.PM25,
         state_class=SensorStateClass.MEASUREMENT,
@@ -121,8 +124,17 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         suggested_display_precision=1,
     ),
     SinumSensorDescription(
+        key="pm4",
+        api_key="pm4p0",
+        source="wtp",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="µg/m³",
+        icon="mdi:air-filter",
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
         key="pm10",
-        api_key="pm10",
+        api_key="pm10p0",
         source="wtp",
         device_class=SensorDeviceClass.PM10,
         state_class=SensorStateClass.MEASUREMENT,
@@ -145,17 +157,53 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.HPA,
+        scale=0.1,
         suggested_display_precision=1,
     ),
     SinumSensorDescription(
-        key="total_active_power",
-        api_key="total_active_power",
+        key="iaq",
+        api_key="iaq",
+        source="wtp",
+        device_class=SensorDeviceClass.AQI,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="air_quality",
+        api_key="air_quality",
+        source="wtp",
+        icon="mdi:air-filter",
+        is_text=True,
+    ),
+    SinumSensorDescription(
+        key="active_power",
+        api_key="active_power",
         source="wtp",
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         scale=0.001,
         suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="voltage",
+        api_key="voltage",
+        source="wtp",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="current",
+        api_key="current",
+        source="wtp",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        scale=0.001,
+        suggested_display_precision=3,
     ),
     SinumSensorDescription(
         key="energy_consumed_total",
@@ -213,6 +261,45 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         scale=0.1,
         suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="illuminance",
+        api_key="illuminance",
+        source="sbus",
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=LIGHT_LUX,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="analog_value",
+        api_key="value",
+        source="sbus",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:gauge",
+    ),
+    SinumSensorDescription(
+        key="impulse_count",
+        api_key="count",
+        source="sbus",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:counter",
+    ),
+)
+
+# ── SBUS temperature_regulator sensors ────────────────────────────────────────
+
+SBUS_REGULATOR_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="target_temperature",
+        api_key="target_temperature",
+        source="sbus_regulator",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="regulator_target_temperature",
     ),
 )
 
@@ -371,9 +458,16 @@ async def async_setup_entry(
 
     # SBUS device sensors
     for device_id, device in coordinator.sbus_devices.items():
-        for desc in SBUS_SENSORS:
-            if desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+        if device.get("type") == "temperature_regulator":
+            for desc in SBUS_REGULATOR_SENSORS:
+                if desc.api_key in device:
+                    entities.append(
+                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry.entry_id)
+                    )
+        else:
+            for desc in SBUS_SENSORS:
+                if desc.api_key in device:
+                    entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
 
     # Weather sensors (best-effort)
     try:
@@ -434,9 +528,7 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
 
         device = self._get_device_dict(coordinator)
-        room = device.get("_room", "")
-        name = device.get("_device_name", str(device_id))
-        label = f"{room} {name}".strip() if room else name
+        label = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
@@ -448,7 +540,7 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
         if self._source == "virtual":
             return coordinator.virtual_devices.get(self._device_id, {})
-        if self._source == "sbus":
+        if self._source in ("sbus", "sbus_regulator"):
             return coordinator.sbus_devices.get(self._device_id, {})
         return coordinator.wtp_devices.get(self._device_id, {})
 
@@ -457,10 +549,12 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         return self._get_device_dict(self.coordinator)
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> float | str | None:
         raw = self._device.get(self.entity_description.api_key)
         if raw is None:
             return None
+        if self.entity_description.is_text:
+            return str(raw)
         return raw * self.entity_description.scale
 
 
@@ -469,7 +563,7 @@ def _model_for_source(source: str) -> str:
         return "Sinum Virtual Device"
     if source == "sbus":
         return "Sinum SBUS Sensor"
-    if source == "wtp_regulator":
+    if source in ("wtp_regulator", "sbus_regulator"):
         return "Sinum Temperature Regulator"
     return "Sinum WTP Sensor"
 
@@ -485,8 +579,7 @@ class SinumTemperatureRegulatorSensor(SinumSensor):
         entry_id: str,
     ) -> None:
         super().__init__(coordinator, device_id, description, entry_id)
-        # Override source for proper device lookup
-        self._source = "wtp"
+        # _source stays as "wtp_regulator" or "sbus_regulator" — _get_device_dict handles both
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -769,6 +862,8 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
 
         day_schedule = self._schedule.get(weekday, [])
         for entry in day_schedule:
+            if not isinstance(entry, dict):
+                continue
             if entry.get("start", 0) <= current_minutes < entry.get("end", 0):
                 return "Active"
 
@@ -800,6 +895,7 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
                     "target_temp": e.get("target_temperature", 0) / 10,
                 }
                 for e in day_schedule
+                if isinstance(e, dict)
             ],
         }
 
