@@ -1,7 +1,7 @@
 {
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "documentation": "https://github.com/zaba848/Sinum_HomeAsistant_connector",
   "issue_tracker": "https://github.com/zaba848/Sinum_HomeAsistant_connector/issues",
   "requirements": ["aiohttp>=3.9.0"],

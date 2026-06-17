@@ -76,7 +76,7 @@ local OPTIONAL_FIELDS = {
     -- Fan control
     "fan_operation_mode",
     -- Buttons
-    "action", "buttons_count", "buzzer",
+    "action", "last_action", "buttons_count", "buzzer",
     -- Valves and actuators
     "enabled", "blockade", "emergency_behaviour",
     "temperature_threshold_heating", "temperature_threshold_cooling",

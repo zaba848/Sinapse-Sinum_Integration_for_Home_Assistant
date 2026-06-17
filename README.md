@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-185%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-380%20passing-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://www.techsterowniki.pl/baza-wiedzy-sinum)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
@@ -140,9 +140,9 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/        # 171 tests, ~0.8s
+pytest tests/        # 380 tests, ~1.3s
 pytest -v tests/     # verbose
-pytest --cov=custom_components/sinum tests/  # with coverage
+pytest --cov=custom_components/sinum tests/  # with coverage (84%+)
 ```
 
 ### Structure
@@ -178,19 +178,27 @@ lua_scripts/
 tests/
   ├── fixtures/sinum_devices.json
   ├── test_api.py
+  ├── test_api_extended.py
   ├── test_alarm_control_panel.py
   ├── test_binary_sensor.py
+  ├── test_binary_sensor_setup.py
   ├── test_button.py
   ├── test_climate.py
   ├── test_config_flow.py
   ├── test_coordinator.py
-  ├── test_fan_coil.py
+  ├── test_cover_extended.py
+  ├── test_diagnostics.py
   ├── test_event.py
+  ├── test_fan_coil.py
   ├── test_mqtt.py
   ├── test_new_device_types.py
+  ├── test_new_entities.py
   ├── test_new_sbus_types.py
+  ├── test_number_extended.py
   ├── test_schedule_sensors.py
-  └── test_sensor.py
+  ├── test_sensor.py
+  ├── test_switch_setup.py
+  └── test_update.py
 ```
 
 ---

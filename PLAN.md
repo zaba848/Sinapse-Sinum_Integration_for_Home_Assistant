@@ -1,7 +1,7 @@
 # Sinapse — Implementation Plan
 
 > Roadmap for the Sinum EH-01 Home Assistant integration.  
-> Last updated: 2026-06-17 (Phase 12 complete), verified against two live hubs (firmware `1.24.0-alpha.2`, API `1.4`).  
+> Last updated: 2026-06-17 (Phase 13 complete), verified against two live hubs (firmware `1.24.0-alpha.2`, API `1.4`).  
 > Credentials and API tokens must never be committed to this repository.
 
 ---
@@ -104,7 +104,7 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 | Virtual | `heat_pump_manager` | 1 | ✅ climate |
 | Virtual | `custom_device` | 65 | ➖ intentionally skipped |
 
-**HA entity counts (Hub 2 live, after Phase 12)**: 137 climate · ~503 sensor · 287 binary_sensor · 89 switch · 45 light · 5 cover · 38 button · 128 update · 3 alarm_control_panel · 3 number
+**HA entity counts (Hub 2 live, after Phase 13)**: 137 climate · ~503 sensor · 287 binary_sensor · 89 switch · 45 light · 5 cover · 38 button · 128 update · 3 alarm_control_panel · 3 number · 1+ event
 
 ---
 
@@ -123,6 +123,7 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 | 10 | SBUS motion sensor; SBUS illuminance/analog_input/impulse_meter sensors | ✅ Done |
 | 11 | Sensor bug fixes: flood state_key, aq PM keys, iaq sensor, energy_meter fields | ✅ Done |
 | 12 | button → sensor; valve_pump + common_valve → switch; analog_output → number; PWM → sensor; heat_pump_manager → climate | ✅ Done |
+| 13 | button → HA event entity; DHW switch; target_reached binary_sensor; valve sensors; 84% test coverage (380 tests) | ✅ Done |
 
 ---
 
@@ -131,9 +132,9 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 No known device types left unimplemented. All types observed on Hub 1 and Hub 2 now have HA entities.
 
 Possible future improvements:
-- `button` → HA `event` entity (better for automations, fires per press rather than polling)
 - MQTT-based real-time push for button actions (currently REST polling only)
 - WTP `smoke_sensor` / `opening_sensor` — not seen on live hubs, would auto-work via existing binary_sensor descriptors
+- Further test coverage improvements (currently 84% — target 90%+)
 
 ---
 

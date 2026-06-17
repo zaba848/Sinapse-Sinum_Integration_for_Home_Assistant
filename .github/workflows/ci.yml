@@ -31,7 +31,7 @@ jobs:
           python -m pytest tests/ \
             --cov=custom_components/sinum \
             --cov-report=term-missing \
-            --cov-fail-under=75 \
+            --cov-fail-under=80 \
             -q
 
       - name: Upload coverage report
