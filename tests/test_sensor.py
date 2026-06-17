@@ -67,15 +67,15 @@ class TestPhase7BTemperatureRegulators:
         coordinator.sbus_devices = {}
         return coordinator
 
-    def test_regulator_temperature_sensor(self):
-        """Temperature regulator reads current room temperature."""
+    def test_regulator_temperature_sensor_returns_none_when_absent(self):
+        """Real regulators have no temperature field — sensor correctly returns None."""
         device = dict(FIXTURES["wtp_temperature_regulator_full"])
         coordinator = self._make_wtp_coordinator(100, device)
         entity = SinumTemperatureRegulatorSensor(
             coordinator, 100, self._wtp_regulator_description("temperature"), "test_entry"
         )
 
-        assert entity.native_value == 21.0
+        assert entity.native_value is None
 
     def test_regulator_target_temperature_sensor(self):
         """Temperature regulator reads target temperature."""
@@ -97,7 +97,7 @@ class TestPhase7BTemperatureRegulators:
 
         attrs = entity.extra_state_attributes
         assert attrs["system_mode"] == "heating"
-        assert attrs["target_temperature_mode"] == {"current": "constant", "remaining_time": 0}
+        assert attrs["target_temperature_mode"] == "constant"
         assert attrs["mode_mutable"] is True
         assert attrs["parent_id"] == 10
 
@@ -113,15 +113,14 @@ class TestPhase7BTemperatureRegulators:
         assert attrs["mode_mutable"] is False
 
     def test_regulator_partial_handles_missing_fields(self):
-        """Temperature regulator with missing fields handles gracefully."""
+        """Temperature regulator with no fields (partial) returns None for all sensors."""
         device = dict(FIXTURES["wtp_temperature_regulator_partial"])
         coordinator = self._make_wtp_coordinator(101, device)
         entity = SinumTemperatureRegulatorSensor(
             coordinator, 101, self._wtp_regulator_description("temperature"), "test_entry"
         )
 
-        # Should read available fields
-        assert entity.native_value == 20.5
+        assert entity.native_value is None
 
         # Attributes should only include fields that exist
         attrs = entity.extra_state_attributes

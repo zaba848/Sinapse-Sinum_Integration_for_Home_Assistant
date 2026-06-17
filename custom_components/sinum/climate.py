@@ -476,7 +476,8 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         if "parent_id" in d:
             attrs["parent_id"] = d["parent_id"]
         if "target_temperature_mode" in d:
-            attrs["target_temperature_mode"] = d["target_temperature_mode"]
+            ttm = d["target_temperature_mode"]
+            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:

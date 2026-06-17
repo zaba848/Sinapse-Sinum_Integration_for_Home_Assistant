@@ -138,9 +138,10 @@ class TestPhase7B2TemperatureRegulator:
         return entity, coordinator
 
     def test_regulator_reads_temperature(self):
+        """Real regulators have no temperature field — current_temperature is None."""
         device = dict(FIXTURES["wtp_temperature_regulator_full"])
         entity, _ = self._make_regulator(device)
-        assert entity.current_temperature == 21.0
+        assert entity.current_temperature is None
 
     def test_regulator_reads_target_temperature(self):
         device = dict(FIXTURES["wtp_temperature_regulator_full"])
