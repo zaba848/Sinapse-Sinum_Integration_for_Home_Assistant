@@ -94,6 +94,15 @@ STYPE_MOTION_SENSOR = "motion_sensor"
 STYPE_LIGHT_SENSOR = "light_sensor"
 STYPE_ANALOG_INPUT = "analog_input"
 STYPE_IMPULSE_METER = "impulse_meter"
+STYPE_BUTTON = "button"
+STYPE_ANALOG_OUTPUT = "analog_output"
+STYPE_VALVE_PUMP = "valve_pump"
+STYPE_COMMON_VALVE = "common_valve"
+STYPE_PWM = "pulse_width_modulation"
+
+WTYPE_BUTTON = "button"
+
+VTYPE_HEAT_PUMP_MANAGER = "heat_pump_manager"
 
 # ── Gate states ────────────────────────────────────────────────────────────────
 GATE_STATE_OPEN = "open"

@@ -334,5 +334,79 @@
     "color_mode": "rgb",
     "room_id": 1,
     "class": "virtual"
+  },
+  "sbus_button": {
+    "id": 50,
+    "name": "SBUS Button",
+    "type": "button",
+    "action": "single_press",
+    "buttons_count": 2,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "wtp_button": {
+    "id": 51,
+    "name": "WTP Button",
+    "type": "button",
+    "action": "double_press",
+    "buttons_count": 1,
+    "room_id": 1,
+    "class": "wtp"
+  },
+  "sbus_valve_pump": {
+    "id": 52,
+    "name": "SBUS Valve Pump",
+    "type": "valve_pump",
+    "state": true,
+    "blockade": false,
+    "emergency_behaviour": "open",
+    "temperature_threshold_heating": 350,
+    "temperature_threshold_cooling": 150,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_common_valve": {
+    "id": 53,
+    "name": "SBUS Common Valve",
+    "type": "common_valve",
+    "enabled": false,
+    "blockade": false,
+    "emergency_behaviour": "open",
+    "blockade_reasons": [],
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_analog_output": {
+    "id": 54,
+    "name": "SBUS Analog Output",
+    "type": "analog_output",
+    "value": 5000,
+    "value_minimum": 0,
+    "value_maximum": 10000,
+    "unit": "mV",
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_pwm": {
+    "id": 55,
+    "name": "SBUS PWM",
+    "type": "pulse_width_modulation",
+    "duty_cycle": 75,
+    "frequency": 1000,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "virtual_heat_pump_manager": {
+    "id": 15,
+    "name": "Heat Pump Manager",
+    "type": "heat_pump_manager",
+    "work_mode": "heating",
+    "temperature": 200,
+    "target_temperature": {"current": 212, "cooling": 212, "heating": 200, "automatic": 180},
+    "state": true,
+    "enabled": true,
+    "dhw_control": {"state": false, "target_temperature": 550},
+    "room_id": 1,
+    "class": "virtual"
   }
 }

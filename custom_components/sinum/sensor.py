@@ -34,7 +34,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import DOMAIN
+from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -285,6 +285,24 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:counter",
     ),
+    SinumSensorDescription(
+        key="pwm_duty_cycle",
+        api_key="duty_cycle",
+        source="sbus",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        icon="mdi:pulse",
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="pwm_frequency",
+        api_key="frequency",
+        source="sbus",
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="Hz",
+        suggested_display_precision=0,
+    ),
 )
 
 # ── SBUS temperature_regulator sensors ────────────────────────────────────────
@@ -456,6 +474,11 @@ async def async_setup_entry(
             if desc.source == "wtp" and desc.api_key in device:
                 entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
 
+    # WTP button sensors
+    for device_id, device in coordinator.wtp_devices.items():
+        if device.get("type") == WTYPE_BUTTON:
+            entities.append(SinumButtonSensor(coordinator, device_id, entry.entry_id, "wtp"))
+
     # SBUS device sensors
     for device_id, device in coordinator.sbus_devices.items():
         if device.get("type") == "temperature_regulator":
@@ -468,6 +491,8 @@ async def async_setup_entry(
             for desc in SBUS_SENSORS:
                 if desc.api_key in device:
                     entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+            if device.get("type") == STYPE_BUTTON:
+                entities.append(SinumButtonSensor(coordinator, device_id, entry.entry_id, "sbus"))
 
     # Weather sensors (best-effort)
     try:
@@ -928,3 +953,53 @@ class SinumScheduleAssociationCountSensor(SinumScheduleSensor):
             "thermostats": assoc.get("thermostats", []),
             "fan_coils": assoc.get("fan_coils", []),
         }
+
+
+class SinumButtonSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    """Last-action sensor for WTP/SBUS button devices."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "button_last_action"
+    _attr_icon = "mdi:gesture-tap-button"
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        entry_id: str,
+        bus: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._bus = bus
+        self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_last_action"
+        store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+        device = store.get(device_id, {})
+        label = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model=f"Sinum {bus.upper()} Button",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        return store.get(self._device_id, {})
+
+    @property
+    def native_value(self) -> str | None:
+        action = self._device.get("action")
+        if action is None:
+            return None
+        return str(action) if action != "" else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {"buttons_count": d.get("buttons_count", 1)}
+        if "buzzer" in d:
+            attrs["buzzer"] = d["buzzer"]
+        return attrs

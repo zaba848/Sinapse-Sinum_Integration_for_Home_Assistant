@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .const import DOMAIN, STYPE_RELAY, VTYPE_RELAY, VTYPE_WICKET, WTYPE_RELAY
+from .const import DOMAIN, STYPE_COMMON_VALVE, STYPE_RELAY, STYPE_VALVE_PUMP, VTYPE_RELAY, VTYPE_WICKET, WTYPE_RELAY
 from .coordinator import SinumCoordinator
 
 
@@ -33,8 +33,13 @@ async def async_setup_entry(
             entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "wtp"))
 
     for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_RELAY:
+        dev_type = device.get("type")
+        if dev_type == STYPE_RELAY:
             entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "sbus"))
+        elif dev_type == STYPE_VALVE_PUMP:
+            entities.append(SinumValvePumpSwitch(coordinator, device_id, entry.entry_id))
+        elif dev_type == STYPE_COMMON_VALVE:
+            entities.append(SinumCommonValveSwitch(coordinator, device_id, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -161,4 +166,110 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         else:
             updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": False})
             self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumValvePumpSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+    """SBUS valve_pump — state bool, with blockade and temperature thresholds as attributes."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_icon = "mdi:pump"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
+        device = coordinator.sbus_devices.get(device_id, {})
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=name,
+            manufacturer="TECH Sterowniki",
+            model="Sinum SBUS Valve Pump",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._device.get("state"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        if "blockade" in d:
+            attrs["blockade"] = d["blockade"]
+        if "emergency_behaviour" in d:
+            attrs["emergency_behaviour"] = d["emergency_behaviour"]
+        if "temperature_threshold_heating" in d:
+            attrs["threshold_heating_c"] = d["temperature_threshold_heating"] / 10
+        if "temperature_threshold_cooling" in d:
+            attrs["threshold_cooling_c"] = d["temperature_threshold_cooling"] / 10
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": True})
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": False})
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+    """SBUS common_valve — enabled bool, complex calibration settings as attributes."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_icon = "mdi:valve"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
+        device = coordinator.sbus_devices.get(device_id, {})
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=name,
+            manufacturer="TECH Sterowniki",
+            model="Sinum SBUS Common Valve",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._device.get("enabled"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        if "blockade" in d:
+            attrs["blockade"] = d["blockade"]
+        if "emergency_behaviour" in d:
+            attrs["emergency_behaviour"] = d["emergency_behaviour"]
+        if "blockade_reasons" in d:
+            attrs["blockade_reasons"] = d["blockade_reasons"]
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"enabled": True})
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"enabled": False})
+        self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()

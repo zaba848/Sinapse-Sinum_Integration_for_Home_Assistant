@@ -7,10 +7,11 @@ from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import DOMAIN
+from .const import DOMAIN, STYPE_ANALOG_OUTPUT
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ async def async_setup_entry(
     for var in variables:
         if var.get("type") in ("integer", "float", "number"):
             entities.append(SinumVariableNumber(coordinator, var, entry.entry_id))
+
+    for device_id, device in coordinator.sbus_devices.items():
+        if device.get("type") == STYPE_ANALOG_OUTPUT:
+            entities.append(SinumAnalogOutputNumber(coordinator, device_id, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -79,3 +84,46 @@ class SinumVariableNumber(NumberEntity):
             if variable.get("id") == self._variable_id:
                 self._variable.update(variable)
                 break
+
+
+class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
+    """SBUS analog_output — writable output value (e.g. 0–10 V control signal)."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_mode = NumberMode.SLIDER
+    _attr_icon = "mdi:knob"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
+        device = coordinator.sbus_devices.get(device_id, {})
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_native_min_value = float(device.get("value_minimum", 0))
+        self._attr_native_max_value = float(device.get("value_maximum", 10000))
+        self._attr_native_step = 1.0
+        self._attr_native_unit_of_measurement = device.get("unit") or None
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=name,
+            manufacturer="TECH Sterowniki",
+            model="Sinum SBUS Analog Output",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._device.get("value")
+        return float(raw) if raw is not None else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"value": int(value)}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()

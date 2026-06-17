@@ -21,6 +21,7 @@ from .const import (
     STYPE_FAN_COIL,
     TEMP_MAX,
     TEMP_MIN,
+    VTYPE_HEAT_PUMP_MANAGER,
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
     WTYPE_TEMPERATURE_REGULATOR,
@@ -71,10 +72,13 @@ async def async_setup_entry(
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[ClimateEntity] = []
 
-    # Virtual thermostats
-    for device_id in coordinator.virtual_devices:
-        if _is_thermostat(coordinator.virtual_devices[device_id]):
+    # Virtual thermostats and heat pump manager
+    for device_id, device in coordinator.virtual_devices.items():
+        dev_type = device.get("type")
+        if _is_thermostat(device):
             entities.append(SinumThermostat(coordinator, device_id, entry.entry_id))
+        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
+            entities.append(SinumHeatPumpManagerClimate(coordinator, device_id, entry.entry_id))
 
     # SBUS fan coils (full climate control: work_mode + temp + fan)
     for device_id, device in coordinator.sbus_devices.items():
@@ -499,4 +503,144 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         if self._bus == "sbus":
             return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
         return await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+
+
+class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
+    """Virtual heat_pump_manager — controls heat pump work mode and target temperature."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_translation_key = "heat_pump_manager"
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
+    )
+    _attr_target_temperature_step = 0.5
+    _attr_min_temp = TEMP_MIN
+    _attr_max_temp = TEMP_MAX
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.AUTO]
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
+        device = coordinator.virtual_devices.get(device_id, {})
+        area = device.get("_area") or device.get("_room", "")
+        label = device.get("_device_name") or device.get("name", "Heat Pump Manager")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model="Sinum Heat Pump Manager",
+            suggested_area=area or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.virtual_devices.get(self._device_id, {})
+
+    @property
+    def current_temperature(self) -> float | None:
+        raw = self._device.get("temperature")
+        if raw is None:
+            return None
+        return self.coordinator.client.decode_temperature(raw)
+
+    @property
+    def target_temperature(self) -> float | None:
+        tt = self._device.get("target_temperature")
+        if tt is None:
+            return None
+        if isinstance(tt, dict):
+            raw = tt.get("current")
+        else:
+            raw = tt
+        if raw is None:
+            return None
+        return self.coordinator.client.decode_temperature(raw)
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        if not self._device.get("enabled", True):
+            return HVACMode.OFF
+        mode = self._device.get("work_mode", "off")
+        return _MODE_TO_HVAC.get(mode, HVACMode.OFF)
+
+    @property
+    def hvac_action(self) -> HVACAction:
+        if self.hvac_mode == HVACMode.OFF:
+            return HVACAction.OFF
+        if self._device.get("state") is True:
+            mode = self._device.get("work_mode", "")
+            if mode == "cooling":
+                return HVACAction.COOLING
+            return HVACAction.HEATING
+        return HVACAction.IDLE
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        tt = d.get("target_temperature")
+        if isinstance(tt, dict):
+            decode = self.coordinator.client.decode_temperature
+            for k in ("heating", "cooling", "automatic"):
+                if tt.get(k) is not None:
+                    attrs[f"target_temperature_{k}"] = decode(tt[k])
+        dhw = d.get("dhw_control")
+        if isinstance(dhw, dict):
+            if dhw.get("target_temperature") is not None:
+                attrs["dhw_target_temperature"] = self.coordinator.client.decode_temperature(
+                    dhw["target_temperature"]
+                )
+            if "state" in dhw:
+                attrs["dhw_state"] = dhw["state"]
+        return attrs
+
+    async def async_set_temperature(self, **kwargs: Any) -> None:
+        temperature = kwargs.get(ATTR_TEMPERATURE)
+        if temperature is None:
+            return
+        raw = self.coordinator.client.encode_temperature(temperature)
+        tt = self._device.get("target_temperature")
+        if isinstance(tt, dict):
+            payload: dict[str, Any] = {"target_temperature": {"current": raw}}
+        else:
+            payload = {"target_temperature": raw}
+        updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        if hvac_mode == HVACMode.OFF:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"enabled": False}
+            )
+        else:
+            sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "heating")
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"enabled": True, "work_mode": sinum_mode}
+            )
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"enabled": True}
+        )
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self) -> None:
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"enabled": False}
+        )
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
 
