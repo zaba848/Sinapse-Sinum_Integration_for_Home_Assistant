@@ -20,7 +20,7 @@
 
 ### Issues Resolution
 - [ ] No unresolved errors in logs
-- [ ] All 91 tests still passing
+- [ ] All 98 tests still passing
 - [ ] No duplicate entities
 - [ ] No conflicts with existing integrations
 
@@ -226,7 +226,7 @@ Once approved:
 
 ### Testing
 - 91 unit tests passing
-- Live tested on Sinum EH-01 (firmware 1.24.0-alpha.1)
+- Live tested on Sinum EH-01 (firmware 1.24.0-alpha.3)
 - Device coverage: Virtual (8), WTP (12+), SBUS (5)
 
 ### Known Limitations
