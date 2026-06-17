@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sinapse-homeassistant-sinum"
+version = "0.1.0"
+description = "Home Assistant integration for Sinum EH-01 home automation hub"
+readme = "README.md"
+license = {text = "Proprietary"}
+authors = [{name = "Tomasz Panek", email = "zaba9214@gmail.com"}]
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+exclude = [
+    ".git",
+    ".github",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.egg-info",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "I",      # isort
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "W503",   # line break before binary operator
+]
+
+[tool.ruff.lint.isort]
+profile = "black"
+known-first-party = ["custom_components"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "homeassistant.*",
+    "voluptuous.*",
+    "pytest_homeassistant_custom_component.*",
+]
+ignore_missing_imports = true
