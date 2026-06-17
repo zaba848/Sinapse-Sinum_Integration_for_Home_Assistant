@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-380%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-485%20passing-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://www.techsterowniki.pl/baza-wiedzy-sinum)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
@@ -140,9 +140,9 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/        # 380 tests, ~1.3s
+pytest tests/        # 485 tests, ~1.6s
 pytest -v tests/     # verbose
-pytest --cov=custom_components/sinum tests/  # with coverage (84%+)
+pytest --cov=custom_components/sinum tests/  # with coverage (94%+)
 ```
 
 ### Structure
