@@ -74,6 +74,9 @@
             }
           }
         }
+      },
+      "temperature_regulator": {
+        "name": "Thermostat"
       }
     },
     "sensor": {
@@ -82,6 +85,45 @@
       },
       "hub_wifi_signal": {
         "name": "Wi-Fi signal"
+      },
+      "regulator_temperature": {
+        "name": "Temperature"
+      },
+      "regulator_target_temperature": {
+        "name": "Target temperature"
+      },
+      "weather_temperature": {
+        "name": "Outside temperature"
+      },
+      "weather_humidity": {
+        "name": "Outside humidity"
+      },
+      "weather_pressure": {
+        "name": "Pressure"
+      },
+      "weather_wind_speed": {
+        "name": "Wind speed"
+      },
+      "weather_uv_index": {
+        "name": "UV index"
+      },
+      "weather_solar_irradiance": {
+        "name": "Solar irradiance"
+      },
+      "weather_cloud_coverage": {
+        "name": "Cloud coverage"
+      },
+      "weather_wind_degrees": {
+        "name": "Wind direction"
+      },
+      "energy_consumption": {
+        "name": "Energy consumption"
+      },
+      "energy_production": {
+        "name": "Energy production"
+      },
+      "energy_storage": {
+        "name": "Energy storage"
       }
     },
     "binary_sensor": {
