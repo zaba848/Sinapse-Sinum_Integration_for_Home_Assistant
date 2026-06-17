@@ -41,7 +41,7 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 ### HACS (recommended)
 
 1. HACS → Integrations → three-dot menu → **Custom repositories**
-2. Add `https://github.com/zaba848/sinapse_ha_integration` as category **Integration**
+2. Add `https://github.com/zaba848/Sinum_HomeAsistant_connector` as category **Integration**
 3. Find and install **Sinapse**
 4. Restart Home Assistant
 

@@ -2,12 +2,11 @@
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
   "version": "0.1.0",
-  "documentation": "https://github.com/zaba9214/ha-sinapse",
-  "issue_tracker": "https://github.com/zaba9214/ha-sinapse/issues",
+  "documentation": "https://github.com/zaba848/Sinum_HomeAsistant_connector",
+  "issue_tracker": "https://github.com/zaba848/Sinum_HomeAsistant_connector/issues",
   "requirements": ["aiohttp>=3.9.0"],
   "dependencies": [],
-  "codeowners": ["@zaba9214"],
+  "codeowners": ["@zaba848"],
   "config_flow": true,
-  "iot_class": "local_polling",
-  "homekit": {}
+  "iot_class": "local_polling"
 }
