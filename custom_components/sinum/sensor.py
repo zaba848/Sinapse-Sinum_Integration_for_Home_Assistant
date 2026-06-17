@@ -4,6 +4,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+# Sinum hub encodes "no value / sensor error" as signed 16-bit minimum (-32768).
+# Multiply by 0.1 scale → -3276.8°C. Treat this as unavailable.
+_SENTINEL_INT16 = -32768
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -626,6 +630,8 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             return str(raw)
         if not isinstance(raw, (int, float)):
             return None
+        if raw == _SENTINEL_INT16:
+            return None
         return raw * self.entity_description.scale
 
 
@@ -692,7 +698,7 @@ class SinumWeatherSensor(SensorEntity):
     @property
     def native_value(self) -> float | None:
         raw = self._data.get(self.entity_description.api_key)
-        if raw is None:
+        if raw is None or raw == _SENTINEL_INT16:
             return None
         return raw * self.entity_description.scale
 
@@ -724,7 +730,7 @@ class SinumEnergySensor(SensorEntity):
     @property
     def native_value(self) -> float | None:
         raw = self._data.get(self.entity_description.api_key)
-        if raw is None:
+        if raw is None or raw == _SENTINEL_INT16:
             return None
         return raw * self.entity_description.scale
 
