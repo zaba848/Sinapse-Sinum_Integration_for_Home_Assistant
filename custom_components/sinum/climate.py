@@ -23,10 +23,17 @@ from .const import (
     TEMP_MIN,
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
+    WTYPE_TEMPERATURE_REGULATOR,
 )
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# Phase 7B.2: Temperature regulator climate entities (optional/experimental)
+# Disabled by default pending live testing decision on whether they add value
+# Enable if users need direct control on regulators (not supervised by thermostat)
+ENABLE_EXPERIMENTAL_REGULATOR_CLIMATE = False
+
 
 # Sinum thermostat modes → HA HVAC modes
 _MODE_TO_HVAC: dict[str, HVACMode] = {
@@ -375,3 +382,128 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         if self._source == "sbus":
             return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
         return await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+
+
+class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
+    """Optional climate entity for WTP temperature regulators (Phase 7B.2).
+
+    Disabled by default. Regulators are usually supervised by virtual thermostats.
+    Only enable if diagnostics show direct control is beneficial.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_translation_key = "temperature_regulator"
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_target_temperature_step = 0.5
+    _attr_min_temp = TEMP_MIN
+    _attr_max_temp = TEMP_MAX
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_wtp_regulator_{device_id}"
+
+        device = coordinator.wtp_devices.get(device_id, {})
+        self._attr_hvac_modes = _available_hvac_modes(device)
+
+        # Dynamic features based on mode_mutable
+        features = ClimateEntityFeature.TARGET_TEMPERATURE
+        if device.get("mode_mutable", True):
+            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+        self._attr_supported_features = features
+
+        area = device.get("_area") or None
+        room = device.get("_room", "")
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        label = f"{room} {name}".strip() if room else name
+
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_wtp_regulator_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model="Sinum Temperature Regulator",
+            suggested_area=area,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.wtp_devices.get(self._device_id, {})
+
+    @property
+    def name(self) -> str:
+        d = self._device
+        room = d.get("_room", "")
+        name = d.get("_device_name") or d.get("name", str(self._device_id))
+        return f"{room} {name}".strip() if room else name
+
+    @property
+    def current_temperature(self) -> float | None:
+        raw = self._device.get("temperature")
+        if raw is None:
+            return None
+        return raw / 10
+
+    @property
+    def target_temperature(self) -> float | None:
+        raw = self._device.get("target_temperature")
+        if raw is None:
+            return None
+        return raw / 10
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        mode = self._device.get("system_mode", "off")
+        return _MODE_TO_HVAC.get(mode, HVACMode.OFF)
+
+    @property
+    def hvac_action(self) -> HVACAction:
+        state = str(self._device.get("state", ""))
+        if "heating" in state:
+            return HVACAction.HEATING
+        if "cooling" in state:
+            return HVACAction.COOLING
+        if self.hvac_mode == HVACMode.OFF:
+            return HVACAction.OFF
+        return HVACAction.IDLE
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        if "mode_mutable" in d:
+            attrs["mode_mutable"] = d["mode_mutable"]
+        if "parent_id" in d:
+            attrs["parent_id"] = d["parent_id"]
+        if "target_temperature_mode" in d:
+            attrs["target_temperature_mode"] = d["target_temperature_mode"]
+        return attrs
+
+    async def async_set_temperature(self, **kwargs: Any) -> None:
+        temperature = kwargs.get(ATTR_TEMPERATURE)
+        if temperature is None:
+            return
+        raw = round(temperature * 10)
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"target_temperature": raw}
+        )
+        if updated:
+            self._device.update(updated)
+        self.async_write_ha_state()
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        # Only allow mode changes if mutable
+        if not self._device.get("mode_mutable", True):
+            _LOGGER.warning(
+                "Temperature regulator %d does not allow mode changes (mode_mutable=false)",
+                self._device_id,
+            )
+            return
+        system_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
+        updated = await self.coordinator.client.patch_wtp_device(
+            self._device_id, {"system_mode": system_mode}
+        )
+        if updated:
+            self._device.update(updated)
+        self.async_write_ha_state()
+

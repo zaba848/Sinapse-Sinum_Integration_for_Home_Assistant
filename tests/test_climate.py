@@ -118,3 +118,75 @@ class TestSinumThermostat:
             entity.async_set_temperature()
         )
         coordinator.client.patch_virtual_device.assert_not_called()
+
+
+class TestPhase7B2TemperatureRegulator:
+    """Phase 7B.2: Optional temperature regulator climate entities (experimental)."""
+
+    def _make_regulator(self, device_data: dict[str, Any]):
+        from custom_components.sinum.climate import SinumTemperatureRegulatorClimate
+
+        coordinator = MagicMock()
+        coordinator.client.patch_wtp_device = AsyncMock(return_value=device_data)
+        coordinator.wtp_devices = {100: device_data}
+        coordinator.virtual_devices = {}
+        coordinator.sbus_devices = {}
+
+        entity = SinumTemperatureRegulatorClimate(coordinator, 100, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity, coordinator
+
+    def test_regulator_reads_temperature(self):
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, _ = self._make_regulator(device)
+        assert entity.current_temperature == 21.0
+
+    def test_regulator_reads_target_temperature(self):
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, _ = self._make_regulator(device)
+        assert entity.target_temperature == 22.0
+
+    def test_regulator_shows_hvac_mode(self):
+        from homeassistant.components.climate import HVACMode
+
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, _ = self._make_regulator(device)
+        assert entity.hvac_mode == HVACMode.HEAT
+
+    async def test_regulator_mutable_allows_mode_set(self):
+        from homeassistant.components.climate import HVACMode
+
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, coordinator = self._make_regulator(device)
+
+        await entity.async_set_hvac_mode(HVACMode.COOL)
+
+        coordinator.client.patch_wtp_device.assert_called_with(100, {"system_mode": "cooling"})
+
+    async def test_regulator_immutable_blocks_mode_set(self):
+        from homeassistant.components.climate import HVACMode
+
+        device = dict(FIXTURES["wtp_temperature_regulator_immutable"])
+        entity, coordinator = self._make_regulator(device)
+
+        # Should not call API when mode_mutable=false
+        await entity.async_set_hvac_mode(HVACMode.COOL)
+
+        coordinator.client.patch_wtp_device.assert_not_called()
+
+    def test_regulator_shows_supervision_attributes(self):
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, _ = self._make_regulator(device)
+
+        attrs = entity.extra_state_attributes
+        assert attrs["mode_mutable"] is True
+        assert attrs["parent_id"] == 10
+
+    async def test_regulator_set_temperature(self):
+        device = dict(FIXTURES["wtp_temperature_regulator_full"])
+        entity, coordinator = self._make_regulator(device)
+
+        await entity.async_set_temperature(temperature=23.0)
+
+        coordinator.client.patch_wtp_device.assert_called_with(100, {"target_temperature": 230})
