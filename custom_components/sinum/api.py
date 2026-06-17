@@ -188,6 +188,11 @@ class SinumClient:
         if resp.status == 304:
             return {}
 
+        # 408 is hub-side bus timeout (firmware alpha behaviour) — raise as connection error
+        # so coordinator logs a warning and retries on next poll instead of crashing
+        if resp.status == 408:
+            raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
+
         if resp.status not in (200, 201, 204):
             raise SinumConnectionError(f"API error {resp.status} for {path}")
 

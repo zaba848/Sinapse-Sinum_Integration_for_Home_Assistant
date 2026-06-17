@@ -97,7 +97,7 @@ class TestPhase7BTemperatureRegulators:
 
         attrs = entity.extra_state_attributes
         assert attrs["system_mode"] == "heating"
-        assert attrs["target_temperature_mode"] == "heating"
+        assert attrs["target_temperature_mode"] == {"current": "constant", "remaining_time": 0}
         assert attrs["mode_mutable"] is True
         assert attrs["parent_id"] == 10
 

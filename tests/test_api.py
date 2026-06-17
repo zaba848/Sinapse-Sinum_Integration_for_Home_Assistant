@@ -145,3 +145,14 @@ class TestApiRequests:
             devices = await client.get_parent_devices()
 
         assert devices == [{"id": 1, "class": "wtp"}, {"id": 2, "class": "sbus"}]
+
+    @pytest.mark.asyncio
+    async def test_408_raises_connection_error(self, session):
+        """Hub-side bus timeout (HTTP 408) raises SinumConnectionError for retry."""
+        resp = make_response(408, {"error": {"message": {"text": "Request timeout exceeded", "id": 7334}}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            with pytest.raises(SinumConnectionError, match="Hub internal timeout"):
+                await client.get_wtp_devices()

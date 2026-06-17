@@ -122,7 +122,7 @@
     "target_temperature_minimum": 50,
     "target_temperature_maximum": 300,
     "system_mode": "heating",
-    "target_temperature_mode": "heating",
+    "target_temperature_mode": {"current": "constant", "remaining_time": 0},
     "mode_mutable": true,
     "parent_id": 10,
     "status": "online"
