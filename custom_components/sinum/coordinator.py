@@ -33,12 +33,12 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.wtp_devices: dict[int, dict[str, Any]] = {}
         self.sbus_devices: dict[int, dict[str, Any]] = {}
         self.rooms: list[dict[str, Any]] = []
-        self.floors: dict[int, dict[str, Any]] = {}       # floor_id → {id, name, level}
-        self.hub_info: dict[str, Any] = {}                # from /api/v1/info
-        self.parent_devices: list[dict[str, Any]] = []    # flat list from /api/v1/parent-devices
-        self.schedules: list[dict[str, Any]] = []         # thermal schedules from /api/v1/schedules
+        self.floors: dict[int, dict[str, Any]] = {}  # floor_id → {id, name, level}
+        self.hub_info: dict[str, Any] = {}  # from /api/v1/info
+        self.parent_devices: list[dict[str, Any]] = []  # flat list from /api/v1/parent-devices
+        self.schedules: list[dict[str, Any]] = []  # thermal schedules from /api/v1/schedules
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
-        self.mqtt_bridge: Any | None = None               # set by __init__ if MQTT enabled
+        self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
         # ── Hub info (always-available health check) ──────────────────────────
@@ -180,6 +180,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _collect_device_ids(
     rooms: list[dict[str, Any]],

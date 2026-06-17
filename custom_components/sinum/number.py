@@ -47,7 +47,9 @@ class SinumVariableNumber(NumberEntity):
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
 
-    def __init__(self, coordinator: SinumCoordinator, variable: dict[str, Any], entry_id: str) -> None:
+    def __init__(
+        self, coordinator: SinumCoordinator, variable: dict[str, Any], entry_id: str
+    ) -> None:
         self._coordinator = coordinator
         self._variable_id: int = variable["id"]
         self._variable = variable

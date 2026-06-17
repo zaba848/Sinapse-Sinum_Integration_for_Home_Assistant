@@ -9,7 +9,16 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .const import DOMAIN, STYPE_COMMON_VALVE, STYPE_RELAY, STYPE_VALVE_PUMP, VTYPE_HEAT_PUMP_MANAGER, VTYPE_RELAY, VTYPE_WICKET, WTYPE_RELAY
+from .const import (
+    DOMAIN,
+    STYPE_COMMON_VALVE,
+    STYPE_RELAY,
+    STYPE_VALVE_PUMP,
+    VTYPE_HEAT_PUMP_MANAGER,
+    VTYPE_RELAY,
+    VTYPE_WICKET,
+    WTYPE_RELAY,
+)
 from .coordinator import SinumCoordinator
 
 
@@ -48,7 +57,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _device_info(coordinator: SinumCoordinator, device_id: int, entry_id: str, model: str) -> DeviceInfo:
+def _device_info(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, model: str
+) -> DeviceInfo:
     device = coordinator.virtual_devices.get(device_id, {})
     name = device.get("_device_name") or device.get("name", str(device_id))
     return DeviceInfo(
@@ -69,7 +80,9 @@ class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
-        self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Relay Integrator")
+        self._attr_device_info = _device_info(
+            coordinator, device_id, entry_id, "Sinum Relay Integrator"
+        )
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -80,12 +93,16 @@ class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return bool(self._device.get("state"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, {"state": True})
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"state": True}
+        )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, {"state": False})
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"state": False}
+        )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -112,12 +129,16 @@ class SinumWicketSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return self._device.get("state") in ("unlocked", "open")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "unlock"})
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"command": "unlock"}
+        )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "lock"})
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"command": "lock"}
+        )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -136,9 +157,9 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        device = (
-            coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        ).get(device_id, {})
+        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
+            device_id, {}
+        )
         name = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -150,7 +171,9 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
         return store.get(self._device_id, {})
 
     @property
@@ -159,19 +182,27 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, {"state": True})
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": True}
+            )
             self.coordinator.wtp_devices[self._device_id].update(updated)
         else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": True})
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": True}
+            )
             self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.wtp_devices[self._device_id].update(updated)
         else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -274,12 +305,16 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return attrs
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"enabled": True})
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"enabled": True}
+        )
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"enabled": False})
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"enabled": False}
+        )
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -295,7 +330,9 @@ class SinumDhwSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}_dhw"
-        self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Heat Pump Manager")
+        self._attr_device_info = _device_info(
+            coordinator, device_id, entry_id, "Sinum Heat Pump Manager"
+        )
 
     @property
     def _device(self) -> dict[str, Any]:

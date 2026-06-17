@@ -11,6 +11,7 @@ Topic schema
 sinum/state/<device_id>     Device state JSON  (Sinum → HA)
 sinum/event/<type>          Hub event JSON     (Sinum → HA)
 """
+
 from __future__ import annotations
 
 import json
@@ -44,12 +45,8 @@ class SinumMqttBridge:
             _LOGGER.warning("MQTT client not available — real-time updates disabled")
             return False
 
-        self._unsub.append(
-            await mqtt.async_subscribe(self._hass, TOPIC_STATE, self._handle_state)
-        )
-        self._unsub.append(
-            await mqtt.async_subscribe(self._hass, TOPIC_EVENT, self._handle_event)
-        )
+        self._unsub.append(await mqtt.async_subscribe(self._hass, TOPIC_STATE, self._handle_state))
+        self._unsub.append(await mqtt.async_subscribe(self._hass, TOPIC_EVENT, self._handle_event))
         _LOGGER.info("Sinapse MQTT bridge active — subscribed to sinum/#")
         return True
 

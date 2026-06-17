@@ -10,25 +10,25 @@ from .const import (
     API_ALARM_DEVICE,
     API_ALARM_DEVICES,
     API_ENERGY,
+    API_FLOORS,
     API_INFO,
     API_LOGIN,
-    API_FLOORS,
     API_LUA_INFO,
     API_PARENT_DEVICES,
     API_REFRESH,
     API_ROOMS,
-    API_SBUS_DEVICES,
     API_SBUS_DEVICE,
+    API_SBUS_DEVICES,
     API_SCENE,
     API_SCENES,
     API_SCHEDULES,
     API_VARIABLE,
     API_VARIABLES,
-    API_VIRTUAL_DEVICES,
     API_VIRTUAL_DEVICE,
+    API_VIRTUAL_DEVICES,
     API_WEATHER,
-    API_WTP_DEVICES,
     API_WTP_DEVICE,
+    API_WTP_DEVICES,
     ATTR_REFRESH_TOKEN,
     ATTR_SESSION,
     TEMP_SCALE,
@@ -112,9 +112,7 @@ class SinumClient:
         }
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
-                resp = await self._session.post(
-                    self._url(API_LOGIN), json=payload, ssl=False
-                )
+                resp = await self._session.post(self._url(API_LOGIN), json=payload, ssl=False)
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise SinumConnectionError(f"Cannot connect to {self._host}: {err}") from err
 
@@ -285,7 +283,9 @@ class SinumClient:
         return result if isinstance(result, list) else []
 
     async def set_variable(self, variable_id: int, value: Any) -> dict[str, Any]:
-        return await self._request("PATCH", API_VARIABLE.format(id=variable_id), json={"value": value})
+        return await self._request(
+            "PATCH", API_VARIABLE.format(id=variable_id), json={"value": value}
+        )
 
     # ------------------------------------------------------------- schedules
 

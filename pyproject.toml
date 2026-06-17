@@ -37,11 +37,9 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
-    "W503",   # line break before binary operator
 ]
 
 [tool.ruff.lint.isort]
-profile = "black"
 known-first-party = ["custom_components"]
 
 [tool.mypy]

@@ -4,8 +4,11 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow  # type: ignore[attr-defined]
+from homeassistant.config_entries import (  # type: ignore[attr-defined]
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -71,7 +74,10 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=STEP_AUTH_SCHEMA,
             errors=errors,
-            description_placeholders={"token_mode": AUTH_MODE_TOKEN, "password_mode": AUTH_MODE_PASSWORD},
+            description_placeholders={
+                "token_mode": AUTH_MODE_TOKEN,
+                "password_mode": AUTH_MODE_PASSWORD,
+            },
         )
 
     async def async_step_token(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -105,7 +111,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._host},
         )
 
-    async def async_step_password(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_password(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             client = self._make_client(
@@ -153,7 +161,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
     # ----------------------------------------------------------------- reauth
 
     @staticmethod
-    def async_get_options_flow(config_entry: Any) -> "SinumOptionsFlow":
+    def async_get_options_flow(config_entry: Any) -> SinumOptionsFlow:
         return SinumOptionsFlow(config_entry)
 
     # ----------------------------------------------------------------- reauth
@@ -161,7 +169,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         entry = self._get_reauth_entry()
         auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_PASSWORD)

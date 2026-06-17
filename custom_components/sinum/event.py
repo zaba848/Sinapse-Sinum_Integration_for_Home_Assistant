@@ -66,7 +66,9 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
         return store.get(self._device_id, {})
 
     @callback

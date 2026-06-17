@@ -16,6 +16,7 @@ NOTE: The REST API does not expose arm/disarm commands (zone_status and
 armed are read-only). The panel is therefore display-only with no
 supported features. State is refreshed via the shared coordinator.
 """
+
 from __future__ import annotations
 
 import logging

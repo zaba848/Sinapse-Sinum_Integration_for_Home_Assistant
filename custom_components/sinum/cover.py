@@ -53,7 +53,9 @@ def _label(device: dict[str, Any]) -> str:
     return (device.get("_device_name") or device.get("name", "")).strip()
 
 
-def _device_info(coordinator: SinumCoordinator, device_id: int, entry_id: str, model: str) -> DeviceInfo:
+def _device_info(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, model: str
+) -> DeviceInfo:
     device = coordinator.virtual_devices.get(device_id, {})
     label = _label(device)
     return DeviceInfo(
@@ -84,7 +86,9 @@ class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
-        self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Blind Controller")
+        self._attr_device_info = _device_info(
+            coordinator, device_id, entry_id, "Sinum Blind Controller"
+        )
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -161,9 +165,7 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_device_class = CoverDeviceClass.GATE
     _attr_icon = "mdi:gate"
     _attr_supported_features = (
-        CoverEntityFeature.OPEN
-        | CoverEntityFeature.CLOSE
-        | CoverEntityFeature.STOP
+        CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
     )
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:

@@ -84,22 +84,25 @@ async def async_setup_entry(
         if device.get("type") == STYPE_FAN_COIL and _has_climate_control(device, source="sbus"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "sbus"))
         elif device.get("type") == "temperature_regulator":
-            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "sbus"))
+            entities.append(
+                SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "sbus")
+            )
 
     # WTP fan coils and temperature regulators
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") in _WTP_FAN_COIL_TYPES and _has_climate_control(device, source="wtp"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "wtp"))
         elif device.get("type") == "temperature_regulator":
-            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "wtp"))
+            entities.append(
+                SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "wtp")
+            )
 
     async_add_entities(entities)
 
 
 def _is_thermostat(device: dict[str, Any]) -> bool:
     return device.get("type") == "thermostat" or (
-        "target_temperature" in device and "temperature" in device
-        and "work_mode" not in device
+        "target_temperature" in device and "temperature" in device and "work_mode" not in device
     )
 
 
@@ -207,7 +210,9 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             attrs["target_temperature_cooling"] = decode(d["target_temperature_cooling"])
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = (
+                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            )
         if "is_window_open" in d:
             attrs["is_window_open"] = d["is_window_open"]
         if "schedule_id" in d:
@@ -350,7 +355,9 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             attrs["mode_mutable"] = d["mode_mutable"]
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = (
+                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            )
         manual_gear = d.get("fan", {}).get("manual_fan_gear")
         if manual_gear:
             attrs["manual_fan_gear"] = manual_gear
@@ -402,7 +409,9 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     _attr_min_temp = TEMP_MIN
     _attr_max_temp = TEMP_MAX
 
-    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str = "wtp") -> None:
+    def __init__(
+        self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str = "wtp"
+    ) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
         self._bus = bus
@@ -431,7 +440,9 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.sbus_devices if self._bus == "sbus" else self.coordinator.wtp_devices
+        store = (
+            self.coordinator.sbus_devices if self._bus == "sbus" else self.coordinator.wtp_devices
+        )
         return store.get(self._device_id, {})
 
     @property
@@ -474,7 +485,9 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             attrs["parent_id"] = d["parent_id"]
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = (
+                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            )
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -554,10 +567,7 @@ class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEn
         tt = self._device.get("target_temperature")
         if tt is None:
             return None
-        if isinstance(tt, dict):
-            raw = tt.get("current")
-        else:
-            raw = tt
+        raw = tt.get("current") if isinstance(tt, dict) else tt
         if raw is None:
             return None
         return self.coordinator.client.decode_temperature(raw)
@@ -644,4 +654,3 @@ class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEn
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
-

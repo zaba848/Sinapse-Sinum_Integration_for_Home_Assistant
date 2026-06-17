@@ -4,10 +4,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-# Sinum hub encodes "no value / sensor error" as signed 16-bit minimum (-32768).
-# Multiply by 0.1 scale → -3276.8°C. Treat this as unavailable.
-_SENTINEL_INT16 = -32768
-
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -42,6 +38,10 @@ from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# Sinum hub encodes "no value / sensor error" as signed 16-bit minimum (-32768).
+# Multiply by 0.1 scale → -3276.8°C. Treat this as unavailable.
+_SENTINEL_INT16 = -32768
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -555,7 +555,9 @@ async def async_setup_entry(
             for desc in SBUS_REGULATOR_SENSORS:
                 if desc.api_key in device:
                     entities.append(
-                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry.entry_id)
+                        SinumTemperatureRegulatorSensor(
+                            coordinator, device_id, desc, entry.entry_id
+                        )
                     )
         else:
             for desc in SBUS_SENSORS:
@@ -569,7 +571,9 @@ async def async_setup_entry(
         weather = await coordinator.client.get_weather()
         for desc in WEATHER_SENSORS:
             if desc.api_key in weather:
-                entities.append(SinumWeatherSensor(coordinator.client, weather, desc, entry.entry_id))
+                entities.append(
+                    SinumWeatherSensor(coordinator.client, weather, desc, entry.entry_id)
+                )
     except SinumConnectionError:
         _LOGGER.debug("Weather endpoint not available on this hub")
 
@@ -604,6 +608,7 @@ async def async_setup_entry(
 
 
 # ── Entity classes ─────────────────────────────────────────────────────────────
+
 
 class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
     _attr_has_entity_name = True
@@ -690,7 +695,9 @@ class SinumTemperatureRegulatorSensor(SinumSensor):
             attrs["system_mode"] = device["system_mode"]
         if "target_temperature_mode" in device:
             ttm = device["target_temperature_mode"]
-            attrs["target_temperature_mode"] = ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = (
+                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            )
         if "mode_mutable" in device:
             attrs["mode_mutable"] = device["mode_mutable"]
         if "parent_id" in device:
@@ -705,7 +712,13 @@ class SinumWeatherSensor(SensorEntity):
     _attr_has_entity_name = True
     entity_description: SinumSensorDescription
 
-    def __init__(self, client: Any, initial: dict[str, Any], description: SinumSensorDescription, entry_id: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        initial: dict[str, Any],
+        description: SinumSensorDescription,
+        entry_id: str,
+    ) -> None:
         self._client = client
         self._data = initial
         self.entity_description = description
@@ -737,7 +750,13 @@ class SinumEnergySensor(SensorEntity):
     _attr_has_entity_name = True
     entity_description: SinumSensorDescription
 
-    def __init__(self, client: Any, initial: dict[str, Any], description: SinumSensorDescription, entry_id: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        initial: dict[str, Any],
+        description: SinumSensorDescription,
+        entry_id: str,
+    ) -> None:
         self._client = client
         self._data = initial
         self.entity_description = description
@@ -764,6 +783,7 @@ class SinumEnergySensor(SensorEntity):
 
 
 # ── Hub diagnostic sensors ─────────────────────────────────────────────────────
+
 
 def _hub_device_info(entry_id: str, hub_info: dict[str, Any]) -> DeviceInfo:
     # device_type field: "sinum", "sinum_pro", "sinum_lite" or similar
@@ -840,6 +860,7 @@ class SinumHubWifiSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
 
 
 # ── Schedule sensors ──────────────────────────────────────────────────────────
+
 
 class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
     """Base class for coordinator-backed schedule sensors."""
@@ -1061,7 +1082,9 @@ class SinumButtonSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
         return store.get(self._device_id, {})
 
     @property

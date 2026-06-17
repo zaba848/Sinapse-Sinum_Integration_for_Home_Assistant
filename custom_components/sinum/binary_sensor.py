@@ -133,7 +133,9 @@ async def async_setup_entry(
         if description:
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
         if wtp_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
-            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_WTP, entry.entry_id))
+            entities.append(
+                SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_WTP, entry.entry_id)
+            )
 
     for device_id, device in coordinator.sbus_devices.items():
         sbus_type = device.get("type", "")
@@ -141,7 +143,9 @@ async def async_setup_entry(
         if description:
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
         if sbus_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
-            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry.entry_id))
+            entities.append(
+                SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry.entry_id)
+            )
 
     # Parent device connectivity sensors from REST /api/v1/parent-devices
     for parent in coordinator.parent_devices:

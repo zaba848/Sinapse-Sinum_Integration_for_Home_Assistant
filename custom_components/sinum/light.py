@@ -16,7 +16,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .const import DOMAIN, STYPE_DIMMER, STYPE_RGB_CONTROLLER, VTYPE_DIMMER_RGB, VTYPE_DIMMER_RGB_INTEGRATOR, WTYPE_DIMMER, WTYPE_RGB_CONTROLLER
+from .const import (
+    DOMAIN,
+    STYPE_DIMMER,
+    STYPE_RGB_CONTROLLER,
+    VTYPE_DIMMER_RGB,
+    VTYPE_DIMMER_RGB_INTEGRATOR,
+    WTYPE_DIMMER,
+    WTYPE_RGB_CONTROLLER,
+)
 from .coordinator import SinumCoordinator
 
 
@@ -88,7 +96,7 @@ def _hs_to_hex(hue: float, saturation: float) -> str:
     t = 1 - (1 - f) * s
     mapping = [(1, t, p), (q, 1, p), (p, 1, t), (p, q, 1), (t, p, 1), (1, p, q)]
     r, g, b = mapping[int(i) % 6]
-    return "#{:02X}{:02X}{:02X}".format(int(r * 255), int(g * 255), int(b * 255))
+    return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
 
 def _supported_color_modes(device: dict[str, Any]) -> set[ColorMode]:
@@ -183,7 +191,9 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, {"state": "off"})
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"state": "off"}
+        )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -203,9 +213,9 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        device = (
-            coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        ).get(device_id, {})
+        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
+            device_id, {}
+        )
         label = _label(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -217,7 +227,9 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
         return store.get(self._device_id, {})
 
     @property
@@ -245,10 +257,14 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.wtp_devices[self._device_id].update(updated)
         else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -268,9 +284,9 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        device = (
-            coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        ).get(device_id, {})
+        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
+            device_id, {}
+        )
         self._attr_supported_color_modes = _supported_color_modes(device)
         label = _label(device)
         self._attr_device_info = DeviceInfo(
@@ -283,7 +299,9 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
         return store.get(self._device_id, {})
 
     @property
@@ -342,9 +360,13 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.wtp_devices[self._device_id].update(updated)
         else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": False})
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": False}
+            )
             self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()

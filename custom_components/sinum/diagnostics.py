@@ -1,4 +1,5 @@
 """Diagnostics support for Sinum integration."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,16 +22,13 @@ async def async_get_config_entry_diagnostics(
             entry_data[secret_key] = "**REDACTED**"
 
     virtual_snapshot = {
-        str(dev_id): _sanitize_device(dev)
-        for dev_id, dev in coordinator.virtual_devices.items()
+        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.virtual_devices.items()
     }
     wtp_snapshot = {
-        str(dev_id): _sanitize_device(dev)
-        for dev_id, dev in coordinator.wtp_devices.items()
+        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.wtp_devices.items()
     }
     sbus_snapshot = {
-        str(dev_id): _sanitize_device(dev)
-        for dev_id, dev in coordinator.sbus_devices.items()
+        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.sbus_devices.items()
     }
 
     return {
