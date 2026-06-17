@@ -1,14 +1,18 @@
 -- Sinapse MQTT Bridge v0.7 (Optimized, Multi-Bus Support)
 -- Creator: zaba848 (Home Assistant Sinum Integration)
--- License: MIT
+--
+-- LICENSE: Proprietary Software
+-- Copyright (c) 2026 Tomasz Panek. All Rights Reserved.
+-- See LICENSE file for full terms. Commercial licensing: zaba9214@gmail.com
+--
 -- Last updated: 2026-06-17
 --
 -- Supported device types:
--- ✅ Virtual: thermostat, relay, blind, dimmer, RGB light, custom_device (generic fields)
+-- ✅ Virtual: thermostat, relay, blind, dimmer, RGB light, custom_device
 -- ✅ WTP: temperature_sensor, humidity_sensor, temperature_regulator, fan_coil, fan_coil_v2,
---    two_state_input_sensor, air_quality_sensor, power_meter, energy_meter
+--    two_state_input_sensor, air_quality_sensor, power_meter
 -- ✅ SBUS: fan_coil, temperature_sensor, humidity_sensor, two_state_input_sensor
--- ⚠️  Not on verified hub but will auto-support if present: LoRa, SLINK, Video, Alarm system
+-- ⚠️  Optional if present: LoRa, SLINK, Video, Alarm system
 --
 -- MQTT topics published:
 --   sinum/state/<device_id>      Device state JSON (all properties via safe_get)
@@ -44,13 +48,26 @@ local CONTAINERS = get_containers()
 
 -- Optional fields extracted from any device (schema-agnostic)
 local OPTIONAL_FIELDS = {
-    "temperature", "target_temperature", "humidity", "mode",
-    "work_mode", "available_work_modes", "working_state", "fan", "schedule_id",
+    -- Climate/temperature (thermostats, fan coils, regulators)
+    "temperature", "room_temperature", "target_temperature",
+    "target_temperature_minimum", "target_temperature_maximum",
+    "dew_point", "humidity", "mode", "mode_mutable",
+    -- Fan coil specific
+    "work_mode", "available_work_modes", "working_state", "fan",
+    -- Device associations
+    "schedule_id",
+    -- Lighting (dimmers, RGB)
     "brightness", "led_color", "white_temperature", "color_mode",
+    -- Window coverings (blinds, roller shades)
     "last_set_target_opening", "action_in_progress", "last_set_target_tilt",
+    -- Sensors (air quality, environmental)
     "co2", "pm1", "pm25", "pm10", "illuminance", "pressure",
+    -- Energy monitoring
     "total_active_power", "energy_consumed_total",
-    "fan_operation_mode", "has_messages", "status"
+    -- Fan control
+    "fan_operation_mode",
+    -- Status and metadata
+    "has_messages", "status", "variant"
 }
 
 local client = mqtt_client[CLIENT_ID]
