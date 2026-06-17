@@ -109,5 +109,58 @@
       "type": "virtual_alarm",
       "state": "disarmed"
     }
-  ]
+  ],
+  "sbus_fan_coil": {
+    "id": 13,
+    "name": "Fan Coil 1",
+    "type": "fan_coil",
+    "class": "sbus",
+    "room_id": 1,
+    "work_mode": "heating",
+    "available_work_modes": ["heating", "cooling", "automatic", "off"],
+    "target_temperature": 220,
+    "target_temperature_minimum": 50,
+    "target_temperature_maximum": 300,
+    "room_temperature": 195,
+    "working_state": "heating_active",
+    "state": "heating_demand",
+    "fan_operation_mode": "automatic",
+    "mode_mutable": true,
+    "fan": {
+      "relay_fan": {
+        "current_gear": "second",
+        "first_gear_hysteresis": 5,
+        "second_gear_hysteresis": 9,
+        "third_gear_hysteresis": 6
+      },
+      "manual_fan_gear": "second",
+      "output_type": "relay"
+    },
+    "status": "online",
+    "variant": "full_fan_coil"
+  },
+  "sbus_temperature_sensor": {
+    "id": 30,
+    "name": "SBUS Temp Sensor",
+    "type": "temperature_sensor",
+    "temperature": 205,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_humidity_sensor": {
+    "id": 31,
+    "name": "SBUS Humidity Sensor",
+    "type": "humidity_sensor",
+    "humidity": 520,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_two_state_sensor": {
+    "id": 32,
+    "name": "SBUS Two-State Sensor",
+    "type": "two_state_input_sensor",
+    "state": true,
+    "room_id": 1,
+    "class": "sbus"
+  }
 }
