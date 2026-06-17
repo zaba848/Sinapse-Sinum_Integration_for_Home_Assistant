@@ -71,14 +71,14 @@ async def async_setup_entry(
 
     # SBUS fan coils (full climate control: work_mode + temp + fan)
     for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_FAN_COIL and _has_climate_control(device):
+        if device.get("type") == STYPE_FAN_COIL and _has_climate_control(device, source="sbus"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "sbus"))
 
-    # WTP fan coils are only exposed as climate entities when firmware returns
-    # full climate fields. The verified hub exposes several WTP fan coils with
-    # metadata/fan status only, so those remain diagnostics until payloads grow.
+    # WTP fan coils (Phase 7A): partial climate support for devices with any temperature field
+    # Full SBUS-like support when: work_mode + target_temperature
+    # Partial support when: only room_temperature or target_temperature (Phase 7A Option A)
     for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") in _WTP_FAN_COIL_TYPES and _has_climate_control(device):
+        if device.get("type") in _WTP_FAN_COIL_TYPES and _has_climate_control(device, source="wtp"):
             entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "wtp"))
 
     async_add_entities(entities)
@@ -91,9 +91,16 @@ def _is_thermostat(device: dict[str, Any]) -> bool:
     )
 
 
-def _has_climate_control(device: dict[str, Any]) -> bool:
-    """True if fan_coil has work_mode and target_temperature (full SBUS variant)."""
-    return "work_mode" in device and "target_temperature" in device
+def _has_climate_control(device: dict[str, Any], source: str = "sbus") -> bool:
+    """Check if fan_coil can be exposed as climate entity.
+
+    SBUS: Requires full climate fields (work_mode + target_temperature)
+    WTP: Accepts partial fields (any temperature field for Phase 7A partial support)
+    """
+    if source == "sbus":
+        return "work_mode" in device and "target_temperature" in device
+    # WTP: partial climate support (Option A) - any temperature field
+    return any(f in device for f in ["work_mode", "target_temperature", "room_temperature"])
 
 
 def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
@@ -238,6 +245,14 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
 
         device = self._device_dict(coordinator)
         self._attr_hvac_modes = _available_hvac_modes(device)
+
+        # Dynamically determine supported features based on available fields (Phase 7A)
+        # All fan coils support target temperature
+        features = ClimateEntityFeature.TARGET_TEMPERATURE
+        # Add fan control only if fan fields are present
+        if "fan" in device or device.get("fan_operation_mode"):
+            features |= ClimateEntityFeature.FAN_MODE
+        self._attr_supported_features = features
 
         # Use per-device temperature limits from API if available
         raw_min = device.get("target_temperature_minimum")

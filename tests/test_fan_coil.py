@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.components.climate import HVACMode
 
 FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
@@ -230,3 +231,91 @@ class TestSinumFanCoilClimate:
         await async_setup_entry(MagicMock(), entry, async_add_entities)
 
         async_add_entities.assert_called_once_with([])
+
+    @pytest.mark.asyncio
+    async def test_setup_adds_wtp_fan_coil_partial_climate_fields(self):
+        """Phase 7A: WTP fan coil with only room_temperature (partial support)."""
+        from custom_components.sinum.climate import async_setup_entry
+
+        partial_wtp = {
+            "id": 24,
+            "name": "WTP Fan Coil Partial",
+            "type": "fan_coil",
+            "class": "wtp",
+            "room_id": 1,
+            "room_temperature": 195,
+            "status": "online"
+        }
+
+        coordinator = MagicMock()
+        coordinator.virtual_devices = {}
+        coordinator.sbus_devices = {}
+        coordinator.wtp_devices = {24: partial_wtp}
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+
+        # Phase 7A: Partial climate should be added
+        entities = async_add_entities.call_args.args[0]
+        assert len(entities) == 1
+        assert entities[0]._source == "wtp"
+
+    def test_partial_wtp_fan_coil_graceful_degradation(self):
+        """Phase 7A: Partial WTP fan coil handles missing optional fields."""
+        device = {
+            "id": 24,
+            "name": "WTP Partial",
+            "type": "fan_coil",
+            "room_temperature": 200
+        }
+        entity, _ = _make_fan_coil(device, source="wtp", device_id=24)
+
+        assert entity.current_temperature == 20.0
+        assert entity.target_temperature is None
+        assert entity.hvac_mode == HVACMode.OFF
+        assert entity.fan_mode is None
+
+    def test_partial_wtp_fan_coil_supported_features(self):
+        """Phase 7A: Partial WTP fan coil without fan has limited features."""
+        from homeassistant.components.climate import ClimateEntityFeature
+
+        device = {
+            "id": 24,
+            "name": "WTP Partial",
+            "type": "fan_coil",
+            "room_temperature": 200
+        }
+        entity, _ = _make_fan_coil(device, source="wtp", device_id=24)
+
+        # No fan field = only TARGET_TEMPERATURE feature
+        assert (
+            entity._attr_supported_features
+            == ClimateEntityFeature.TARGET_TEMPERATURE
+        )
+
+    def test_wtp_fan_coil_with_fan_field_enables_fan_mode(self):
+        """Phase 7A: WTP fan coil with fan field enables FAN_MODE feature."""
+        from homeassistant.components.climate import ClimateEntityFeature
+
+        device = {
+            "id": 25,
+            "name": "WTP With Fan",
+            "type": "fan_coil",
+            "room_temperature": 200,
+            "fan": {
+                "relay_fan": {"current_gear": "second"}
+            }
+        }
+        entity, _ = _make_fan_coil(device, source="wtp", device_id=25)
+
+        # With fan field = both TARGET_TEMPERATURE and FAN_MODE
+        assert (
+            entity._attr_supported_features
+            == (
+                ClimateEntityFeature.TARGET_TEMPERATURE
+                | ClimateEntityFeature.FAN_MODE
+            )
+        )
