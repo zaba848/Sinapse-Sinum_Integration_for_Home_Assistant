@@ -76,6 +76,24 @@ class TestWtpFanCoilValve:
         entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
         assert entity.is_on is None
 
+    def test_valve_state_exposes_gear_attributes(self):
+        """Valve binary sensor exposes gear states and hotel_mode as attributes."""
+        device = {
+            "id": 4, "type": "fan_coil", "class": "wtp",
+            "name": "Fan Coil", "valve_state": True,
+            "gear_1": {"hysteresis": 3, "state": False},
+            "gear_2": {"hysteresis": 30, "state": False},
+            "gear_3": {"hysteresis": 42, "state": True},
+            "hotel_mode": False,
+        }
+        coordinator = _make_wtp_coordinator(4, device)
+        entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
+        attrs = entity.extra_state_attributes
+        assert attrs["gear_1_active"] is False
+        assert attrs["gear_2_active"] is False
+        assert attrs["gear_3_active"] is True
+        assert attrs["hotel_mode"] is False
+
 
 class TestThermostatAttributes:
     def test_thermostat_exposes_heating_cooling_targets(self):

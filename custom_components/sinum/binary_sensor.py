@@ -168,6 +168,18 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
             return str(state).lower() in self.entity_description.on_states
         return str(state).lower() in self.entity_description.on_states
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        # Fan coil gear states — show which relay gear is active
+        for gear in ("gear_1", "gear_2", "gear_3"):
+            if gear in d and isinstance(d[gear], dict):
+                attrs[f"{gear}_active"] = bool(d[gear].get("state", False))
+        if "hotel_mode" in d:
+            attrs["hotel_mode"] = d["hotel_mode"]
+        return attrs
+
 
 class SinumParentOnlineSensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity):
     """Connectivity sensor for a Sinum parent device (WTP, SLINK, SBUS, etc.)."""
