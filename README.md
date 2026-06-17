@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-98%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-131%20passing-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://www.techsterowniki.pl/baza-wiedzy-sinum)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
@@ -15,12 +15,12 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 
 | Platform | Description | Status |
 |---|---|---|
-| `climate` | Virtual thermostats, SBUS/WTP fan coils, temperature regulators (optional) | ✅ |
-| `sensor` | WTP/SBUS temperature & humidity, weather, energy, hub diagnostics, thermal schedule summaries | ✅ |
-| `binary_sensor` | WTP/SBUS flood/motion/opening/smoke sensors, WTP fan coil valve state, parent device connectivity | ✅ |
-| `switch` | Virtual relay integrators, wicket (electric strike) | ✅ |
-| `cover` | Virtual blind controller, gate | ✅ |
-| `light` | Virtual dimmer/RGB controller | ✅ |
+| `climate` | Virtual thermostats, SBUS/WTP fan coils, SBUS/WTP temperature regulators | ✅ |
+| `sensor` | Temperature, humidity, illuminance, CO₂, pressure, PM, IAQ, power, energy, voltage, current, weather, hub diagnostics, thermal schedule summaries, SBUS regulator target temp | ✅ |
+| `binary_sensor` | Flood, motion, opening, smoke, two-state input, WTP fan coil valve state, parent device connectivity | ✅ |
+| `switch` | Virtual relay integrators, wicket (electric strike), WTP/SBUS physical relays | ✅ |
+| `cover` | Virtual blind controller, gate, WTP blind controller | ✅ |
+| `light` | Virtual dimmer/RGB, WTP/SBUS dimmer, WTP/SBUS RGB controller | ✅ |
 | `button` | Sinum scenes and Lua code scripts | ✅ |
 | `number` | Numeric Lua variables | ✅ |
 | `update` | Parent device firmware tracker | ✅ |
@@ -28,11 +28,11 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 
 ### Supported Device Types
 
-**Virtual devices**: thermostat, relay_integrator, blind_controller_integrator, gate, wicket, dimmer_rgb_controller_integrator
+**Virtual devices**: `thermostat`, `relay_integrator`, `blind_controller_integrator`, `gate`, `wicket`, `dimmer_rgb_controller_integrator`, `dimmer_rgb_integrator`
 
-**WTP bus**: temperature_sensor, humidity_sensor, temperature_regulator, fan_coil, fan_coil_v2, flood_sensor, motion_sensor, opening_sensor, smoke_sensor, two_state_input_sensor
+**WTP bus**: `temperature_sensor`, `humidity_sensor`, `pressure_sensor`, `light_sensor`, `co2_sensor`, `iaq_sensor`, `aq_sensor`, `motion_sensor`, `flood_sensor`, `opening_sensor`, `smoke_sensor`, `two_state_input_sensor`, `relay`, `dimmer`, `rgb_controller`, `blind_controller`, `energy_meter`, `fan_coil`, `fan_coil_v2`, `temperature_regulator`
 
-**SBUS bus**: temperature_sensor, humidity_sensor, two_state_input_sensor, fan_coil
+**SBUS bus**: `temperature_sensor`, `humidity_sensor`, `light_sensor`, `motion_sensor`, `two_state_input_sensor`, `analog_input`, `impulse_meter`, `relay`, `dimmer`, `rgb_controller`, `fan_coil`, `temperature_regulator`
 
 ---
 
@@ -104,20 +104,24 @@ Sinum integration → Options → Enable MQTT real-time transport → Save.
 
 ---
 
-## Verified Hub
+## Tested Hubs
 
-| Field | Value |
-|---|---|
-| Model | EH-01 |
-| Firmware | `1.24.0-alpha.3` |
-| API version | `1.4` |
-| Virtual devices | 12 (9 thermostats, 3 custom) |
-| WTP devices | 34 (8 regulators, 8 temp sensors, 8 humidity sensors, 7 fan coils, 1 fan_coil_v2, 2 two-state inputs) |
-| SBUS devices | 10 (2 temp, 2 humidity, 4 two-state inputs, 2 fan coils) |
-| Parent devices | 23 (WTP, SBUS, TECH, Modbus, system modules) |
-| Predicted HA entities | ~153 (12 climate, 54 sensor, 59 binary, 5 button, 23 update) |
+Integration is continuously tested against two live hubs with different hardware configurations:
 
-**Note**: The hub runs alpha firmware. The `/api/v1/rooms` and bus list endpoints occasionally return HTTP 408 (bus timeout) — the integration handles this gracefully using cached data.
+| Hub | Type | Firmware | Virtual | WTP | SBUS | HA entities |
+|---|---|---|---|---|---|---|
+| `tablica-wtp` (10.0.61.132) | sinum_plus | 1.24.0-alpha.2 | 28 | 254 | 8 | — |
+| `sinum-tablica-sbus-1` (10.0.62.167) | sinum_lite | 1.24.0-alpha.2 | 169 | 35 | 436 | ~1 200 |
+
+**Hub 2 entity breakdown** (active in HA):
+- 136 climate (83 virtual thermostats + 51 SBUS regulators + 2 WTP regulators)
+- 468 sensor
+- 287 binary_sensor
+- 85 switch (69 SBUS relay + 11 WTP relay + 5 virtual)
+- 45 light (38 SBUS dimmer + 6 SBUS RGB + 1 virtual)
+- 5 cover (3 virtual blind + 2 virtual gate)
+
+**Note**: The hubs run alpha firmware. The `/api/v1/rooms` and bus list endpoints occasionally return HTTP 408 (bus timeout) — the integration handles this gracefully using cached data.
 
 ---
 
@@ -134,7 +138,7 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/        # 98 tests, ~0.5s
+pytest tests/        # 131 tests, ~0.6s
 pytest -v tests/     # verbose
 pytest --cov=custom_components/sinum tests/  # with coverage
 ```
@@ -147,17 +151,18 @@ custom_components/sinum/
   ├── api.py               # REST client (SinumClient)
   ├── coordinator.py       # DataUpdateCoordinator
   ├── config_flow.py       # UI setup flow
-  ├── climate.py           # Thermostats, fan coils, regulators
-  ├── sensor.py            # Temperature, humidity, hub diagnostics, schedules
+  ├── climate.py           # Thermostats, fan coils, regulators (WTP + SBUS)
+  ├── sensor.py            # Temperature, humidity, IAQ, PM, power, schedules
   ├── binary_sensor.py     # Flood, motion, valve, connectivity
-  ├── switch.py            # Relay, wicket
-  ├── cover.py             # Blind, gate
-  ├── light.py             # Dimmer/RGB
+  ├── switch.py            # Relay integrators, wicket, WTP/SBUS relays
+  ├── cover.py             # Blind, gate (virtual + WTP)
+  ├── light.py             # Dimmer/RGB (virtual + WTP/SBUS)
   ├── button.py            # Scenes
   ├── number.py            # Lua variables
   ├── update.py            # Firmware update tracker
   ├── alarm_control_panel.py
   ├── mqtt.py              # MQTT bridge transport
+  ├── services.yaml        # send_notification service
   ├── strings.json         # UI strings (EN)
   └── translations/
       ├── en.json
@@ -170,6 +175,7 @@ lua_scripts/
 tests/
   ├── fixtures/sinum_devices.json
   ├── test_api.py
+  ├── test_alarm_control_panel.py
   ├── test_binary_sensor.py
   ├── test_button.py
   ├── test_climate.py
@@ -177,6 +183,7 @@ tests/
   ├── test_coordinator.py
   ├── test_fan_coil.py
   ├── test_mqtt.py
+  ├── test_new_device_types.py
   ├── test_schedule_sensors.py
   └── test_sensor.py
 ```
@@ -185,9 +192,11 @@ tests/
 
 ## Known Limitations
 
-- Energy Center (`/api/v1/energy`) not available on verified hub — entities will not appear
+- `button` devices (WTP/SBUS) — `last_action` field not exposed as entity yet
+- `analog_output`, `pulse_width_modulation`, `valve_pump`, `common_valve` (SBUS) — not yet supported
+- `custom_device` virtual type — complex Lua contracts vary per installation, intentionally skipped
+- Energy Center (`/api/v1/energy`) not available on all hubs — entities will not appear where missing
 - LoRa, SLINK, video cameras not supported (require specific hardware modules)
-- Custom `custom_device` virtual types not mapped (complex Lua contracts vary per installation)
 - Hub alpha firmware may cause intermittent HTTP 408 on bus polling — handled gracefully
 
 ---
