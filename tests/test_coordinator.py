@@ -119,9 +119,10 @@ class TestSinumCoordinator:
         assert thermostat["_id"] == 10
 
     @pytest.mark.asyncio
-    async def test_update_raises_on_room_failure_with_no_cache(self, mock_client):
+    async def test_update_raises_on_hub_info_failure_with_no_cache(self, mock_client):
+        """Hub unreachable (hub info fails, no cache) raises UpdateFailed."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
-        mock_client.get_rooms = AsyncMock(
+        mock_client.get_hub_info = AsyncMock(
             side_effect=SinumConnectionError("hub unreachable")
         )
         coordinator = self._make_coordinator(mock_client)

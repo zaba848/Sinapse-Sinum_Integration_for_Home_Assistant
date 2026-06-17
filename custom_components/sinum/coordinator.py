@@ -40,24 +40,23 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.mqtt_bridge: Any | None = None               # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
-        # ── Rooms ─────────────────────────────────────────────────────────────
-        # Non-fatal: if hub returns 408 (bus timeout, alpha firmware), keep cached rooms
+        # ── Hub info (always-available health check) ──────────────────────────
+        try:
+            self.hub_info = await self.client.get_hub_info()
+        except SinumConnectionError as err:
+            if not self.hub_info:
+                raise UpdateFailed(f"Cannot reach Sinum hub: {err}") from err
+            _LOGGER.debug("Hub info unavailable (%s), using cached", err)
+
+        # ── Rooms (non-fatal — 408 on alpha firmware, use cache or empty) ─────
         try:
             rooms = await self.client.get_rooms()
             self.rooms = rooms
         except SinumConnectionError as err:
-            if self.rooms:
-                _LOGGER.debug("Rooms endpoint unavailable (%s), using cached rooms", err)
-                rooms = self.rooms
-            else:
-                raise UpdateFailed(f"Cannot reach Sinum hub: {err}") from err
+            _LOGGER.debug("Rooms endpoint unavailable (%s), using cached rooms", err)
+            rooms = self.rooms
 
-        # ── Hub info (uptime, version, uid) ───────────────────────────────────
-        try:
-            self.hub_info = await self.client.get_hub_info()
-        except SinumConnectionError as err:
-            _LOGGER.debug("Failed to fetch hub info: %s", err)
-
+        # ── Lua hub info (optional extension) ────────────────────────────────
         try:
             lua_info = await self.client.get_lua_hub_info()
             if lua_info:
