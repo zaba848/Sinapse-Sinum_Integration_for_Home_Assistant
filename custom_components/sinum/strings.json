@@ -63,6 +63,27 @@
     }
   },
   "entity": {
+    "climate": {
+      "fan_coil": {
+        "state_attributes": {
+          "fan_mode": {
+            "state": {
+              "1": "Speed 1",
+              "2": "Speed 2",
+              "3": "Speed 3"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "hub_uptime": {
+        "name": "Uptime"
+      },
+      "hub_wifi_signal": {
+        "name": "Wi-Fi signal"
+      }
+    },
     "binary_sensor": {
       "parent_online": {
         "name": "Online",
@@ -77,14 +98,6 @@
           "on": "Problem",
           "off": "OK"
         }
-      }
-    },
-    "sensor": {
-      "hub_uptime": {
-        "name": "Uptime"
-      },
-      "hub_wifi_signal": {
-        "name": "Wi-Fi signal"
       }
     },
     "update": {
