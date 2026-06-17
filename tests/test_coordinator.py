@@ -160,3 +160,29 @@ class TestSinumCoordinator:
             data = await coordinator._async_update_data()
         # Virtual devices failed but coordinator returned empty dict, not exception
         assert data["virtual"] == {}
+
+    @pytest.mark.asyncio
+    async def test_bulk_fetch_failure_returns_cached_data(self, mock_client):
+        """When bulk collection endpoint fails, cached devices are preserved."""
+        coordinator = self._make_coordinator(mock_client)
+        # Prime the cache with a successful fetch
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        assert coordinator.virtual_devices  # cache populated
+
+        # Now the bulk endpoint goes down
+        mock_client.get_virtual_devices = AsyncMock(
+            side_effect=SinumConnectionError("connection refused")
+        )
+        mock_client.get_wtp_devices = AsyncMock(
+            side_effect=SinumConnectionError("connection refused")
+        )
+        mock_client.get_sbus_devices = AsyncMock(
+            side_effect=SinumConnectionError("connection refused")
+        )
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+
+        # Cached data is preserved — entities remain available
+        assert 10 in data["virtual"]
+        assert coordinator.virtual_devices is data["virtual"]

@@ -77,6 +77,9 @@
       },
       "temperature_regulator": {
         "name": "Thermostat"
+      },
+      "heat_pump_manager": {
+        "name": "Heat Pump"
       }
     },
     "sensor": {
@@ -124,6 +127,15 @@
       },
       "energy_storage": {
         "name": "Energy storage"
+      },
+      "button_last_action": {
+        "name": "Last action"
+      },
+      "pwm_duty_cycle": {
+        "name": "Duty cycle"
+      },
+      "pwm_frequency": {
+        "name": "Frequency"
       }
     },
     "binary_sensor": {

@@ -95,6 +95,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.client.get_virtual_device,
             virtual_ids,
             rooms,
+            self.virtual_devices,
         )
         wtp = await self._fetch_device_collection(
             "WTP",
@@ -102,6 +103,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.client.get_wtp_device,
             wtp_ids,
             rooms,
+            self.wtp_devices,
         )
         sbus = await self._fetch_device_collection(
             "SBUS",
@@ -109,6 +111,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.client.get_sbus_device,
             sbus_ids,
             rooms,
+            self.sbus_devices,
         )
 
         self.virtual_devices = virtual
@@ -123,11 +126,20 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         item_getter: Any,
         fallback_ids: list[int],
         rooms: list[dict[str, Any]],
+        cached: dict[int, dict[str, Any]],
     ) -> dict[int, dict[str, Any]]:
-        """Fetch a class-wide device list, falling back to per-room IDs."""
+        """Fetch a class-wide device list, falling back to per-room IDs.
+
+        When the bulk endpoint fails (hub unreachable), return the existing
+        cached data unchanged to keep entities available during outages.
+        The per-device fallback is only used when the bulk endpoint succeeds
+        but returns an empty list (older firmware without a bulk endpoint).
+        """
         devices: dict[int, dict[str, Any]] = {}
+        bulk_ok = False
         try:
             collection = await list_getter()
+            bulk_ok = True
         except SinumConnectionError as err:
             _LOGGER.debug("Failed to fetch %s device collection: %s", label, err)
             collection = []
@@ -141,6 +153,11 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _inject_room_keys(device, device_id, rooms, self.floors)
                 devices[device_id] = device
             return devices
+
+        # Bulk succeeded but returned empty → try per-device (old firmware).
+        # Bulk failed → return cached data to avoid 400+ WARNING log entries.
+        if not bulk_ok:
+            return cached
 
         for device_id in fallback_ids:
             try:

@@ -77,6 +77,9 @@
       },
       "temperature_regulator": {
         "name": "Termostat"
+      },
+      "heat_pump_manager": {
+        "name": "Pompa ciepła"
       }
     },
     "sensor": {
@@ -124,6 +127,15 @@
       },
       "energy_storage": {
         "name": "Magazyn energii"
+      },
+      "button_last_action": {
+        "name": "Ostatnia akcja"
+      },
+      "pwm_duty_cycle": {
+        "name": "Wypełnienie"
+      },
+      "pwm_frequency": {
+        "name": "Częstotliwość"
       }
     },
     "binary_sensor": {
