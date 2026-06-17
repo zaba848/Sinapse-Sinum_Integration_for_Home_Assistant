@@ -24,7 +24,6 @@ from .const import (
     VTYPE_HEAT_PUMP_MANAGER,
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
-    WTYPE_TEMPERATURE_REGULATOR,
 )
 from .coordinator import SinumCoordinator
 

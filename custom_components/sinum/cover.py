@@ -19,7 +19,6 @@ from .const import (
     DOMAIN,
     GATE_STATE_CLOSED,
     GATE_STATE_CLOSING,
-    GATE_STATE_OPEN,
     GATE_STATE_OPENING,
     VTYPE_BLIND,
     VTYPE_GATE,
