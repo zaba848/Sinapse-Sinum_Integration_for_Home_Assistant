@@ -1,6 +1,24 @@
-# Local planning notes stay out of the repository.
+# Local planning and dev notes — never commit
 /PLAN.md
+.env
+.env.*
+*.env
 
+# Python
 __pycache__/
 *.py[cod]
+.coverage
+.venv/
+venv/
+
+# Editor
 .vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Dev scripts that may contain credentials — keep locally, never commit
+diagnose_*.py
+test_live_*.py
+*_live_*.py
