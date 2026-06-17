@@ -59,6 +59,7 @@ def _device_info(coordinator: SinumCoordinator, device_id: int, entry_id: str, m
 class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_icon = "mdi:electric-switch"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -90,6 +91,7 @@ class SinumWicketSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_icon = "mdi:door-sliding"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -121,6 +123,7 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_icon = "mdi:toggle-switch"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
@@ -207,9 +210,11 @@ class SinumValvePumpSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         if "emergency_behaviour" in d:
             attrs["emergency_behaviour"] = d["emergency_behaviour"]
         if "temperature_threshold_heating" in d:
-            attrs["threshold_heating_c"] = d["temperature_threshold_heating"] / 10
+            th = d["temperature_threshold_heating"]
+            attrs["threshold_heating_c"] = th / 10 if isinstance(th, (int, float)) else None
         if "temperature_threshold_cooling" in d:
-            attrs["threshold_cooling_c"] = d["temperature_threshold_cooling"] / 10
+            tc = d["temperature_threshold_cooling"]
+            attrs["threshold_cooling_c"] = tc / 10 if isinstance(tc, (int, float)) else None
         return attrs
 
     async def async_turn_on(self, **kwargs: Any) -> None:

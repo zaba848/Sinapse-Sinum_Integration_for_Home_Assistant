@@ -56,7 +56,12 @@ def _label(device: dict[str, Any]) -> str:
 def _hex_to_hs(hex_color: str) -> tuple[float, float]:
     """Convert #RRGGBB to (hue 0-360, saturation 0-100)."""
     hex_color = hex_color.lstrip("#")
-    r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    if len(hex_color) < 6:
+        return (0.0, 0.0)
+    try:
+        r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except ValueError:
+        return (0.0, 0.0)
     max_c = max(r, g, b)
     min_c = min(r, g, b)
     delta = max_c - min_c

@@ -1,4 +1,4 @@
--- Sinapse MQTT Bridge v0.7.2 (Optimized, Multi-Bus Support)
+-- Sinapse MQTT Bridge v0.8.0 (Full Device Coverage)
 -- Creator: zaba848 (Home Assistant Sinum Integration)
 --
 -- LICENSE: Proprietary Software
@@ -8,10 +8,15 @@
 -- Last updated: 2026-06-17
 --
 -- Supported device types:
--- ✅ Virtual: thermostat, relay, blind, dimmer, RGB light, custom_device
+-- ✅ Virtual: thermostat, relay_integrator, blind_controller_integrator, gate, wicket,
+--    dimmer_rgb_controller_integrator, dimmer_rgb_integrator, heat_pump_manager, custom_device
 -- ✅ WTP: temperature_sensor, humidity_sensor, temperature_regulator, fan_coil, fan_coil_v2,
---    two_state_input_sensor, air_quality_sensor, power_meter
--- ✅ SBUS: fan_coil, temperature_sensor, humidity_sensor, two_state_input_sensor
+--    two_state_input_sensor, air_quality_sensor, power_meter, button, blind_controller,
+--    flood_sensor, motion_sensor, opening_sensor, smoke_sensor, relay, dimmer, rgb_controller,
+--    iaq_sensor
+-- ✅ SBUS: fan_coil, temperature_sensor, humidity_sensor, two_state_input_sensor, button,
+--    temperature_regulator, valve_pump, common_valve, pulse_width_modulation, analog_output,
+--    analog_input, impulse_meter, relay, dimmer, rgb_controller, motion_sensor
 -- ⚠️  Optional if present: LoRa, SLINK, Video, Alarm system
 --
 -- MQTT topics published:
@@ -60,15 +65,24 @@ local OPTIONAL_FIELDS = {
     -- Device associations
     "schedule_id",
     -- Lighting (dimmers, RGB)
-    "brightness", "led_color", "white_temperature", "color_mode",
+    "brightness", "led_color", "white_temperature", "color_mode", "target_level",
     -- Window coverings (blinds, roller shades)
     "last_set_target_opening", "action_in_progress", "last_set_target_tilt",
+    "current_opening", "target_opening",
     -- Sensors (air quality, environmental)
     "co2", "pm1", "pm25", "pm10", "illuminance", "pressure",
     -- Energy monitoring
     "total_active_power", "energy_consumed_total",
     -- Fan control
     "fan_operation_mode",
+    -- Buttons
+    "action", "buttons_count", "buzzer",
+    -- Valves and actuators
+    "enabled", "blockade", "emergency_behaviour",
+    "temperature_threshold_heating", "temperature_threshold_cooling",
+    "blockade_reasons",
+    -- PWM / analog outputs
+    "duty_cycle", "frequency", "value", "count",
     -- Status and metadata
     "has_messages", "status", "variant"
 }

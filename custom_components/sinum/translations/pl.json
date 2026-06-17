@@ -63,6 +63,18 @@
     }
   },
   "entity": {
+    "event": {
+      "button_press": {
+        "name": "Przycisk",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "pressed": "Wciśnięty"
+            }
+          }
+        }
+      }
+    },
     "climate": {
       "fan_coil": {
         "state_attributes": {
@@ -130,6 +142,12 @@
       },
       "button_last_action": {
         "name": "Ostatnia akcja"
+      },
+      "room_temperature": {
+        "name": "Temperatura pokojowa"
+      },
+      "dew_point": {
+        "name": "Punkt rosy"
       },
       "pwm_duty_cycle": {
         "name": "Wypełnienie"

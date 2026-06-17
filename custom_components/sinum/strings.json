@@ -63,6 +63,18 @@
     }
   },
   "entity": {
+    "event": {
+      "button_press": {
+        "name": "Button",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "pressed": "Pressed"
+            }
+          }
+        }
+      }
+    },
     "climate": {
       "fan_coil": {
         "state_attributes": {
@@ -130,6 +142,12 @@
       },
       "button_last_action": {
         "name": "Last action"
+      },
+      "room_temperature": {
+        "name": "Room temperature"
+      },
+      "dew_point": {
+        "name": "Dew point"
       },
       "pwm_duty_cycle": {
         "name": "Duty cycle"

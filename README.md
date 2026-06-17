@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-171%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-185%20passing-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://www.techsterowniki.pl/baza-wiedzy-sinum)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
@@ -15,14 +15,15 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 
 | Platform | Description | Status |
 |---|---|---|
-| `climate` | Virtual thermostats, SBUS/WTP fan coils, SBUS/WTP temperature regulators | ✅ |
+| `climate` | Virtual thermostats, SBUS/WTP fan coils, SBUS/WTP temperature regulators, heat pump manager | ✅ |
 | `sensor` | Temperature, humidity, illuminance, CO₂, pressure, PM, IAQ, power, energy, voltage, current, weather, hub diagnostics, thermal schedule summaries, SBUS regulator target temp | ✅ |
 | `binary_sensor` | Flood, motion, opening, smoke, two-state input, WTP fan coil valve state, parent device connectivity | ✅ |
-| `switch` | Virtual relay integrators, wicket (electric strike), WTP/SBUS physical relays | ✅ |
+| `switch` | Virtual relay integrators, wicket (electric strike), WTP/SBUS physical relays, valve_pump, common_valve | ✅ |
 | `cover` | Virtual blind controller, gate, WTP blind controller | ✅ |
 | `light` | Virtual dimmer/RGB, WTP/SBUS dimmer, WTP/SBUS RGB controller | ✅ |
+| `event` | Button press event — fires per action, ideal for automations | ✅ |
 | `button` | Sinum scenes and Lua code scripts | ✅ |
-| `number` | Numeric Lua variables | ✅ |
+| `number` | Numeric Lua variables, SBUS analog output (0–10V) | ✅ |
 | `update` | Parent device firmware tracker | ✅ |
 | `alarm_control_panel` | Alarm system (if present) | ✅ |
 
@@ -159,6 +160,7 @@ custom_components/sinum/
   ├── cover.py             # Blind, gate (virtual + WTP)
   ├── light.py             # Dimmer/RGB (virtual + WTP/SBUS)
   ├── button.py            # Scenes
+  ├── event.py             # Button press events (SinumButtonEvent)
   ├── number.py            # Lua variables + SBUS analog_output
   ├── update.py            # Firmware update tracker
   ├── alarm_control_panel.py
@@ -170,7 +172,7 @@ custom_components/sinum/
       └── pl.json
 
 lua_scripts/
-  ├── mqtt_bridge.lua      # MQTT state bridge (v0.7.2)
+  ├── mqtt_bridge.lua      # MQTT state bridge (v0.8.0)
   └── sinapse_api.lua      # Optional HTTP diagnostics endpoint
 
 tests/
@@ -183,6 +185,7 @@ tests/
   ├── test_config_flow.py
   ├── test_coordinator.py
   ├── test_fan_coil.py
+  ├── test_event.py
   ├── test_mqtt.py
   ├── test_new_device_types.py
   ├── test_new_sbus_types.py
@@ -194,7 +197,7 @@ tests/
 
 ## Known Limitations
 
-- `button` devices — exposed as `last_action` sensor (REST polling); for real-time triggers use the MQTT bridge
+- `button` devices — exposed as `last_action` sensor (disabled by default); for real-time triggers use the **Event entity** with MQTT bridge
 - `custom_device` virtual type — complex Lua contracts vary per installation, intentionally skipped
 - Energy Center (`/api/v1/energy`) not available on all hubs — entities will not appear where missing
 - LoRa, SLINK, video cameras not supported (require specific hardware modules)

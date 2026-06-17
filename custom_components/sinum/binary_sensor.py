@@ -195,6 +195,7 @@ class SinumParentOnlineSensor(CoordinatorEntity[SinumCoordinator], BinarySensorE
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_translation_key = "parent_online"
+    _attr_icon = "mdi:router-network"
 
     def __init__(
         self,
@@ -249,6 +250,7 @@ class SinumParentErrorSensor(CoordinatorEntity[SinumCoordinator], BinarySensorEn
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_translation_key = "parent_problem"
+    _attr_icon = "mdi:alert-circle"
 
     def __init__(
         self,

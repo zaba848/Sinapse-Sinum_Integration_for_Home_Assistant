@@ -71,6 +71,28 @@ VIRTUAL_SENSORS: tuple[SinumSensorDescription, ...] = (
         scale=0.1,
         suggested_display_precision=0,
     ),
+    SinumSensorDescription(
+        key="room_temperature",
+        api_key="room_temperature",
+        source="virtual",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="room_temperature",
+    ),
+    SinumSensorDescription(
+        key="dew_point",
+        api_key="dew_point",
+        source="virtual",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="dew_point",
+    ),
 )
 
 # ── WTP device sensors ─────────────────────────────────────────────────────────
@@ -213,6 +235,28 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="room_temperature",
+        api_key="room_temperature",
+        source="wtp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="room_temperature",
+    ),
+    SinumSensorDescription(
+        key="dew_point",
+        api_key="dew_point",
+        source="wtp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="dew_point",
     ),
     # Temperature regulator sensors (Phase 7B)
     SinumSensorDescription(
@@ -580,6 +624,8 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             return None
         if self.entity_description.is_text:
             return str(raw)
+        if not isinstance(raw, (int, float)):
+            return None
         return raw * self.entity_description.scale
 
 
@@ -956,11 +1002,12 @@ class SinumScheduleAssociationCountSensor(SinumScheduleSensor):
 
 
 class SinumButtonSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
-    """Last-action sensor for WTP/SBUS button devices."""
+    """Last-action sensor for WTP/SBUS button devices (diagnostic fallback)."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "button_last_action"
     _attr_icon = "mdi:gesture-tap-button"
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,

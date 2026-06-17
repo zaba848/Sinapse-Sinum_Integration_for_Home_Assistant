@@ -1,0 +1,172 @@
+"""Tests for SinumButtonEvent entity."""
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from custom_components.sinum.event import SinumButtonEvent, async_setup_entry
+from custom_components.sinum.sensor import SinumButtonSensor
+
+
+def _make_coordinator(wtp_devices=None, sbus_devices=None):
+    coordinator = MagicMock()
+    coordinator.wtp_devices = wtp_devices or {}
+    coordinator.sbus_devices = sbus_devices or {}
+    return coordinator
+
+
+def _make_wtp_button(action="single_press"):
+    return {
+        "id": 51,
+        "name": "WTP Button",
+        "type": "button",
+        "action": action,
+        "buttons_count": 1,
+        "_device_name": "WTP Button",
+        "_area": "Living Room",
+        "class": "wtp",
+    }
+
+
+def _make_sbus_button(action="single_press"):
+    return {
+        "id": 50,
+        "name": "SBUS Button",
+        "type": "button",
+        "action": action,
+        "buttons_count": 2,
+        "_device_name": "SBUS Button",
+        "_area": "Kitchen",
+        "class": "sbus",
+    }
+
+
+class TestSinumButtonEvent:
+    def _make_entity(self, bus="wtp", action="single_press"):
+        if bus == "wtp":
+            device = _make_wtp_button(action)
+            coordinator = _make_coordinator(wtp_devices={51: device})
+        else:
+            device = _make_sbus_button(action)
+            coordinator = _make_coordinator(sbus_devices={50: device})
+
+        device_id = 51 if bus == "wtp" else 50
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumButtonEvent(coordinator, device_id, "test_entry", bus)
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity, coordinator
+
+    def test_event_types(self):
+        entity, _ = self._make_entity()
+        assert entity.event_types == ["pressed"]
+
+    def test_translation_key(self):
+        entity, _ = self._make_entity()
+        assert entity._attr_translation_key == "button_press"
+
+    def test_initial_prev_action_set_from_device(self):
+        """On creation, _prev_action is set to current action — no event fires on load."""
+        entity, _ = self._make_entity(action="single_press")
+        assert entity._prev_action == "single_press"
+
+    def test_no_event_when_action_unchanged(self):
+        entity, coordinator = self._make_entity(action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        # Update with same action
+        coordinator.wtp_devices[51]["action"] = "single_press"
+        entity._handle_coordinator_update()
+
+        assert fired == []
+
+    def test_event_fired_on_action_change(self):
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        # Action changes
+        coordinator.wtp_devices[51]["action"] = "double_press"
+        entity._handle_coordinator_update()
+
+        assert len(fired) == 1
+        assert fired[0][0] == "pressed"
+        assert fired[0][1] == {"action": "double_press"}
+
+    def test_prev_action_updated_after_event(self):
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        entity._trigger_event = MagicMock()
+
+        coordinator.wtp_devices[51]["action"] = "double_press"
+        entity._handle_coordinator_update()
+
+        assert entity._prev_action == "double_press"
+
+    def test_no_event_when_action_is_none(self):
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.wtp_devices[51].pop("action", None)
+        entity._handle_coordinator_update()
+
+        assert fired == []
+
+    def test_no_event_when_action_is_empty_string(self):
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.wtp_devices[51]["action"] = ""
+        entity._handle_coordinator_update()
+
+        assert fired == []
+
+    def test_wtp_button_unique_id(self):
+        entity, _ = self._make_entity(bus="wtp")
+        assert entity.unique_id == "test_entry_wtp_51_event"
+
+    def test_sbus_button_unique_id(self):
+        entity, _ = self._make_entity(bus="sbus")
+        assert entity.unique_id == "test_entry_sbus_50_event"
+
+    def test_sbus_button_reads_sbus_store(self):
+        entity, coordinator = self._make_entity(bus="sbus", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.sbus_devices[50]["action"] = "long_press"
+        entity._handle_coordinator_update()
+
+        assert len(fired) == 1
+        assert fired[0][1] == {"action": "long_press"}
+
+    @pytest.mark.asyncio
+    async def test_setup_creates_wtp_and_sbus_entities(self):
+        wtp_button = _make_wtp_button()
+        sbus_button = _make_sbus_button()
+        coordinator = _make_coordinator(
+            wtp_devices={51: wtp_button},
+            sbus_devices={50: sbus_button},
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(MagicMock(), entry, lambda entities, **_: added.extend(entities))
+
+        assert len(added) == 2
+        buses = {e._bus for e in added}
+        assert buses == {"wtp", "sbus"}
+
+
+class TestSinumButtonSensorDisabledByDefault:
+    def test_entity_registry_enabled_default_via_instance(self):
+        coordinator = _make_coordinator(wtp_devices={51: _make_wtp_button()})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumButtonSensor(coordinator, 51, "test_entry", "wtp")
+        assert entity.entity_registry_enabled_default is False

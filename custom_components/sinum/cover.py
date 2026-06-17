@@ -71,6 +71,7 @@ class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.BLIND
+    _attr_icon = "mdi:blinds"
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -158,6 +159,7 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.GATE
+    _attr_icon = "mdi:gate"
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -217,6 +219,7 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.BLIND
+    _attr_icon = "mdi:blinds-horizontal"
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -256,7 +259,10 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         current = d.get("current_opening")
         if target is None or current is None:
             return False
-        return bool(d.get("action_in_progress")) and int(target) > int(current)
+        try:
+            return bool(d.get("action_in_progress")) and int(target) > int(current)
+        except (TypeError, ValueError):
+            return False
 
     @property
     def is_closing(self) -> bool:
@@ -265,7 +271,10 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         current = d.get("current_opening")
         if target is None or current is None:
             return False
-        return bool(d.get("action_in_progress")) and int(target) < int(current)
+        try:
+            return bool(d.get("action_in_progress")) and int(target) < int(current)
+        except (TypeError, ValueError):
+            return False
 
     @property
     def current_cover_position(self) -> int | None:
