@@ -1,13 +1,21 @@
--- Sinapse MQTT Bridge v0.5 (Sinum Lua API - Safe getValue wrappers)
+-- Sinapse MQTT Bridge v0.6 (Optimized & Refactored)
 
 local CLIENT_ID   = 1
 local TOPIC_PREFIX = "sinum"
 local QOS         = 0
 local RETAIN      = false
 
+local EVENTS = { INIT = "application_initialized", CHANGE = "device_state_changed", TICK = "minute_changed" }
+local TOPICS = { STATE = "state", HB = "event/heartbeat" }
+local CONTAINERS = { { "virtual", virtual }, { "wtp", wtp }, { "sbus", sbus } }
+local OPTIONAL_FIELDS = {
+    "temperature", "target_temperature", "humidity", "mode",
+    "work_mode", "available_work_modes", "working_state", "fan", "schedule_id"
+}
+
 local client = mqtt_client[CLIENT_ID]
 
-print("[Sinapse] MQTT bridge v0.5 started. Client ID: " .. tostring(CLIENT_ID))
+print("[Sinapse] MQTT bridge v0.6 started. Client ID: " .. tostring(CLIENT_ID))
 
 local function safe_get(obj, key)
     local ok, val = pcall(function() return obj:getValue(key) end)
@@ -35,26 +43,10 @@ local function device_snapshot(device)
         state       = safe_get(device, "state"),
         updated_at  = os.time(),
     }
-
-    local temp = safe_get(device, "temperature")
-    if temp ~= nil then snap.temperature = temp end
-    local target_temp = safe_get(device, "target_temperature")
-    if target_temp ~= nil then snap.target_temperature = target_temp end
-    local humidity = safe_get(device, "humidity")
-    if humidity ~= nil then snap.humidity = humidity end
-    local mode = safe_get(device, "mode")
-    if mode ~= nil then snap.mode = mode end
-    local work_mode = safe_get(device, "work_mode")
-    if work_mode ~= nil then snap.work_mode = work_mode end
-    local available_work_modes = safe_get(device, "available_work_modes")
-    if available_work_modes ~= nil then snap.available_work_modes = available_work_modes end
-    local working_state = safe_get(device, "working_state")
-    if working_state ~= nil then snap.working_state = working_state end
-    local fan = safe_get(device, "fan")
-    if fan ~= nil then snap.fan = fan end
-    local schedule_id = safe_get(device, "schedule_id")
-    if schedule_id ~= nil then snap.schedule_id = schedule_id end
-
+    for _, field in ipairs(OPTIONAL_FIELDS) do
+        local val = safe_get(device, field)
+        if val ~= nil then snap[field] = val end
+    end
     return snap
 end
 
@@ -71,45 +63,34 @@ local function find_device(device_id)
     return nil, nil
 end
 
-if event.type == "application_initialized" then
-    print("[Sinapse] >> application_initialized: publishing initial device snapshots")
-    if virtual then
-        for id, device in pairs(virtual) do
-            local snap = device_snapshot(device)
-            snap.source = "virtual"
-            publish("state/" .. tostring(id), snap)
+if event.type == EVENTS.INIT then
+    local counts = { virtual = 0, wtp = 0, sbus = 0 }
+    for _, container_entry in ipairs(CONTAINERS) do
+        local source_type, container = container_entry[1], container_entry[2]
+        if container then
+            for id, device in pairs(container) do
+                local snap = device_snapshot(device)
+                snap.source = source_type
+                publish(TOPICS.STATE .. "/" .. tostring(id), snap)
+                counts[source_type] = counts[source_type] + 1
+            end
         end
     end
-    if wtp then
-        for id, device in pairs(wtp) do
-            local snap = device_snapshot(device)
-            snap.source = "wtp"
-            publish("state/" .. tostring(id), snap)
-        end
-    end
-    if sbus then
-        for id, device in pairs(sbus) do
-            local snap = device_snapshot(device)
-            snap.source = "sbus"
-            publish("state/" .. tostring(id), snap)
-        end
-    end
-    print("[Sinapse] Initial device snapshots published")
+    print("[Sinapse] Published " .. counts.virtual .. " virtual, " .. counts.wtp ..
+          " wtp, " .. counts.sbus .. " sbus devices")
 end
 
-if event.type == "device_state_changed" and event.source and event.source.id ~= 0 then
-    local source = event.source
-    local device, source_type = find_device(source.id)
-
+if event.type == EVENTS.CHANGE and event.source and event.source.id ~= 0 then
+    local device, source_type = find_device(event.source.id)
     if device and source_type then
         local snap = device_snapshot(device)
         snap.source = source_type
-        publish("state/" .. tostring(source.id), snap)
+        publish(TOPICS.STATE .. "/" .. tostring(event.source.id), snap)
     else
-        print("[Sinapse] device_state_changed: device " .. tostring(source.id) .. " not found in any container")
+        print("[Sinapse] device_state_changed: device " .. tostring(event.source.id) .. " not found")
     end
 end
 
-if event.type == "minute_changed" then
-    publish("event/heartbeat", { ts = os.time(), client_id = CLIENT_ID })
+if event.type == EVENTS.TICK then
+    publish(TOPICS.HB, { ts = os.time(), client_id = CLIENT_ID })
 end
