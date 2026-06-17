@@ -1,11 +1,20 @@
-"""Alarm control panel for Sinum Virtual Alarm System.
+"""Alarm control panel for Sinum alarm zones.
 
-Supports:
-  - Virtual alarm (software zones configured in Sinum app)
-  - Satel alarm parent (physical Satel hardware integrated into Sinum)
+API: GET /api/v1/devices/alarm-system  — list of alarm_zone devices
+     GET /api/v1/devices/alarm-system/{id}  — single zone
 
-REST endpoint: GET/PATCH /devices/alarm/{id}
-States: disarmed | armed_home | armed_away | armed_night | triggered | pending
+State fields (read-only in API):
+  zone_status : "armed" | "disarmed"
+  violated    : bool  — zone sensor currently tripped
+
+HA state mapping:
+  violated=True        → TRIGGERED
+  zone_status="armed"  → ARMED_AWAY
+  default              → DISARMED
+
+NOTE: The REST API does not expose arm/disarm commands (zone_status and
+armed are read-only). The panel is therefore display-only with no
+supported features. State is refreshed via the shared coordinator.
 """
 from __future__ import annotations
 
@@ -14,12 +23,12 @@ from typing import Any
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
-    AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
@@ -27,17 +36,6 @@ from .const import DOMAIN
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
-# Sinum alarm state → HA AlarmControlPanelState
-_STATE_MAP: dict[str, AlarmControlPanelState] = {
-    "disarmed":    AlarmControlPanelState.DISARMED,
-    "armed_home":  AlarmControlPanelState.ARMED_HOME,
-    "armed_away":  AlarmControlPanelState.ARMED_AWAY,
-    "armed_night": AlarmControlPanelState.ARMED_NIGHT,
-    "triggered":   AlarmControlPanelState.TRIGGERED,
-    "pending":     AlarmControlPanelState.PENDING,
-    "arming":      AlarmControlPanelState.ARMING,
-}
 
 
 async def async_setup_entry(
@@ -55,22 +53,20 @@ async def async_setup_entry(
         return
 
     for device in alarm_devices:
-        entities.append(SinumAlarmPanel(coordinator, device, entry.entry_id))
+        entities.append(SinumAlarmZone(coordinator, device, entry.entry_id))
 
     async_add_entities(entities)
 
 
-class SinumAlarmPanel(AlarmControlPanelEntity):
-    """Represents a Sinum alarm system zone/panel."""
+class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntity):
+    """Alarm zone from the Sinum alarm system (read-only state monitor)."""
 
     _attr_has_entity_name = True
-    _attr_supported_features = (
-        AlarmControlPanelEntityFeature.ARM_HOME
-        | AlarmControlPanelEntityFeature.ARM_AWAY
-        | AlarmControlPanelEntityFeature.ARM_NIGHT
-        | AlarmControlPanelEntityFeature.TRIGGER
-    )
+    _attr_name = None
+    # REST API does not support arm/disarm — display-only panel
+    _attr_supported_features = 0
     _attr_code_arm_required = False
+    _attr_icon = "mdi:shield-home"
 
     def __init__(
         self,
@@ -78,47 +74,44 @@ class SinumAlarmPanel(AlarmControlPanelEntity):
         device: dict[str, Any],
         entry_id: str,
     ) -> None:
-        self._coordinator = coordinator
-        self._device_id: int = device["id"]
-        self._data = device
-        name: str = device.get("name", f"Alarm {self._device_id}")
-        self._attr_name = name
-        self._attr_unique_id = f"{entry_id}_alarm_{self._device_id}"
+        super().__init__(coordinator)
+        self._zone_id: int = int(device["id"])
+        name: str = device.get("name", f"Alarm zone {self._zone_id}")
+        self._attr_unique_id = f"{entry_id}_alarm_{self._zone_id}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_alarm_{self._device_id}")},
+            identifiers={(DOMAIN, f"{entry_id}_alarm_{self._zone_id}")},
             name=name,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {device.get('type', 'Alarm System').replace('_', ' ').title()}",
+            model="Sinum Alarm Zone",
+            suggested_area=device.get("_area") or None,
         )
 
     @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.alarm_zones.get(self._zone_id, {})
+
+    @property
     def alarm_state(self) -> AlarmControlPanelState | None:
-        raw = self._data.get("state", "disarmed")
-        return _STATE_MAP.get(str(raw), AlarmControlPanelState.DISARMED)
+        d = self._device
+        if d.get("violated"):
+            return AlarmControlPanelState.TRIGGERED
+        if d.get("zone_status") == "armed":
+            return AlarmControlPanelState.ARMED_AWAY
+        return AlarmControlPanelState.DISARMED
 
-    async def _patch(self, payload: dict[str, Any]) -> None:
-        updated = await self._coordinator.client.patch_alarm_device(self._device_id, payload)
-        self._data.update(updated)
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        attrs: dict[str, Any] = {}
+        if (v := d.get("enter_time_delay")) is not None:
+            attrs["entry_delay_s"] = v
+        if (v := d.get("exit_time_delay")) is not None:
+            attrs["exit_delay_s"] = v
+        inputs = d.get("associations", {}).get("inputs", [])
+        if inputs:
+            attrs["inputs"] = [f"{i['class']}/{i['id']}" for i in inputs]
+        return attrs
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
         self.async_write_ha_state()
-
-    async def async_alarm_disarm(self, code: str | None = None) -> None:
-        await self._patch({"state": "disarmed", "code": code})
-
-    async def async_alarm_arm_home(self, code: str | None = None) -> None:
-        await self._patch({"state": "armed_home", "code": code})
-
-    async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        await self._patch({"state": "armed_away", "code": code})
-
-    async def async_alarm_arm_night(self, code: str | None = None) -> None:
-        await self._patch({"state": "armed_night", "code": code})
-
-    async def async_alarm_trigger(self, code: str | None = None) -> None:
-        await self._patch({"state": "triggered"})
-
-    async def async_update(self) -> None:
-        try:
-            updated = await self._coordinator.client.get_alarm_device(self._device_id)
-            self._data.update(updated)
-        except SinumConnectionError as err:
-            _LOGGER.warning("Alarm update failed for %s: %s", self._device_id, err)

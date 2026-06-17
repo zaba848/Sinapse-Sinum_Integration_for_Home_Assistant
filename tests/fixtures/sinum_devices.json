@@ -4,18 +4,42 @@
       "id": 1,
       "name": "Living Room",
       "devices": [
-        {"id": 10, "name": "Thermostat", "class": "virtual"},
-        {"id": 11, "name": "Ceiling Light", "class": "virtual"},
-        {"id": 20, "name": "Temp Sensor", "class": "wtp"},
-        {"id": 21, "name": "Motion", "class": "wtp"}
+        {
+          "id": 10,
+          "name": "Thermostat",
+          "class": "virtual"
+        },
+        {
+          "id": 11,
+          "name": "Ceiling Light",
+          "class": "virtual"
+        },
+        {
+          "id": 20,
+          "name": "Temp Sensor",
+          "class": "wtp"
+        },
+        {
+          "id": 21,
+          "name": "Motion",
+          "class": "wtp"
+        }
       ]
     },
     {
       "id": 2,
       "name": "Kitchen",
       "devices": [
-        {"id": 12, "name": "Relay", "class": "virtual"},
-        {"id": 13, "name": "Blind", "class": "virtual"}
+        {
+          "id": 12,
+          "name": "Relay",
+          "class": "virtual"
+        },
+        {
+          "id": 13,
+          "name": "Blind",
+          "class": "virtual"
+        }
       ]
     }
   ],
@@ -86,7 +110,12 @@
     "class": "wtp",
     "room_id": 1,
     "work_mode": "heating",
-    "available_work_modes": ["heating", "cooling", "automatic", "off"],
+    "available_work_modes": [
+      "heating",
+      "cooling",
+      "automatic",
+      "off"
+    ],
     "target_temperature": 220,
     "target_temperature_minimum": 50,
     "target_temperature_maximum": 300,
@@ -121,7 +150,10 @@
     "target_temperature_minimum": 50,
     "target_temperature_maximum": 300,
     "system_mode": "heating",
-    "target_temperature_mode": {"current": "constant", "remaining_time": 0},
+    "target_temperature_mode": {
+      "current": "constant",
+      "remaining_time": 0
+    },
     "mode_mutable": true,
     "parent_id": 10,
     "status": "online"
@@ -146,12 +178,28 @@
     "status": "online"
   },
   "scenes": [
-    {"id": 1, "name": "Good Morning"},
-    {"id": 2, "name": "Good Night"}
+    {
+      "id": 1,
+      "name": "Good Morning"
+    },
+    {
+      "id": 2,
+      "name": "Good Night"
+    }
   ],
   "variables": [
-    {"id": 1, "name": "brightness_level", "value": 50, "type": "number"},
-    {"id": 2, "name": "mode", "value": 1, "type": "number"}
+    {
+      "id": 1,
+      "name": "brightness_level",
+      "value": 50,
+      "type": "number"
+    },
+    {
+      "id": 2,
+      "name": "mode",
+      "value": 1,
+      "type": "number"
+    }
   ],
   "weather": {
     "temperature": 185,
@@ -173,15 +221,31 @@
       "id": 7,
       "name": "Living Schedule",
       "type": "thermal",
-      "modes": ["heating"],
+      "modes": [
+        "heating"
+      ],
       "current_target_temperature": 215,
       "fallback": 180,
       "associations": {
-        "thermostats": [{"id": 10, "class": "virtual"}],
-        "fan_coils": [{"id": 13, "class": "sbus"}]
+        "thermostats": [
+          {
+            "id": 10,
+            "class": "virtual"
+          }
+        ],
+        "fan_coils": [
+          {
+            "id": 13,
+            "class": "sbus"
+          }
+        ]
       },
       "monday": [
-        {"start": 0, "end": 600, "target_temperature": 210}
+        {
+          "start": 0,
+          "end": 600,
+          "target_temperature": 210
+        }
       ],
       "tuesday": [],
       "wednesday": [],
@@ -194,9 +258,42 @@
   "alarm_devices": [
     {
       "id": 1,
-      "name": "Main Alarm",
-      "type": "virtual_alarm",
-      "state": "disarmed"
+      "name": "Zone 1",
+      "type": "alarm_zone",
+      "class": "alarm_system",
+      "zone_status": "disarmed",
+      "armed": false,
+      "violated": false,
+      "enter_time_delay": 15,
+      "exit_time_delay": 15,
+      "associations": {
+        "inputs": [
+          {
+            "class": "sbus",
+            "id": 10
+          },
+          {
+            "class": "sbus",
+            "id": 11
+          }
+        ]
+      },
+      "status": "online"
+    },
+    {
+      "id": 2,
+      "name": "Zone 2",
+      "type": "alarm_zone",
+      "class": "alarm_system",
+      "zone_status": "armed",
+      "armed": true,
+      "violated": false,
+      "enter_time_delay": 30,
+      "exit_time_delay": 30,
+      "associations": {
+        "inputs": []
+      },
+      "status": "online"
     }
   ],
   "sbus_fan_coil": {
@@ -206,7 +303,12 @@
     "class": "sbus",
     "room_id": 1,
     "work_mode": "heating",
-    "available_work_modes": ["heating", "cooling", "automatic", "off"],
+    "available_work_modes": [
+      "heating",
+      "cooling",
+      "automatic",
+      "off"
+    ],
     "target_temperature": 220,
     "target_temperature_minimum": 50,
     "target_temperature_maximum": 300,
@@ -402,10 +504,18 @@
     "type": "heat_pump_manager",
     "work_mode": "heating",
     "temperature": 200,
-    "target_temperature": {"current": 212, "cooling": 212, "heating": 200, "automatic": 180},
+    "target_temperature": {
+      "current": 212,
+      "cooling": 212,
+      "heating": 200,
+      "automatic": 180
+    },
     "state": true,
     "enabled": true,
-    "dhw_control": {"state": false, "target_temperature": 550},
+    "dhw_control": {
+      "state": false,
+      "target_temperature": 550
+    },
     "room_id": 1,
     "class": "virtual"
   }

@@ -37,6 +37,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hub_info: dict[str, Any] = {}                # from /api/v1/info
         self.parent_devices: list[dict[str, Any]] = []    # flat list from /api/v1/parent-devices
         self.schedules: list[dict[str, Any]] = []         # thermal schedules from /api/v1/schedules
+        self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None               # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -117,6 +118,15 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.virtual_devices = virtual
         self.wtp_devices = wtp
         self.sbus_devices = sbus
+
+        # ── Alarm zones (/api/v1/devices/alarm-system) ───────────────────────
+        try:
+            alarm_list = await self.client.get_alarm_devices()
+            if alarm_list:
+                self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
+        except SinumConnectionError as err:
+            _LOGGER.debug("Alarm zones unavailable: %s", err)
+
         return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "schedules": self.schedules}
 
     async def _fetch_device_collection(
