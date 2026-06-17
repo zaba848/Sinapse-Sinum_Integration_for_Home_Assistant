@@ -59,15 +59,15 @@ local function device_snapshot(device)
 end
 
 local function find_device(device_id)
-    if virtual and virtual[device_id] then
-        return virtual[device_id], "virtual"
-    end
-    if wtp and wtp[device_id] then
-        return wtp[device_id], "wtp"
-    end
-    if sbus and sbus[device_id] then
-        return sbus[device_id], "sbus"
-    end
+    local ok, device = pcall(function() return virtual[device_id] end)
+    if ok and device then return device, "virtual" end
+
+    ok, device = pcall(function() return wtp[device_id] end)
+    if ok and device then return device, "wtp" end
+
+    ok, device = pcall(function() return sbus[device_id] end)
+    if ok and device then return device, "sbus" end
+
     return nil, nil
 end
 
