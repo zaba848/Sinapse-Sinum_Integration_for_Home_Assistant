@@ -34,26 +34,37 @@ This matters because devices do not have to be assigned to rooms. `/api/v1/rooms
 
 ## Supported Today
 
-| Platform | Sinum sources |
-|---|---|
-| `climate` | Virtual thermostats |
-| `sensor` | WTP temperature/humidity, WTP air/energy-style sensors where present, SBUS temperature/humidity, weather, hub uptime/Wi-Fi when available |
-| `binary_sensor` | WTP flood/motion/opening/smoke/two-state inputs, SBUS two-state inputs, parent online/problem status |
-| `switch` | Virtual relay integrator, wicket |
-| `cover` | Virtual blind controller, gate |
-| `light` | Virtual dimmer/RGB controller |
-| `button` | Sinum scenes/scripts via `PATCH /api/v1/scenes/{id}` |
-| `number` | Numeric Lua variables |
-| `update` | Parent device firmware status |
+| Platform | Sinum sources | Status |
+|---|---|---|
+| `climate` | Virtual thermostats | ✅ |
+| `sensor` | WTP temperature/humidity, WTP air/energy, SBUS temperature/humidity, weather, hub diagnostics | ✅ |
+| `binary_sensor` | WTP/SBUS two-state sensors, parent device status | ✅ |
+| `switch` | Virtual relay, wicket | ✅ |
+| `cover` | Virtual blind, gate | ✅ |
+| `light` | Virtual dimmer/RGB | ✅ |
+| `button` | Sinum scenes/scripts | ✅ |
+| `number` | Numeric Lua variables | ✅ |
+| `update` | Parent device firmware | ✅ |
 
-Not yet production-ready:
+**Coming Soon (Planned Phases)**
 
-- WTP/SBUS fan coil climate entities
-- WTP temperature regulator climate entities
-- Thermal schedule entities
-- TECH RS, Modbus heat pump, Energy Center, LoRa, SLINK, cameras
+| Feature | Phase | Status |
+|---|---|---|
+| Fan coil climate entities (WTP + SBUS) | 7A | 33% — SBUS done, WTP pending |
+| Temperature regulator climate/sensors | 7B | Planned |
+| Thermal schedule entities | 7C | Planned |
+| MQTT bridge (v0.6) | 7D | ✅ Complete |
+| Quality gate & testing | 7E | In progress |
+| TECH RS ventilation sensors | 8 | Future |
+| Modbus heat pump / DHW | 9 | Future |
 
-See [PLAN.md](PLAN.md) for the detailed roadmap and verified device counts.
+**Not Supported**
+
+- LoRa, SLINK, video cameras (require specific hardware)
+- Energy Center (API endpoint not available on verified hub)
+- Custom device types (complex Lua modules)
+
+See [PLAN.md](PLAN.md) for detailed roadmap and verified device counts.
 
 ---
 
@@ -100,25 +111,71 @@ Do not commit API tokens, passwords, exported diagnostics with secrets, or local
 
 ## Optional MQTT
 
-MQTT is optional. REST polling works without it.
+MQTT is optional. REST polling works without it and is the supported baseline.
 
-To enable real-time updates:
+### Prerequisites
 
-1. Configure an MQTT broker in Home Assistant, for example Mosquitto.
-2. In Sinum, add an MQTT client pointing to the broker.
-3. Upload [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua) to the Sinum Lua scripts panel.
-4. Set the Lua `CLIENT_ID` to the ID assigned by Sinum.
-5. Enable MQTT in the integration options.
+1. MQTT broker configured in Home Assistant (e.g., Mosquitto add-on)
+2. Sinum hub network access to the MQTT broker
+3. Manual upload of Lua bridge script to Sinum hub
 
-Current topic layout:
+### Setup Workflow
 
-| Topic | Direction |
+**Step 1: Configure MQTT in Sinum Hub**
+1. Open Sinum hub web UI → Integrations → Add MQTT client
+2. Enter your MQTT broker IP, port (usually 1883), username, password
+3. **Note the MQTT Client ID assigned by Sinum** (shown after saving)
+4. Save and verify connection
+
+**Step 2: Upload Lua Bridge Script**
+1. Open Sinum hub web UI → Settings → Lua Scripts
+2. Create a new script or replace existing
+3. Copy full contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua) 
+4. **Important**: Set `CLIENT_ID = <the ID from Step 1>` at line 17
+5. Save and Enable the script
+6. Check Sinum logs for startup message: `[Sinapse] MQTT bridge v0.7 started`
+
+**Step 3: Enable in Home Assistant**
+1. Go to Sinum integration settings → Options
+2. Toggle "Enable MQTT real-time transport"
+3. Save
+
+### MQTT Message Topics
+
+| Topic | Direction | Payload |
+|---|---|---|
+| `sinum/state/{device_id}` | Sinum → HA | Complete device state JSON (see below) |
+| `sinum/event/heartbeat` | Sinum → HA | Heartbeat pulse (every minute) |
+
+### Example Payload
+
+```json
+{
+  "id": 123,
+  "type": "fan_coil",
+  "name": "Salon Floor",
+  "room_id": 5,
+  "parent_id": 42,
+  "state": true,
+  "source": "wtp",
+  "room_temperature": 195,
+  "target_temperature": 220,
+  "humidity": 450,
+  "work_mode": "heating",
+  "working_state": "heating_active",
+  "updated_at": 1718545200
+}
+```
+
+### Troubleshooting
+
+| Issue | Solution |
 |---|---|
-| `sinum/state/{device_id}` | Sinum -> HA state updates |
-| `sinum/event/{type}` | Sinum -> HA events |
-| `sinum/cmd/{device_id}` | HA -> Sinum commands |
+| No messages in HA | Check MQTT broker connectivity, verify script logs on hub |
+| Device updates slow | Check network latency, verify MQTT client online status |
+| Script errors on hub | Check CLIENT_ID matches hub's configured value, verify JSON syntax |
 
-The bridge still needs a hardening pass before relying on it for critical control paths. REST remains the supported baseline.
+**Note**: Command topics (`sinum/cmd/#`) are disabled until write payloads are verified. Use REST API for device control.
 
 ---
 
@@ -163,26 +220,134 @@ The integration treats this as best-effort. If the script is not installed, setu
 
 ## Development
 
+### Environment Setup
+
+**Requirements**: Python 3.9+
+
 ```bash
+# Clone or fork repository
+cd sinapse
+python3 -m venv venv
+source venv/bin/activate  # macOS/Linux
+# OR on Windows:
+# venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements-dev.txt
+```
+
+### Running Tests
+
+```bash
+# Run all tests (51 tests, ~0.3s)
 pytest tests/
+
+# Run specific test file
+pytest tests/test_api.py
+
+# Run with verbose output
+pytest -vv tests/
+
+# Run with coverage
+pytest --cov=custom_components/sinum tests/
+```
+
+**Expected output**: All 51 tests passing
+
+### Code Quality Checks
+
+```bash
+# Type checking with mypy
+python3 -m mypy custom_components/sinum/
+
+# Linting with ruff
 ruff check custom_components/sinum/
+
+# Syntax verification
+python3 -m compileall custom_components/sinum tests
+
+# All checks (use this before committing)
+ruff check custom_components/sinum/ && \
+python3 -m mypy custom_components/sinum/ && \
+pytest tests/ && \
 python3 -m compileall custom_components/sinum tests
 ```
+
+### Project Structure
+
+```
+custom_components/sinum/
+  ├── __init__.py           # Integration entry point
+  ├── api.py                # REST API client (334 LOC)
+  ├── climate.py            # Climate entities (fan coil, thermostat)
+  ├── coordinator.py        # DataUpdateCoordinator (device discovery)
+  ├── config_flow.py        # Configuration UI
+  ├── sensor.py             # Sensor entities (763 LOC)
+  ├── binary_sensor.py      # Binary sensor entities
+  ├── switch.py, cover.py, light.py, button.py, number.py, update.py
+  ├── strings.json          # UI strings (EN)
+  └── translations/pl.json  # Polish translations
+
+lua_scripts/
+  ├── mqtt_bridge.lua       # MQTT state bridge (v0.7.1)
+  └── sinapse_api.lua       # HTTP server diagnostics
+
+tests/
+  ├── conftest.py           # Pytest fixtures
+  ├── fixtures/             # Test data
+  ├── test_api.py           # API client tests
+  ├── test_config_flow.py   # Config flow tests
+  ├── test_climate.py       # Climate entity tests
+  ├── test_coordinator.py   # Coordinator tests
+  └── test_fan_coil.py      # Fan coil tests (22 tests)
+```
+
+### Adding a New Entity Type
+
+1. Create new file `custom_components/sinum/new_platform.py`
+2. Inherit from appropriate Home Assistant entity base class
+3. Implement required properties and methods
+4. Register in `__init__.py` (entry point)
+5. Add tests in `tests/test_new_platform.py`
+6. Add translation keys to `strings.json` and `translations/pl.json`
+
+See [PLAN.md](PLAN.md) for upcoming entity work (fan coil, regulators, schedules).
 
 ---
 
 ## Roadmap
 
-Immediate next work:
+See [PLAN.md](PLAN.md) for detailed timeline and device counts.
 
-1. Implement fan coil `climate` entities for WTP `fan_coil`, WTP `fan_coil_v2`, and SBUS `fan_coil`.
-2. Add schedule sensors for thermal schedules and temperature curves.
-3. Decide whether WTP `temperature_regulator` should be exposed as climate entities or thermostat attributes.
-4. Harden the Lua MQTT bridge with safe `getValue()` snapshots and initial publishes for virtual/WTP/SBUS devices.
-5. Run the full test suite after installing dev dependencies.
+### Current Phase: 7E — Quality Gate
 
-Detailed plan: [PLAN.md](PLAN.md).
+- ✅ Fix JSON translation bugs
+- ✅ Create pyproject.toml with ruff/mypy config
+- ✅ Add test fixtures for SBUS sensors
+- ⏳ Add Phase 7E tests (collection discovery, SBUS sensors, scene trigger, Energy 404, alarm empty)
+- ⏳ Run mypy type checking
+- ⏳ Run ruff linting
+- ⏳ Verify HA custom integration checks
+
+### Completed Phases
+
+| Phase | Feature | Status |
+|---|---|---|
+| 7D | MQTT Bridge Hardening | ✅ v0.7.1 complete |
+| Previous | Device discovery, sensors, binary sensors, switches, covers, lights, buttons, numbers, updates | ✅ |
+
+### Planned Phases
+
+| Phase | Feature | ETA |
+|---|---|---|
+| 7A | Fan coil climate entities (WTP + SBUS) | Next |
+| 7B | Temperature regulator support | Q3 |
+| 7C | Thermal schedule entities | Q3 |
+| 8 | TECH RS ventilation/heat pump | Q3/Q4 |
+| 9 | Modbus DHW / energy integration | Q4 |
+| 10 | Energy Center (if endpoint available) | Future |
+| 11 | LoRa / SLINK / cameras | When hardware present |
+| 12 | Long-term statistics | Future |
 
 ---
 
