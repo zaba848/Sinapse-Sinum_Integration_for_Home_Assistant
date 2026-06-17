@@ -354,6 +354,8 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         manual_gear = d.get("fan", {}).get("manual_fan_gear")
         if manual_gear:
             attrs["manual_fan_gear"] = manual_gear
+        if working_state := d.get("working_state"):
+            attrs["working_state"] = working_state
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:

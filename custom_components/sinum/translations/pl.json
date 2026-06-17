@@ -149,6 +149,12 @@
       "dew_point": {
         "name": "Punkt rosy"
       },
+      "valve_temperature": {
+        "name": "Temperatura zaworu"
+      },
+      "valve_position": {
+        "name": "Otwarcie zaworu"
+      },
       "pwm_duty_cycle": {
         "name": "Wypełnienie"
       },
@@ -170,6 +176,18 @@
           "on": "Problem",
           "off": "OK"
         }
+      },
+      "target_reached": {
+        "name": "Cel osiągnięty",
+        "state": {
+          "on": "Osiągnięty",
+          "off": "Nie osiągnięty"
+        }
+      }
+    },
+    "switch": {
+      "dhw_control": {
+        "name": "Ciepła woda"
       }
     },
     "update": {

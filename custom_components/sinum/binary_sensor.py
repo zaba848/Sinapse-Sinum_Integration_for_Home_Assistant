@@ -23,6 +23,7 @@ from .const import (
     WTYPE_MOTION_SENSOR,
     WTYPE_OPENING_SENSOR,
     WTYPE_SMOKE_SENSOR,
+    WTYPE_TEMPERATURE_REGULATOR,
     WTYPE_TWO_STATE_INPUT_SENSOR,
 )
 from .coordinator import SinumCoordinator
@@ -98,6 +99,25 @@ SBUS_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
 
 _SBUS_TYPE_TO_DESCRIPTION = {d.wtp_type: d for d in SBUS_BINARY_SENSOR_TYPES}
 
+_TARGET_REACHED_WTP = SinumBinarySensorDescription(
+    key="target_reached",
+    wtp_type=WTYPE_TEMPERATURE_REGULATOR,
+    source="wtp",
+    device_class=None,
+    state_key="target_temperature_reached",
+    on_states=("true",),
+    translation_key="target_reached",
+)
+_TARGET_REACHED_SBUS = SinumBinarySensorDescription(
+    key="target_reached",
+    wtp_type=WTYPE_TEMPERATURE_REGULATOR,
+    source="sbus",
+    device_class=None,
+    state_key="target_temperature_reached",
+    on_states=("true",),
+    translation_key="target_reached",
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -112,12 +132,16 @@ async def async_setup_entry(
         description = _WTP_TYPE_TO_DESCRIPTION.get(wtp_type)
         if description:
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
+        if wtp_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
+            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_WTP, entry.entry_id))
 
     for device_id, device in coordinator.sbus_devices.items():
         sbus_type = device.get("type", "")
         description = _SBUS_TYPE_TO_DESCRIPTION.get(sbus_type)
         if description:
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
+        if sbus_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
+            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry.entry_id))
 
     # Parent device connectivity sensors from REST /api/v1/parent-devices
     for parent in coordinator.parent_devices:

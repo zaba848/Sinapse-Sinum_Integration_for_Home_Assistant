@@ -351,6 +351,28 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement="Hz",
         suggested_display_precision=0,
     ),
+    SinumSensorDescription(
+        key="valve_temperature",
+        api_key="temperature_valve",
+        source="sbus",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        translation_key="valve_temperature",
+    ),
+    SinumSensorDescription(
+        key="valve_position",
+        api_key="open_percent",
+        source="sbus",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.01,
+        suggested_display_precision=1,
+        icon="mdi:valve",
+        translation_key="valve_position",
+    ),
 )
 
 # ── SBUS temperature_regulator sensors ────────────────────────────────────────

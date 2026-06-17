@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .const import DOMAIN, STYPE_COMMON_VALVE, STYPE_RELAY, STYPE_VALVE_PUMP, VTYPE_RELAY, VTYPE_WICKET, WTYPE_RELAY
+from .const import DOMAIN, STYPE_COMMON_VALVE, STYPE_RELAY, STYPE_VALVE_PUMP, VTYPE_HEAT_PUMP_MANAGER, VTYPE_RELAY, VTYPE_WICKET, WTYPE_RELAY
 from .coordinator import SinumCoordinator
 
 
@@ -27,6 +27,10 @@ async def async_setup_entry(
             entities.append(SinumRelaySwitch(coordinator, device_id, entry.entry_id))
         elif dev_type == VTYPE_WICKET:
             entities.append(SinumWicketSwitch(coordinator, device_id, entry.entry_id))
+        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
+            dhw = device.get("dhw_control")
+            if isinstance(dhw, dict) and "enabled" in dhw:
+                entities.append(SinumDhwSwitch(coordinator, device_id, entry.entry_id))
 
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") == WTYPE_RELAY:
@@ -277,4 +281,62 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"enabled": False})
         self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumDhwSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+    """DHW (domestic hot water) enable switch on heat_pump_manager virtual devices."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dhw_control"
+    _attr_icon = "mdi:water-boiler"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_virtual_{device_id}_dhw"
+        self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Heat Pump Manager")
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.virtual_devices.get(self._device_id, {})
+
+    @property
+    def is_on(self) -> bool:
+        dhw = self._device.get("dhw_control")
+        if not isinstance(dhw, dict):
+            return False
+        return bool(dhw.get("enabled"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        dhw = self._device.get("dhw_control")
+        if not isinstance(dhw, dict):
+            return {}
+        attrs: dict[str, Any] = {}
+        decode = self.coordinator.client.decode_temperature
+        if "state" in dhw:
+            attrs["dhw_active"] = dhw["state"]
+        if "temperature" in dhw:
+            attrs["dhw_temperature_c"] = decode(dhw["temperature"])
+        if "target_temperature" in dhw:
+            attrs["dhw_target_c"] = decode(dhw["target_temperature"])
+        if "hysteresis" in dhw:
+            attrs["hysteresis"] = dhw["hysteresis"] / 10
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"dhw_control": {"enabled": True}}
+        )
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, {"dhw_control": {"enabled": False}}
+        )
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()

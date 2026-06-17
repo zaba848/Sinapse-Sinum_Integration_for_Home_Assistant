@@ -149,6 +149,12 @@
       "dew_point": {
         "name": "Dew point"
       },
+      "valve_temperature": {
+        "name": "Valve temperature"
+      },
+      "valve_position": {
+        "name": "Valve position"
+      },
       "pwm_duty_cycle": {
         "name": "Duty cycle"
       },
@@ -170,6 +176,18 @@
           "on": "Problem",
           "off": "OK"
         }
+      },
+      "target_reached": {
+        "name": "Target reached",
+        "state": {
+          "on": "Reached",
+          "off": "Not reached"
+        }
+      }
+    },
+    "switch": {
+      "dhw_control": {
+        "name": "Hot water"
       }
     },
     "update": {
