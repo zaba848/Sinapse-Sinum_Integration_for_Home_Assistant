@@ -40,12 +40,17 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.mqtt_bridge: Any | None = None               # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
+        # ── Rooms ─────────────────────────────────────────────────────────────
+        # Non-fatal: if hub returns 408 (bus timeout, alpha firmware), keep cached rooms
         try:
             rooms = await self.client.get_rooms()
+            self.rooms = rooms
         except SinumConnectionError as err:
-            raise UpdateFailed(f"Cannot reach Sinum hub: {err}") from err
-
-        self.rooms = rooms
+            if self.rooms:
+                _LOGGER.debug("Rooms endpoint unavailable (%s), using cached rooms", err)
+                rooms = self.rooms
+            else:
+                raise UpdateFailed(f"Cannot reach Sinum hub: {err}") from err
 
         # ── Hub info (uptime, version, uid) ───────────────────────────────────
         try:

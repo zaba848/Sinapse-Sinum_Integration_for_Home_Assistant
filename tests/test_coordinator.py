@@ -119,7 +119,7 @@ class TestSinumCoordinator:
         assert thermostat["_id"] == 10
 
     @pytest.mark.asyncio
-    async def test_update_raises_on_room_failure(self, mock_client):
+    async def test_update_raises_on_room_failure_with_no_cache(self, mock_client):
         from homeassistant.helpers.update_coordinator import UpdateFailed
         mock_client.get_rooms = AsyncMock(
             side_effect=SinumConnectionError("hub unreachable")
@@ -127,6 +127,26 @@ class TestSinumCoordinator:
         coordinator = self._make_coordinator(mock_client)
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
+    async def test_update_uses_cached_rooms_on_408(self, mock_client):
+        """When rooms returns 408 but cache exists, coordinator continues with cached rooms."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+        coordinator = self._make_coordinator(mock_client)
+        # Populate cache on first successful call
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        assert coordinator.rooms  # cache populated
+
+        # Now rooms endpoint times out (408 → SinumConnectionError)
+        mock_client.get_rooms = AsyncMock(
+            side_effect=SinumConnectionError("Hub internal timeout (bus may be busy)")
+        )
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+
+        # Should not raise — uses cached rooms
+        assert 10 in data["virtual"]
 
     @pytest.mark.asyncio
     async def test_single_device_failure_does_not_abort(self, mock_client):

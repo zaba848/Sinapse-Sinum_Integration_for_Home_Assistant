@@ -36,7 +36,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 30
 
 
 class SinumAuthError(Exception):

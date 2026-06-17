@@ -1,4 +1,4 @@
--- Sinapse MQTT Bridge v0.7 (Optimized, Multi-Bus Support)
+-- Sinapse MQTT Bridge v0.7.2 (Optimized, Multi-Bus Support)
 -- Creator: zaba848 (Home Assistant Sinum Integration)
 --
 -- LICENSE: Proprietary Software
@@ -51,7 +51,10 @@ local OPTIONAL_FIELDS = {
     -- Climate/temperature (thermostats, fan coils, regulators)
     "temperature", "room_temperature", "target_temperature",
     "target_temperature_minimum", "target_temperature_maximum",
+    "target_temperature_mode", "target_temperature_reached",
     "dew_point", "humidity", "mode", "mode_mutable",
+    -- Temperature regulator specific
+    "system_mode",
     -- Fan coil specific
     "work_mode", "available_work_modes", "working_state", "fan",
     -- Device associations
@@ -83,11 +86,11 @@ end
 local function publish(subtopic, data)
     local ok, payload = pcall(function() return JSON:encode(data) end)
     if not ok then
-        print("[Sinapse] JSON encode error: " .. tostring(payload))
+        print("[S] JSON encode error: " .. tostring(payload))
         return
     end
     client:publish(TOPIC_PREFIX .. "/" .. subtopic, payload, QOS, RETAIN)
-    print("[Sinapse] Published: " .. subtopic)
+    print("[S] Published: " .. subtopic)
 end
 
 local function device_snapshot(device)
@@ -133,7 +136,7 @@ if event.type == EVENTS.INIT then
             end
         end
     end
-    local msg = "[Sinapse] Published:"
+    local msg = "[S] Published:"
     for source_type, count in pairs(counts) do
         if count > 0 then msg = msg .. " " .. count .. " " .. source_type .. "," end
     end
@@ -147,7 +150,7 @@ if event.type == EVENTS.CHANGE and event.source and event.source.id ~= 0 then
         snap.source = source_type
         publish(TOPICS.STATE .. "/" .. tostring(event.source.id), snap)
     else
-        print("[Sinapse] device_state_changed: device " .. tostring(event.source.id) .. " not found")
+        print("[S] device_state_changed: device " .. tostring(event.source.id) .. " not found")
     end
 end
 
