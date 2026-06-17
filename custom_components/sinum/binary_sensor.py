@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    WTYPE_FAN_COIL,
     WTYPE_FLOOD_SENSOR,
     WTYPE_MOTION_SENSOR,
     WTYPE_OPENING_SENSOR,
@@ -31,6 +32,7 @@ class SinumBinarySensorDescription(BinarySensorEntityDescription):
     wtp_type: str
     on_states: tuple[str, ...]
     source: str = "wtp"
+    state_key: str = "state"
 
 
 BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
@@ -63,6 +65,13 @@ BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         wtp_type=WTYPE_TWO_STATE_INPUT_SENSOR,
         device_class=BinarySensorDeviceClass.OPENING,
         on_states=("true", "on", "open", "alarm"),
+    ),
+    SinumBinarySensorDescription(
+        key="valve",
+        wtp_type=WTYPE_FAN_COIL,
+        device_class=BinarySensorDeviceClass.OPENING,
+        state_key="valve_state",
+        on_states=("true",),
     ),
 )
 
@@ -149,11 +158,14 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
 
     @property
     def is_on(self) -> bool | None:
-        state = self._device.get("state")
+        state_key = self.entity_description.state_key
+        state = self._device.get(state_key)
         if state is None:
-            state = self._device.get("status")
+            state = self._device.get("status") if state_key == "state" else None
         if state is None:
             return None
+        if isinstance(state, bool):
+            return str(state).lower() in self.entity_description.on_states
         return str(state).lower() in self.entity_description.on_states
 
 

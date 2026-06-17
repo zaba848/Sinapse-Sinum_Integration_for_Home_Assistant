@@ -194,11 +194,23 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
+        decode = self.coordinator.client.decode_temperature
         attrs: dict[str, Any] = {}
         if "humidity" in d:
-            attrs["humidity"] = self.coordinator.client.decode_temperature(d["humidity"])
+            attrs["humidity"] = decode(d["humidity"])
         if "dew_point" in d:
-            attrs["dew_point"] = self.coordinator.client.decode_temperature(d["dew_point"])
+            attrs["dew_point"] = decode(d["dew_point"])
+        if "floor_temperature" in d:
+            attrs["floor_temperature"] = decode(d["floor_temperature"])
+        if "target_temperature_heating" in d:
+            attrs["target_temperature_heating"] = decode(d["target_temperature_heating"])
+        if "target_temperature_cooling" in d:
+            attrs["target_temperature_cooling"] = decode(d["target_temperature_cooling"])
+        if "target_temperature_mode" in d:
+            ttm = d["target_temperature_mode"]
+            attrs["target_temperature_mode"] = ttm.get("current") if isinstance(ttm, dict) else ttm
+        if "is_window_open" in d:
+            attrs["is_window_open"] = d["is_window_open"]
         if "schedule_id" in d:
             attrs["schedule_id"] = d["schedule_id"]
         return attrs
