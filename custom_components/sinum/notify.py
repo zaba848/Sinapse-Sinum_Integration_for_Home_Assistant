@@ -1,4 +1,5 @@
 """Sinum notify platform — sends push notifications to the hub display."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -42,7 +43,9 @@ class SinumNotifyEntity(CoordinatorEntity[SinumCoordinator], NotifyEntity):
             model=hub.get("model") or "Sinum Hub",
         )
 
-    async def async_send_message(self, message: str, title: str | None = None, **kwargs: Any) -> None:
+    async def async_send_message(
+        self, message: str, title: str | None = None, **kwargs: Any
+    ) -> None:
         await self.coordinator.client.send_notification(
             title=title or "Sinum",
             message=message,

@@ -156,7 +156,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._host},
         )
 
-    async def _create_entry(self, data: dict[str, Any], hub_name: str | None = None) -> ConfigFlowResult:
+    async def _create_entry(
+        self, data: dict[str, Any], hub_name: str | None = None
+    ) -> ConfigFlowResult:
         unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()

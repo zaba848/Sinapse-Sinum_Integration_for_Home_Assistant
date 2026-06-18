@@ -61,8 +61,12 @@ class SinumMqttBridge:
             _LOGGER.warning("MQTT client not available — real-time updates disabled")
             return False
 
-        self._unsub.append(await mqtt.async_subscribe(self._hass, self._state_topic, self._handle_state))
-        self._unsub.append(await mqtt.async_subscribe(self._hass, self._event_topic, self._handle_event))
+        self._unsub.append(
+            await mqtt.async_subscribe(self._hass, self._state_topic, self._handle_state)
+        )
+        self._unsub.append(
+            await mqtt.async_subscribe(self._hass, self._event_topic, self._handle_event)
+        )
         _LOGGER.info("Sinapse MQTT bridge active — subscribed to %s/#", self._topic_prefix)
         return True
 
@@ -78,7 +82,9 @@ class SinumMqttBridge:
         """Handle <topic_prefix>/state/<device_id> messages."""
         state_prefix = f"{self._topic_prefix}/state/"
         if not msg.topic.startswith(state_prefix):
-            _LOGGER.debug("Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, msg.topic)
+            _LOGGER.debug(
+                "Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, msg.topic
+            )
             return
 
         try:
@@ -127,7 +133,9 @@ class SinumMqttBridge:
         """Handle <topic_prefix>/event/<type> messages → fire HA events for automations."""
         event_prefix = f"{self._topic_prefix}/event/"
         if not msg.topic.startswith(event_prefix):
-            _LOGGER.debug("Ignoring MQTT event outside prefix %s: %s", self._topic_prefix, msg.topic)
+            _LOGGER.debug(
+                "Ignoring MQTT event outside prefix %s: %s", self._topic_prefix, msg.topic
+            )
             return
 
         event_type = msg.topic.removeprefix(event_prefix).split("/")[-1]

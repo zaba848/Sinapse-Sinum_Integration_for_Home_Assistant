@@ -224,7 +224,8 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
+            model=device.get("_parent_model")
+            or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
             suggested_area=device.get("_area") or None,
         )
 

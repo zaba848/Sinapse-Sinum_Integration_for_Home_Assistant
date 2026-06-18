@@ -548,7 +548,6 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             return raw_max / 10
         return TEMP_MAX
 
-
     @property
     def hvac_mode(self) -> HVACMode:
         mode = self._device.get("system_mode", "off")

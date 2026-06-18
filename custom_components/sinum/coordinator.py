@@ -57,7 +57,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _safe_fetch(self.client.get_rooms, "rooms", default=[]),
             _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
             _safe_fetch(self.client.get_floors, "floors", default=[]),
-            _safe_fetch(self.client.get_parent_devices, "parent devices", default=self.parent_devices),
+            _safe_fetch(
+                self.client.get_parent_devices, "parent devices", default=self.parent_devices
+            ),
             _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
         )
 
@@ -86,20 +88,36 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # ── Group 2: device collections — all fetched in parallel ─────────────
         virtual, wtp, sbus, lora, alarm_list = await asyncio.gather(
             self._fetch_device_collection(
-                "virtual", self.client.get_virtual_devices, self.client.get_virtual_device,
-                virtual_ids, rooms, self.virtual_devices,
+                "virtual",
+                self.client.get_virtual_devices,
+                self.client.get_virtual_device,
+                virtual_ids,
+                rooms,
+                self.virtual_devices,
             ),
             self._fetch_device_collection(
-                "WTP", self.client.get_wtp_devices, self.client.get_wtp_device,
-                wtp_ids, rooms, self.wtp_devices,
+                "WTP",
+                self.client.get_wtp_devices,
+                self.client.get_wtp_device,
+                wtp_ids,
+                rooms,
+                self.wtp_devices,
             ),
             self._fetch_device_collection(
-                "SBUS", self.client.get_sbus_devices, self.client.get_sbus_device,
-                sbus_ids, rooms, self.sbus_devices,
+                "SBUS",
+                self.client.get_sbus_devices,
+                self.client.get_sbus_device,
+                sbus_ids,
+                rooms,
+                self.sbus_devices,
             ),
             self._fetch_device_collection(
-                "LoRa", self.client.get_lora_devices, self.client.get_lora_device,
-                lora_ids, rooms, self.lora_devices,
+                "LoRa",
+                self.client.get_lora_devices,
+                self.client.get_lora_device,
+                lora_ids,
+                rooms,
+                self.lora_devices,
             ),
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
         )
@@ -118,7 +136,13 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _inject_parent_models(sbus, "sbus", parent_maps)
         _inject_parent_models(lora, "lora", parent_maps)
 
-        return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "lora": lora, "schedules": self.schedules}
+        return {
+            "virtual": virtual,
+            "wtp": wtp,
+            "sbus": sbus,
+            "lora": lora,
+            "schedules": self.schedules,
+        }
 
     async def _fetch_device_collection(
         self,
