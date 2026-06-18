@@ -34,7 +34,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import DOMAIN, LTYPE_HUMIDITY_SENSOR, LTYPE_TEMP_SENSOR, STYPE_BUTTON, WTYPE_BUTTON
+from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)

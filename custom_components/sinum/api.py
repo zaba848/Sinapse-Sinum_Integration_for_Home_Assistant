@@ -22,7 +22,6 @@ from .const import (
     API_ROOMS,
     API_SBUS_DEVICE,
     API_SBUS_DEVICES,
-    API_SCENE,
     API_SCENE_ACTIVATE,
     API_SCENES,
     API_SCHEDULES,

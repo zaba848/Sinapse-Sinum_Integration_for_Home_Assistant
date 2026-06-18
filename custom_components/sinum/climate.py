@@ -125,9 +125,8 @@ def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
     # Infer from mode-specific temperature fields (thermostat with null available_work_modes)
     if device.get("target_temperature_heating_minimum") is not None:
         modes.append(HVACMode.HEAT)
-    if device.get("target_temperature_cooling_minimum") is not None:
-        if HVACMode.COOL not in modes:
-            modes.append(HVACMode.COOL)
+    if device.get("target_temperature_cooling_minimum") is not None and HVACMode.COOL not in modes:
+        modes.append(HVACMode.COOL)
 
     # Always include current active mode so it never disappears from the picker
     current = device.get("mode") or device.get("work_mode")
