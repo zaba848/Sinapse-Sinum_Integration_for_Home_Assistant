@@ -122,9 +122,9 @@ class TestApiRequests:
 
         args = session.request.await_args.args
         kwargs = session.request.await_args.kwargs
-        assert args[0] == "PATCH"
-        assert args[1] == "http://192.168.1.1/api/v1/scenes/2"
-        assert kwargs["json"] == {"trigger": True}
+        assert args[0] == "POST"
+        assert args[1] == "http://192.168.1.1/api/v1/scenes/2/activate"
+        assert kwargs.get("json") is None
 
     @pytest.mark.asyncio
     async def test_get_parent_devices_flattens_class_collections(self, session):

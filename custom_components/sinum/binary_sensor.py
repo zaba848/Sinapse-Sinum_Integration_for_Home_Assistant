@@ -17,6 +17,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    LTYPE_FLOOD_SENSOR,
+    LTYPE_OPENING_SENSOR,
+    LTYPE_SMOKE_SENSOR,
+    LTYPE_TWO_STATE_INPUT_SENSOR,
     STYPE_MOTION_SENSOR,
     WTYPE_FAN_COIL,
     WTYPE_FLOOD_SENSOR,
@@ -99,6 +103,40 @@ SBUS_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
 
 _SBUS_TYPE_TO_DESCRIPTION = {d.wtp_type: d for d in SBUS_BINARY_SENSOR_TYPES}
 
+LORA_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
+    SinumBinarySensorDescription(
+        key="opening",
+        wtp_type=LTYPE_OPENING_SENSOR,
+        source="lora",
+        device_class=BinarySensorDeviceClass.OPENING,
+        on_states=("open", "true", "alarm"),
+    ),
+    SinumBinarySensorDescription(
+        key="flood",
+        wtp_type=LTYPE_FLOOD_SENSOR,
+        source="lora",
+        device_class=BinarySensorDeviceClass.MOISTURE,
+        state_key="flood_detected",
+        on_states=("true", "wet", "flood", "alarm"),
+    ),
+    SinumBinarySensorDescription(
+        key="smoke",
+        wtp_type=LTYPE_SMOKE_SENSOR,
+        source="lora",
+        device_class=BinarySensorDeviceClass.SMOKE,
+        on_states=("smoke", "alarm"),
+    ),
+    SinumBinarySensorDescription(
+        key="two_state_input",
+        wtp_type=LTYPE_TWO_STATE_INPUT_SENSOR,
+        source="lora",
+        device_class=BinarySensorDeviceClass.OPENING,
+        on_states=("true", "on", "open", "alarm"),
+    ),
+)
+
+_LORA_TYPE_TO_DESCRIPTION = {d.wtp_type: d for d in LORA_BINARY_SENSOR_TYPES}
+
 _TARGET_REACHED_WTP = SinumBinarySensorDescription(
     key="target_reached",
     wtp_type=WTYPE_TEMPERATURE_REGULATOR,
@@ -147,6 +185,12 @@ async def async_setup_entry(
                 SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry.entry_id)
             )
 
+    for device_id, device in coordinator.lora_devices.items():
+        lora_type = device.get("type", "")
+        description = _LORA_TYPE_TO_DESCRIPTION.get(lora_type)
+        if description:
+            entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
+
     # Parent device connectivity sensors from REST /api/v1/parent-devices
     for parent in coordinator.parent_devices:
         entities.append(SinumParentOnlineSensor(coordinator, parent, entry.entry_id))
@@ -185,6 +229,8 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
         if self._source == "sbus":
             return coordinator.sbus_devices.get(self._device_id, {})
+        if self._source == "lora":
+            return coordinator.lora_devices.get(self._device_id, {})
         return coordinator.wtp_devices.get(self._device_id, {})
 
     @property

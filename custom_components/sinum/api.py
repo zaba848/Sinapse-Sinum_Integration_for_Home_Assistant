@@ -7,12 +7,15 @@ from typing import Any
 import aiohttp
 
 from .const import (
+    API_ALARM_COMMAND,
     API_ALARM_DEVICE,
     API_ALARM_DEVICES,
     API_ENERGY,
     API_FLOORS,
     API_INFO,
     API_LOGIN,
+    API_LORA_DEVICE,
+    API_LORA_DEVICES,
     API_LUA_INFO,
     API_PARENT_DEVICES,
     API_REFRESH,
@@ -20,6 +23,7 @@ from .const import (
     API_SBUS_DEVICE,
     API_SBUS_DEVICES,
     API_SCENE,
+    API_SCENE_ACTIVATE,
     API_SCENES,
     API_SCHEDULES,
     API_VARIABLE,
@@ -286,7 +290,7 @@ class SinumClient:
         return result if isinstance(result, list) else []
 
     async def run_scene(self, scene_id: int) -> None:
-        await self._request("PATCH", API_SCENE.format(id=scene_id), json={"trigger": True})
+        await self._request("POST", API_SCENE_ACTIVATE.format(id=scene_id))
 
     # ------------------------------------------------------------ variables
 
@@ -316,6 +320,27 @@ class SinumClient:
 
     async def patch_alarm_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request("PATCH", API_ALARM_DEVICE.format(id=device_id), json=payload)
+
+    async def command_alarm_device(
+        self, device_id: int, command: str, payload: dict[str, Any]
+    ) -> None:
+        await self._request(
+            "POST",
+            API_ALARM_COMMAND.format(id=device_id, command=command),
+            json=payload,
+        )
+
+    # ------------------------------------------------------------ LoRa devices
+
+    async def get_lora_devices(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_LORA_DEVICES)
+        return result if isinstance(result, list) else []
+
+    async def get_lora_device(self, device_id: int) -> dict[str, Any]:
+        return await self._request("GET", API_LORA_DEVICE.format(id=device_id))
+
+    async def patch_lora_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("PATCH", API_LORA_DEVICE.format(id=device_id), json=payload)
 
     # ---------------------------------------------------------- notifications
 

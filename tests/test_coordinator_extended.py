@@ -90,7 +90,7 @@ class TestCoordinatorMissingPaths:
 class TestCollectDeviceIdsEdgeCases:
     def test_skips_device_with_no_id(self):
         rooms = [{"devices": [{"class": "virtual"}]}]  # no id
-        virtual_ids, wtp_ids, sbus_ids = _collect_device_ids(rooms)
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
         assert virtual_ids == []
 
     def test_deduplicates_same_device_in_multiple_rooms(self):
@@ -98,17 +98,17 @@ class TestCollectDeviceIdsEdgeCases:
             {"devices": [{"class": "virtual", "id": 10}]},
             {"devices": [{"class": "virtual", "id": 10}]},  # duplicate
         ]
-        virtual_ids, _, _ = _collect_device_ids(rooms)
+        virtual_ids, _, _, _ = _collect_device_ids(rooms)
         assert virtual_ids.count(10) == 1
 
     def test_sbus_class_collected(self):
         rooms = [{"devices": [{"class": "sbus", "id": 50}]}]
-        _, _, sbus_ids = _collect_device_ids(rooms)
+        _, _, sbus_ids, _ = _collect_device_ids(rooms)
         assert 50 in sbus_ids
 
     def test_source_field_as_fallback_for_class(self):
         rooms = [{"devices": [{"source": "virtual", "id": 20}]}]
-        virtual_ids, _, _ = _collect_device_ids(rooms)
+        virtual_ids, _, _, _ = _collect_device_ids(rooms)
         assert 20 in virtual_ids
 
 

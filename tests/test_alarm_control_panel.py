@@ -150,9 +150,10 @@ class TestAlarmZoneIdentity:
         assert entity.unique_id == "test_entry_alarm_5"
 
     def test_no_supported_features(self):
+        from homeassistant.components.alarm_control_panel import AlarmControlPanelEntityFeature
         zone = _make_zone()
         entity = _make_entity(zone)
-        assert entity.supported_features == 0
+        assert entity.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
 
     def test_coordinator_update_writes_state(self):
         zone = _make_zone()

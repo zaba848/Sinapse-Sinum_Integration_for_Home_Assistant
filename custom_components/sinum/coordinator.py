@@ -13,9 +13,10 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 # Device classes present in the rooms device list
-_WTP_CLASSES = {"wtp", "lora"}
+_WTP_CLASSES = {"wtp"}
 _SBUS_CLASSES = {"sbus"}
 _VIRTUAL_CLASSES = {"virtual"}
+_LORA_CLASSES = {"lora"}
 
 
 class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -32,6 +33,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.virtual_devices: dict[int, dict[str, Any]] = {}
         self.wtp_devices: dict[int, dict[str, Any]] = {}
         self.sbus_devices: dict[int, dict[str, Any]] = {}
+        self.lora_devices: dict[int, dict[str, Any]] = {}
         self.rooms: list[dict[str, Any]] = []
         self.floors: dict[int, dict[str, Any]] = {}  # floor_id → {id, name, level}
         self.hub_info: dict[str, Any] = {}  # from /api/v1/info
@@ -85,7 +87,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Failed to fetch schedules: %s", err)
 
         # ── Classify device IDs from rooms (fallback for older firmware) ──────
-        virtual_ids, wtp_ids, sbus_ids = _collect_device_ids(rooms)
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
 
         # ── Device collections ────────────────────────────────────────────────
         # Firmware 1.24 exposes full class collections. Relying only on rooms
@@ -115,9 +117,19 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.sbus_devices,
         )
 
+        lora = await self._fetch_device_collection(
+            "LoRa",
+            self.client.get_lora_devices,
+            self.client.get_lora_device,
+            lora_ids,
+            rooms,
+            self.lora_devices,
+        )
+
         self.virtual_devices = virtual
         self.wtp_devices = wtp
         self.sbus_devices = sbus
+        self.lora_devices = lora
 
         # ── Alarm zones (/api/v1/devices/alarm-system) ───────────────────────
         try:
@@ -127,7 +139,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except SinumConnectionError as err:
             _LOGGER.debug("Alarm zones unavailable: %s", err)
 
-        return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "schedules": self.schedules}
+        return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "lora": lora, "schedules": self.schedules}
 
     async def _fetch_device_collection(
         self,
@@ -184,11 +196,12 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 def _collect_device_ids(
     rooms: list[dict[str, Any]],
-) -> tuple[list[int], list[int], list[int]]:
-    """Return (virtual_ids, wtp_ids, sbus_ids) from rooms device listings."""
+) -> tuple[list[int], list[int], list[int], list[int]]:
+    """Return (virtual_ids, wtp_ids, sbus_ids, lora_ids) from rooms device listings."""
     virtual_ids: list[int] = []
     wtp_ids: list[int] = []
     sbus_ids: list[int] = []
+    lora_ids: list[int] = []
     seen: set[tuple[str, int]] = set()
 
     for room in rooms:
@@ -208,8 +221,10 @@ def _collect_device_ids(
                 wtp_ids.append(dev_id)
             elif cls in _SBUS_CLASSES:
                 sbus_ids.append(dev_id)
+            elif cls in _LORA_CLASSES:
+                lora_ids.append(dev_id)
 
-    return virtual_ids, wtp_ids, sbus_ids
+    return virtual_ids, wtp_ids, sbus_ids, lora_ids
 
 
 def _inject_room_keys(

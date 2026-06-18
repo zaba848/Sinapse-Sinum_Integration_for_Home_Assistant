@@ -24,16 +24,18 @@ FIXTURES = json.loads(
 class TestCollectDeviceIds:
     def test_separates_virtual_and_wtp(self):
         rooms = FIXTURES["rooms"]
-        virtual_ids, wtp_ids, sbus_ids = _collect_device_ids(rooms)
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
         assert set(virtual_ids) == {10, 11, 12, 13}
         assert set(wtp_ids) == {20, 21}
         assert sbus_ids == []
+        assert lora_ids == []
 
     def test_empty_rooms(self):
-        virtual_ids, wtp_ids, sbus_ids = _collect_device_ids([])
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids([])
         assert virtual_ids == []
         assert wtp_ids == []
         assert sbus_ids == []
+        assert lora_ids == []
 
 
 class TestRoomHelpers:

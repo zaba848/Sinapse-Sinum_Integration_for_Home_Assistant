@@ -518,5 +518,63 @@
     },
     "room_id": 1,
     "class": "virtual"
+  },
+  "sbus_blind_controller": {
+    "id": 60,
+    "name": "SBUS Blind",
+    "type": "blind_controller",
+    "current_opening": 50,
+    "target_opening": 80,
+    "current_tilt": 30,
+    "target_tilt": 30,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "sbus_energy_meter": {
+    "id": 61,
+    "name": "SBUS Energy Meter",
+    "type": "energy_meter",
+    "active_power": 1500,
+    "voltage": 2300,
+    "current": 650,
+    "energy_consumed_total": 12500,
+    "energy_consumed_today": 150,
+    "energy_consumed_yesterday": 200,
+    "room_id": 1,
+    "class": "sbus"
+  },
+  "lora_temp_sensor": {
+    "id": 70,
+    "name": "LoRa Temp",
+    "type": "temperature_sensor",
+    "temperature": 215,
+    "battery": 85,
+    "signal": 72,
+    "class": "lora"
+  },
+  "lora_humidity_sensor": {
+    "id": 71,
+    "name": "LoRa Humidity",
+    "type": "humidity_sensor",
+    "humidity": 65,
+    "battery": 90,
+    "signal": 68,
+    "class": "lora"
+  },
+  "lora_opening_sensor": {
+    "id": 72,
+    "name": "LoRa Opening",
+    "type": "opening_sensor",
+    "state": "open",
+    "battery": 80,
+    "signal": 60,
+    "class": "lora"
+  },
+  "lora_relay": {
+    "id": 73,
+    "name": "LoRa Relay",
+    "type": "relay",
+    "state": true,
+    "class": "lora"
   }
 }

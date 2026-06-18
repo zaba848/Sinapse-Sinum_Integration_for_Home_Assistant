@@ -34,7 +34,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
+from .const import DOMAIN, LTYPE_HUMIDITY_SENSOR, LTYPE_TEMP_SENSOR, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -241,6 +241,26 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         suggested_display_precision=0,
     ),
     SinumSensorDescription(
+        key="energy_consumed_today",
+        api_key="energy_consumed_today",
+        source="wtp",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_today",
+    ),
+    SinumSensorDescription(
+        key="energy_consumed_yesterday",
+        api_key="energy_consumed_yesterday",
+        source="wtp",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_yesterday",
+    ),
+    SinumSensorDescription(
         key="room_temperature",
         api_key="room_temperature",
         source="wtp",
@@ -261,6 +281,28 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         scale=0.1,
         suggested_display_precision=1,
         translation_key="dew_point",
+    ),
+    SinumSensorDescription(
+        key="battery",
+        api_key="battery",
+        source="wtp",
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="signal",
+        api_key="signal",
+        source="wtp",
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+        icon="mdi:signal",
+        translation_key="signal_strength",
     ),
     # Temperature regulator sensors (Phase 7B)
     SinumSensorDescription(
@@ -373,6 +415,65 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         icon="mdi:valve",
         translation_key="valve_position",
     ),
+    SinumSensorDescription(
+        key="active_power",
+        api_key="active_power",
+        source="sbus",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="voltage",
+        api_key="voltage",
+        source="sbus",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="current",
+        api_key="current",
+        source="sbus",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        scale=0.001,
+        suggested_display_precision=3,
+    ),
+    SinumSensorDescription(
+        key="energy_consumed_total",
+        api_key="energy_consumed_total",
+        source="sbus",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="energy_consumed_today",
+        api_key="energy_consumed_today",
+        source="sbus",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_today",
+    ),
+    SinumSensorDescription(
+        key="energy_consumed_yesterday",
+        api_key="energy_consumed_yesterday",
+        source="sbus",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_yesterday",
+    ),
 )
 
 # ── SBUS temperature_regulator sensors ────────────────────────────────────────
@@ -388,6 +489,53 @@ SBUS_REGULATOR_SENSORS: tuple[SinumSensorDescription, ...] = (
         scale=0.1,
         suggested_display_precision=1,
         translation_key="regulator_target_temperature",
+    ),
+)
+
+# ── LoRa device sensors ────────────────────────────────────────────────────────
+
+LORA_SENSORS: tuple[SinumSensorDescription, ...] = (
+    SinumSensorDescription(
+        key="temperature",
+        api_key="temperature",
+        source="lora",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+    ),
+    SinumSensorDescription(
+        key="humidity",
+        api_key="humidity",
+        source="lora",
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        scale=0.1,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="battery",
+        api_key="battery",
+        source="lora",
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+    ),
+    SinumSensorDescription(
+        key="signal",
+        api_key="signal",
+        source="lora",
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+        icon="mdi:signal",
+        translation_key="signal_strength",
     ),
 )
 
@@ -566,6 +714,12 @@ async def async_setup_entry(
             if device.get("type") == STYPE_BUTTON:
                 entities.append(SinumButtonSensor(coordinator, device_id, entry.entry_id, "sbus"))
 
+    # LoRa device sensors
+    for device_id, device in coordinator.lora_devices.items():
+        for desc in LORA_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
+
     # Weather sensors (best-effort)
     try:
         weather = await coordinator.client.get_weather()
@@ -642,6 +796,8 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             return coordinator.virtual_devices.get(self._device_id, {})
         if self._source in ("sbus", "sbus_regulator"):
             return coordinator.sbus_devices.get(self._device_id, {})
+        if self._source == "lora":
+            return coordinator.lora_devices.get(self._device_id, {})
         return coordinator.wtp_devices.get(self._device_id, {})
 
     @property
@@ -669,6 +825,8 @@ def _model_for_source(source: str) -> str:
         return "Sinum SBUS Sensor"
     if source in ("wtp_regulator", "sbus_regulator"):
         return "Sinum Temperature Regulator"
+    if source == "lora":
+        return "Sinum LoRa Sensor"
     return "Sinum WTP Sensor"
 
 

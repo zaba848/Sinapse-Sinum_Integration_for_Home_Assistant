@@ -20,6 +20,7 @@ from .const import (
     GATE_STATE_CLOSED,
     GATE_STATE_CLOSING,
     GATE_STATE_OPENING,
+    STYPE_BLIND_CONTROLLER,
     VTYPE_BLIND,
     VTYPE_GATE,
     WTYPE_BLIND_CONTROLLER,
@@ -45,6 +46,10 @@ async def async_setup_entry(
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") == WTYPE_BLIND_CONTROLLER:
             entities.append(SinumWtpBlindCover(coordinator, device_id, entry.entry_id))
+
+    for device_id, device in coordinator.sbus_devices.items():
+        if device.get("type") == STYPE_BLIND_CONTROLLER:
+            entities.append(SinumSbusBlindCover(coordinator, device_id, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -310,4 +315,117 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             self._device_id, {"command": "open", "opening_percentage": position}
         )
         self.coordinator.wtp_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumSbusBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+    """SBUS blind_controller — position + tilt (venetian blinds)."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_device_class = CoverDeviceClass.BLIND
+    _attr_icon = "mdi:blinds"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
+        device = coordinator.sbus_devices.get(device_id, {})
+        label = _label(device)
+        has_tilt = "current_tilt" in device or "target_tilt" in device
+        self._attr_supported_features = (
+            CoverEntityFeature.OPEN
+            | CoverEntityFeature.CLOSE
+            | CoverEntityFeature.STOP
+            | CoverEntityFeature.SET_POSITION
+            | (CoverEntityFeature.SET_TILT_POSITION if has_tilt else CoverEntityFeature(0))
+        )
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model="Sinum SBUS Blind Controller",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def is_closed(self) -> bool | None:
+        pos = self._device.get("current_opening")
+        if pos is None:
+            return None
+        return int(pos) == 0
+
+    @property
+    def is_opening(self) -> bool:
+        d = self._device
+        target = d.get("target_opening")
+        current = d.get("current_opening")
+        if target is None or current is None:
+            return False
+        try:
+            return int(target) > int(current)
+        except (TypeError, ValueError):
+            return False
+
+    @property
+    def is_closing(self) -> bool:
+        d = self._device
+        target = d.get("target_opening")
+        current = d.get("current_opening")
+        if target is None or current is None:
+            return False
+        try:
+            return int(target) < int(current)
+        except (TypeError, ValueError):
+            return False
+
+    @property
+    def current_cover_position(self) -> int | None:
+        pos = self._device.get("current_opening")
+        return int(pos) if pos is not None else None
+
+    @property
+    def current_cover_tilt_position(self) -> int | None:
+        tilt = self._device.get("current_tilt")
+        return int(tilt) if tilt is not None else None
+
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"command": "open", "opening_percentage": 100}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_close_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"command": "open", "opening_percentage": 0}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_stop_cover(self, **kwargs: Any) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"command": "stop"}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_set_cover_position(self, **kwargs: Any) -> None:
+        position = kwargs[ATTR_POSITION]
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"command": "open", "opening_percentage": position}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
+        tilt = kwargs[ATTR_TILT_POSITION]
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"command": "tilt", "tilt_percentage": tilt}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()

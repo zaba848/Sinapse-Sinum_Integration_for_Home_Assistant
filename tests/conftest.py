@@ -39,9 +39,11 @@ def fixture_mock_client(fixtures: dict[str, Any]) -> MagicMock:
         ]
     )
     client.get_sbus_devices = AsyncMock(return_value=[])
+    client.get_lora_devices = AsyncMock(return_value=[])
     client.get_virtual_device = AsyncMock(side_effect=_virtual_device_side_effect(fixtures))
     client.get_wtp_device = AsyncMock(side_effect=_wtp_device_side_effect(fixtures))
     client.get_sbus_device = AsyncMock(return_value={})
+    client.get_lora_device = AsyncMock(return_value={})
     client.patch_virtual_device = AsyncMock(return_value={})
     client.get_scenes = AsyncMock(return_value=fixtures["scenes"])
     client.run_scene = AsyncMock(return_value=None)

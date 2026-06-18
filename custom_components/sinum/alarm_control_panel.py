@@ -2,8 +2,10 @@
 
 API: GET /api/v1/devices/alarm-system  — list of alarm_zone devices
      GET /api/v1/devices/alarm-system/{id}  — single zone
+     POST /api/v1/devices/alarm-system/{id}/command/arm     — arm with PIN
+     POST /api/v1/devices/alarm-system/{id}/command/disarm  — disarm with PIN
 
-State fields (read-only in API):
+State fields:
   zone_status : "armed" | "disarmed"
   violated    : bool  — zone sensor currently tripped
 
@@ -11,10 +13,6 @@ HA state mapping:
   violated=True        → TRIGGERED
   zone_status="armed"  → ARMED_AWAY
   default              → DISARMED
-
-NOTE: The REST API does not expose arm/disarm commands (zone_status and
-armed are read-only). The panel is therefore display-only with no
-supported features. State is refreshed via the shared coordinator.
 """
 
 from __future__ import annotations
@@ -24,9 +22,12 @@ from typing import Any
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
+    AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
+    CodeFormat,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -60,13 +61,13 @@ async def async_setup_entry(
 
 
 class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntity):
-    """Alarm zone from the Sinum alarm system (read-only state monitor)."""
+    """Alarm zone from the Sinum alarm system."""
 
     _attr_has_entity_name = True
     _attr_name = None
-    # REST API does not support arm/disarm — display-only panel
-    _attr_supported_features = 0
-    _attr_code_arm_required = False
+    _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
+    _attr_code_arm_required = True
+    _attr_code_format = CodeFormat.NUMBER
     _attr_icon = "mdi:shield-home"
 
     def __init__(
@@ -112,6 +113,26 @@ class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntit
         if inputs:
             attrs["inputs"] = [f"{i['class']}/{i['id']}" for i in inputs]
         return attrs
+
+    async def async_alarm_arm_away(self, code: str | None = None) -> None:
+        if not code:
+            raise HomeAssistantError("PIN code is required to arm the alarm")
+        try:
+            await self.coordinator.client.command_alarm_device(
+                self._zone_id, "arm", {"arm": str(code)}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot arm alarm: {err}") from err
+
+    async def async_alarm_disarm(self, code: str | None = None) -> None:
+        if not code:
+            raise HomeAssistantError("PIN code is required to disarm the alarm")
+        try:
+            await self.coordinator.client.command_alarm_device(
+                self._zone_id, "disarm", {"disarm": str(code)}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot disarm alarm: {err}") from err
 
     @callback
     def _handle_coordinator_update(self) -> None:

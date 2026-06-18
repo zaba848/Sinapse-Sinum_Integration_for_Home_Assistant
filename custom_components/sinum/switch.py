@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    LTYPE_RELAY,
     STYPE_COMMON_VALVE,
     STYPE_RELAY,
     STYPE_VALVE_PUMP,
@@ -53,6 +54,10 @@ async def async_setup_entry(
             entities.append(SinumValvePumpSwitch(coordinator, device_id, entry.entry_id))
         elif dev_type == STYPE_COMMON_VALVE:
             entities.append(SinumCommonValveSwitch(coordinator, device_id, entry.entry_id))
+
+    for device_id, device in coordinator.lora_devices.items():
+        if device.get("type") == LTYPE_RELAY:
+            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "lora"))
 
     async_add_entities(entities)
 
@@ -157,9 +162,12 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
-            device_id, {}
-        )
+        if bus == "wtp":
+            device = coordinator.wtp_devices.get(device_id, {})
+        elif bus == "sbus":
+            device = coordinator.sbus_devices.get(device_id, {})
+        else:
+            device = coordinator.lora_devices.get(device_id, {})
         name = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -171,10 +179,11 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        if self._bus == "wtp":
+            return self.coordinator.wtp_devices.get(self._device_id, {})
+        if self._bus == "sbus":
+            return self.coordinator.sbus_devices.get(self._device_id, {})
+        return self.coordinator.lora_devices.get(self._device_id, {})
 
     @property
     def is_on(self) -> bool:
@@ -186,11 +195,16 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
                 self._device_id, {"state": True}
             )
             self.coordinator.wtp_devices[self._device_id].update(updated)
-        else:
+        elif self._bus == "sbus":
             updated = await self.coordinator.client.patch_sbus_device(
                 self._device_id, {"state": True}
             )
             self.coordinator.sbus_devices[self._device_id].update(updated)
+        else:
+            updated = await self.coordinator.client.patch_lora_device(
+                self._device_id, {"state": True}
+            )
+            self.coordinator.lora_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -199,11 +213,16 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
                 self._device_id, {"state": False}
             )
             self.coordinator.wtp_devices[self._device_id].update(updated)
-        else:
+        elif self._bus == "sbus":
             updated = await self.coordinator.client.patch_sbus_device(
                 self._device_id, {"state": False}
             )
             self.coordinator.sbus_devices[self._device_id].update(updated)
+        else:
+            updated = await self.coordinator.client.patch_lora_device(
+                self._device_id, {"state": False}
+            )
+            self.coordinator.lora_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
 

@@ -38,6 +38,10 @@ API_ENERGY = "/api/v1/energy"
 API_SCHEDULES = "/api/v1/schedules"
 API_ALARM_DEVICES = "/api/v1/devices/alarm-system"
 API_ALARM_DEVICE = "/api/v1/devices/alarm-system/{id}"
+API_ALARM_COMMAND = "/api/v1/devices/alarm-system/{id}/command/{command}"
+API_LORA_DEVICES = "/api/v1/devices/lora"
+API_LORA_DEVICE = "/api/v1/devices/lora/{id}"
+API_SCENE_ACTIVATE = "/api/v1/scenes/{id}/activate"
 
 # Lua HTTP server (sinapse_api.lua — optional, provides wifi/signal data)
 API_LUA_INFO = "/api/v1/lua/http-server/sinapse/info"
@@ -99,8 +103,20 @@ STYPE_ANALOG_OUTPUT = "analog_output"
 STYPE_VALVE_PUMP = "valve_pump"
 STYPE_COMMON_VALVE = "common_valve"
 STYPE_PWM = "pulse_width_modulation"
+STYPE_BLIND_CONTROLLER = "blind_controller"
+STYPE_ENERGY_METER = "energy_meter"
+STYPE_TEMPERATURE_REGULATOR = "temperature_regulator"
 
 WTYPE_BUTTON = "button"
+
+# ── LoRa device types ──────────────────────────────────────────────────────────
+LTYPE_TEMP_SENSOR = "temperature_sensor"
+LTYPE_HUMIDITY_SENSOR = "humidity_sensor"
+LTYPE_OPENING_SENSOR = "opening_sensor"
+LTYPE_FLOOD_SENSOR = "flood_sensor"
+LTYPE_RELAY = "relay"
+LTYPE_TWO_STATE_INPUT_SENSOR = "two_state_input_sensor"
+LTYPE_SMOKE_SENSOR = "smoke_sensor"
 
 VTYPE_HEAT_PUMP_MANAGER = "heat_pump_manager"
 
