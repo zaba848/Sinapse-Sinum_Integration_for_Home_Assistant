@@ -191,6 +191,18 @@ class SinumClient:
         if resp.status == 408:
             raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
 
+        if resp.status == 422:
+            try:
+                body = await resp.json()
+                errors = body.get("error", {}).get("errors", {})
+                details = "; ".join(
+                    f"{k}: {v.get('text', v)}" if isinstance(v, dict) else f"{k}: {v}"
+                    for k, v in errors.items()
+                )
+            except Exception:
+                details = f"status {resp.status}"
+            raise SinumConnectionError(f"Validation error for {path}: {details}")
+
         if resp.status not in (200, 201, 204):
             raise SinumConnectionError(f"API error {resp.status} for {path}")
 

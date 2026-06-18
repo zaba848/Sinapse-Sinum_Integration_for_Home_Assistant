@@ -117,6 +117,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_name = None
     _attr_min_color_temp_kelvin = 1000
     _attr_max_color_temp_kelvin = 6500
+    _attr_icon = "mdi:lightbulb"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -205,6 +206,7 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_name = None
     _attr_supported_color_modes: set[ColorMode] = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_icon = "mdi:lightbulb-on"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
@@ -276,6 +278,7 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_name = None
     _attr_min_color_temp_kelvin = 1000
     _attr_max_color_temp_kelvin = 6500
+    _attr_icon = "mdi:lightbulb-variant"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str

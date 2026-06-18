@@ -11,6 +11,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -135,8 +136,7 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_target_temperature_step = 0.5
-    _attr_min_temp = TEMP_MIN
-    _attr_max_temp = TEMP_MAX
+    _attr_icon = "mdi:thermostat"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -194,6 +194,22 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         return HVACAction.IDLE
 
     @property
+    def min_temp(self) -> float:
+        raw_min = self._device.get("target_temperature_minimum")
+        raw_max = self._device.get("target_temperature_maximum")
+        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+            return raw_min / 10
+        return TEMP_MIN
+
+    @property
+    def max_temp(self) -> float:
+        raw_min = self._device.get("target_temperature_minimum")
+        raw_max = self._device.get("target_temperature_maximum")
+        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+            return raw_max / 10
+        return TEMP_MAX
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         decode = self.coordinator.client.decode_temperature
@@ -223,10 +239,15 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
-        raw = self.coordinator.client.encode_temperature(temperature)
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"target_temperature": raw}
+        raw = self.coordinator.client.encode_temperature(
+            max(self.min_temp, min(self.max_temp, temperature))
         )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"target_temperature": raw}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set temperature: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
@@ -253,6 +274,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     )
     _attr_target_temperature_step = 0.5
     _attr_fan_modes = _FAN_MODES
+    _attr_icon = "mdi:air-conditioner"
 
     def __init__(
         self,
@@ -280,8 +302,12 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         # Use per-device temperature limits from API if available
         raw_min = device.get("target_temperature_minimum")
         raw_max = device.get("target_temperature_maximum")
-        self._attr_min_temp = raw_min / 10 if raw_min is not None else TEMP_MIN
-        self._attr_max_temp = raw_max / 10 if raw_max is not None else TEMP_MAX
+        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+            self._attr_min_temp = raw_min / 10
+            self._attr_max_temp = raw_max / 10
+        else:
+            self._attr_min_temp = TEMP_MIN
+            self._attr_max_temp = TEMP_MAX
 
         area = device.get("_area") or None
         label = device.get("_device_name") or device.get("name", str(device_id))
@@ -369,8 +395,11 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
-        raw = round(temperature * 10)
-        updated = await self._patch({"target_temperature": raw})
+        raw = round(max(self.min_temp, min(self.max_temp, temperature)) * 10)
+        try:
+            updated = await self._patch({"target_temperature": raw})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set temperature: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
@@ -406,8 +435,7 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     _attr_translation_key = "temperature_regulator"
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
-    _attr_min_temp = TEMP_MIN
-    _attr_max_temp = TEMP_MAX
+    _attr_icon = "mdi:thermostat-cog"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str = "wtp"
@@ -460,6 +488,23 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         return raw / 10
 
     @property
+    def min_temp(self) -> float:
+        raw_min = self._device.get("target_temperature_minimum")
+        raw_max = self._device.get("target_temperature_maximum")
+        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+            return raw_min / 10
+        return TEMP_MIN
+
+    @property
+    def max_temp(self) -> float:
+        raw_min = self._device.get("target_temperature_minimum")
+        raw_max = self._device.get("target_temperature_maximum")
+        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+            return raw_max / 10
+        return TEMP_MAX
+
+
+    @property
     def hvac_mode(self) -> HVACMode:
         mode = self._device.get("system_mode", "off")
         return _MODE_TO_HVAC.get(mode, HVACMode.OFF)
@@ -494,8 +539,11 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
-        raw = round(temperature * 10)
-        updated = await self._patch({"target_temperature": raw})
+        raw = round(max(self.min_temp, min(self.max_temp, temperature)) * 10)
+        try:
+            updated = await self._patch({"target_temperature": raw})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set temperature: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
@@ -535,6 +583,7 @@ class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEn
     _attr_min_temp = TEMP_MIN
     _attr_max_temp = TEMP_MAX
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.AUTO]
+    _attr_icon = "mdi:heat-pump"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -614,13 +663,18 @@ class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEn
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
-        raw = self.coordinator.client.encode_temperature(temperature)
+        raw = self.coordinator.client.encode_temperature(
+            max(self.min_temp, min(self.max_temp, temperature))
+        )
         tt = self._device.get("target_temperature")
         if isinstance(tt, dict):
             payload: dict[str, Any] = {"target_temperature": {"current": raw}}
         else:
             payload = {"target_temperature": raw}
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set temperature: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
