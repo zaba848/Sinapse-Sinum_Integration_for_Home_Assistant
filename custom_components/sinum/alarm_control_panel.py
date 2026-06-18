@@ -123,6 +123,7 @@ class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntit
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot arm alarm: {err}") from err
+        await self.coordinator.async_request_refresh()
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         if not code:
@@ -133,6 +134,7 @@ class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntit
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot disarm alarm: {err}") from err
+        await self.coordinator.async_request_refresh()
 
     @callback
     def _handle_coordinator_update(self) -> None:

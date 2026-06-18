@@ -44,10 +44,10 @@ class TestSinumThermostatDynamicMinMax:
         assert entity.max_temp == 25.0
 
     def test_min_max_fallback_when_min_equals_max(self):
-        """Fallback to TEMP_MIN/TEMP_MAX when schedule-locked (min == max)."""
+        """When schedule-locked (min == max), use the actual values to prevent 'exceeds range' errors."""
         entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50})
-        assert entity.min_temp == TEMP_MIN
-        assert entity.max_temp == TEMP_MAX
+        assert entity.min_temp == 5.0
+        assert entity.max_temp == 5.0
 
     def test_min_max_fallback_when_missing(self):
         """Fallback when keys absent."""
@@ -103,9 +103,10 @@ class TestSinumTempRegClimateMinMax:
         assert entity.max_temp == 35.0
 
     def test_min_max_fallback_when_locked(self):
+        """When locked (min == max), use actual values to prevent 'exceeds range' errors."""
         entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50})
-        assert entity.min_temp == TEMP_MIN
-        assert entity.max_temp == TEMP_MAX
+        assert entity.min_temp == 5.0
+        assert entity.max_temp == 5.0
 
     @pytest.mark.asyncio
     async def test_set_temperature_clamps_and_sends(self):

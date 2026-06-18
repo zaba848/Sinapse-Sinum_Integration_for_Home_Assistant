@@ -244,7 +244,7 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             identifiers={(DOMAIN, f"{entry_id}_wtp_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model="Sinum WTP Blind Controller",
+            model=device.get("_parent_model") or "Sinum WTP Blind Controller",
             suggested_area=device.get("_area") or None,
         )
 
@@ -344,7 +344,7 @@ class SinumSbusBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model="Sinum SBUS Blind Controller",
+            model=device.get("_parent_model") or "Sinum SBUS Blind Controller",
             suggested_area=device.get("_area") or None,
         )
 

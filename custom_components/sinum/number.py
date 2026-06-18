@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import DOMAIN, STYPE_ANALOG_OUTPUT
+from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
 from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ async def async_setup_entry(
     for device_id, device in coordinator.sbus_devices.items():
         if device.get("type") == STYPE_ANALOG_OUTPUT:
             entities.append(SinumAnalogOutputNumber(coordinator, device_id, entry.entry_id))
+        elif device.get("type") == STYPE_PWM:
+            entities.append(SinumPwmNumber(coordinator, device_id, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -110,7 +112,7 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=name,
             manufacturer="TECH Sterowniki",
-            model="Sinum SBUS Analog Output",
+            model=device.get("_parent_model") or "Sinum SBUS Analog Output",
             suggested_area=device.get("_area") or None,
         )
 
@@ -126,6 +128,49 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
     async def async_set_native_value(self, value: float) -> None:
         updated = await self.coordinator.client.patch_sbus_device(
             self._device_id, {"value": int(value)}
+        )
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumPwmNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
+    """SBUS pulse_width_modulation — duty_cycle control (0–100 %)."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_mode = NumberMode.SLIDER
+    _attr_icon = "mdi:sine-wave"
+    _attr_native_min_value = 0.0
+    _attr_native_max_value = 100.0
+    _attr_native_step = 1.0
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}_pwm"
+        device = coordinator.sbus_devices.get(device_id, {})
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=name,
+            manufacturer="TECH Sterowniki",
+            model=device.get("_parent_model") or "Sinum SBUS PWM",
+            suggested_area=device.get("_area") or None,
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def native_value(self) -> float | None:
+        raw = self._device.get("duty_cycle")
+        return float(raw) if raw is not None else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        updated = await self.coordinator.client.patch_sbus_device(
+            self._device_id, {"duty_cycle": int(value)}
         )
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()

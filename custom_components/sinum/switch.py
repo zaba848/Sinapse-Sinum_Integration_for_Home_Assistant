@@ -173,7 +173,7 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=name,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {bus.upper()} Relay",
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} Relay",
             suggested_area=device.get("_area") or None,
         )
 
@@ -243,7 +243,7 @@ class SinumValvePumpSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=name,
             manufacturer="TECH Sterowniki",
-            model="Sinum SBUS Valve Pump",
+            model=device.get("_parent_model") or "Sinum SBUS Valve Pump",
             suggested_area=device.get("_area") or None,
         )
 
@@ -299,7 +299,7 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=name,
             manufacturer="TECH Sterowniki",
-            model="Sinum SBUS Common Valve",
+            model=device.get("_parent_model") or "Sinum SBUS Common Valve",
             suggested_area=device.get("_area") or None,
         )
 

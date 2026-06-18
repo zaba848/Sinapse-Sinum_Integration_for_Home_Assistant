@@ -1,11 +1,12 @@
 # Sinapse — Sinum Integration for Home Assistant
 
-**Sinapse** connects a TECH Sterowniki Sinum EH-01 hub to Home Assistant over the local network.
+**Sinapse** connects a TECH Sterowniki Sinum hub to Home Assistant over the local network.
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-502%20passing-brightgreen.svg)](tests/)
-[![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://www.techsterowniki.pl/baza-wiedzy-sinum)
+[![Tests](https://img.shields.io/badge/tests-865%20passing-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](tests/)
+[![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://apidocs.sinum.tech)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
 
@@ -21,11 +22,11 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 | `switch` | Virtual relay integrators, wicket (electric strike), WTP/SBUS physical relays, valve_pump, common_valve | ✅ |
 | `cover` | Virtual blind controller, gate, WTP blind controller | ✅ |
 | `light` | Virtual dimmer/RGB, WTP/SBUS dimmer, WTP/SBUS RGB controller | ✅ |
-| `event` | Button press event — fires per action, ideal for automations | ✅ |
-| `button` | Sinum scenes and Lua code scripts | ✅ |
-| `number` | Numeric Lua variables, SBUS analog output (0–10V) | ✅ |
+| `event` | Button press event — fires per action, ideal for HA automations | ✅ |
+| `button` | Sinum scenes (Lua `code` type) and Lua code scripts | ✅ |
+| `number` | Numeric Lua environment variables, SBUS analog output (0–10 V) | ✅ |
 | `update` | Parent device firmware tracker | ✅ |
-| `alarm_control_panel` | Alarm system (if present) | ✅ |
+| `alarm_control_panel` | Alarm system (if present on hub) | ✅ |
 
 ### Supported Device Types
 
@@ -33,7 +34,9 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 
 **WTP bus**: `temperature_sensor`, `humidity_sensor`, `pressure_sensor`, `light_sensor`, `co2_sensor`, `iaq_sensor`, `aq_sensor`, `motion_sensor`, `flood_sensor`, `opening_sensor`, `smoke_sensor`, `two_state_input_sensor`, `relay`, `dimmer`, `rgb_controller`, `blind_controller`, `energy_meter`, `fan_coil`, `fan_coil_v2`, `temperature_regulator`, `button`
 
-**SBUS bus**: `temperature_sensor`, `humidity_sensor`, `light_sensor`, `motion_sensor`, `two_state_input_sensor`, `analog_input`, `analog_output`, `impulse_meter`, `relay`, `dimmer`, `rgb_controller`, `fan_coil`, `temperature_regulator`, `button`, `valve_pump`, `common_valve`, `pulse_width_modulation`
+**SBUS bus**: `temperature_sensor`, `humidity_sensor`, `light_sensor`, `motion_sensor`, `two_state_input_sensor`, `analog_input`, `analog_output`, `impulse_meter`, `relay`, `dimmer`, `rgb_controller`, `fan_coil`, `temperature_regulator`, `button`, `valve_pump`, `common_valve`, `pulse_width_modulation`, `blind_controller`, `energy_meter`
+
+**LoRa bus**: `temperature_sensor`, `humidity_sensor`, `opening_sensor`, `flood_sensor`, `relay`, `two_state_input_sensor`, `smoke_sensor`
 
 ---
 
@@ -69,9 +72,40 @@ The polling interval defaults to 30 seconds and can be changed in integration op
 
 ---
 
+## Sinum Scenes and Automations
+
+Sinum hubs can run Lua scripts in three modes: **scenes** (single-shot actions), **automations** (event-driven), and **custom devices**. Sinapse exposes scenes as `button` entities in Home Assistant — pressing the button activates the scene via `POST /api/v1/scenes/{id}/activate`.
+
+This makes it easy to trigger hub-side logic from HA automations, dashboards, or voice assistants, without duplicating logic on the HA side.
+
+**Example scene (all WTP blinds down at a specific time):**
+
+```lua
+-- Automation script: close all WTP blind controllers at 22:00
+if event.type == "minute_changed" then
+    if dateTime:getHours() == 22 and dateTime:getMinutes() == 0 then
+        room[1]:foreach(function(device)
+            if device:getValue("type") == "blind_controller" then
+                device:setValue("position", 0)
+            end
+        end)
+    end
+end
+```
+
+**Environment variables** (persistent across executions) are exposed as `number` entities, so HA can read and write them:
+
+```lua
+-- Scene: read setpoint from HA-writable variable and apply to regulators
+local setpoint = variable[1]:getValue()
+sbus[42]:setValue("target_temperature", setpoint * 10)  -- Sinum stores °C × 10
+```
+
+---
+
 ## Optional MQTT Real-Time Updates
 
-MQTT is optional — REST polling is fully supported without it.
+MQTT is optional — REST polling is fully supported without it. With MQTT the hub pushes state changes immediately instead of waiting for the next poll cycle.
 
 ### Prerequisites
 
@@ -88,7 +122,19 @@ Open Sinum hub web UI → Integrations → Add MQTT client. Note the assigned **
 
 Sinum hub web UI → Settings → Lua Scripts → New script.  
 Paste contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua).  
-Set `CLIENT_ID = <id from step 1>` at line 17, save and enable.
+Set `CLIENT_ID = <id from step 1>`, save and enable.
+
+The script publishes the full device state JSON every time a device property changes:
+
+```lua
+-- excerpt from mqtt_bridge.lua
+mqtt[CLIENT_ID]:publish(
+    TOPIC_PREFIX .. "/state/" .. tostring(device_id),
+    json.encode(payload)
+)
+```
+
+For multiple Sinum hubs connected to the same MQTT broker, set a unique `TOPIC_PREFIX` in each Lua script — for example `sinum/tablica-wtp` and `sinum/tablica-sbus-1` — and use the same prefix in the integration options for that hub.
 
 Verify by checking hub logs for `[Sinapse] Published:` entries.
 
@@ -100,30 +146,27 @@ Sinum integration → Options → Enable MQTT real-time transport → Save.
 
 | Topic | Direction | Content |
 |---|---|---|
-| `sinum/state/{device_id}` | Hub → HA | Full device state JSON |
-| `sinum/event/heartbeat` | Hub → HA | Heartbeat every minute |
+| `{topic_prefix}/state/{device_id}` | Hub → HA | Full device state JSON |
+| `{topic_prefix}/event/heartbeat` | Hub → HA | Heartbeat every minute |
+
+Default `topic_prefix` is `sinum`.
 
 ---
 
 ## Tested Hubs
 
-Integration is continuously tested against two live hubs with different hardware configurations:
+Integration is tested against two live hubs running different hardware configurations:
 
-| Hub | Type | Firmware | Virtual | WTP | SBUS | HA entities |
+| Hub | Model | API | Firmware | Virtual | WTP | SBUS |
 |---|---|---|---|---|---|---|
-| Hub 1 | sinum_plus | 1.24.0-alpha.2 | 28 | 254 | 8 | — |
-| Hub 2 | sinum_lite | 1.24.0-alpha.2 | 169 | 35 | 436 | ~1 200 |
+| tablica-wtp | sinum_plus | 1.4 | 1.24.0-alpha.2 | 28 | 254 | 8 |
+| sinum-tablica-sbus-1 | sinum_lite | 1.4 | 1.24.0-alpha.3 | 169 | 35 | 436 |
 
-**Hub 2 entity breakdown** (active in HA, Phase 12):
-- 137 climate (83 virtual thermostats + 51 SBUS regulators + 2 WTP regulators + 1 heat_pump_manager)
-- ~503 sensor (+ 30 button last_action + 2 PWM)
-- 287 binary_sensor
-- 89 switch (69 SBUS relay + 11 WTP relay + 5 virtual + 2 valve_pump + 2 common_valve)
-- 45 light (38 SBUS dimmer + 6 SBUS RGB + 1 virtual)
-- 5 cover (3 virtual blind + 2 virtual gate)
-- 3 number (SBUS analog_output)
+**tablica-wtp** is WTP-heavy: 108 WTP relays, 18 blind controllers, 15 temperature regulators, 28 buttons, assorted sensors (temperature, humidity, CO₂, IAQ, pressure, light, motion, flood), 1 fan coil, 1 energy meter.
 
-**Note**: The hubs run alpha firmware. The `/api/v1/rooms` and bus list endpoints occasionally return HTTP 408 (bus timeout) — the integration handles this gracefully using cached data.
+**sinum-tablica-sbus-1** is SBUS-heavy: 83 virtual thermostats, 51 SBUS temperature regulators, 69 SBUS relays, 38 SBUS dimmers, 6 SBUS RGB controllers, 30 SBUS buttons, 134 SBUS temperature sensors, 46 SBUS humidity sensors, 1 heat pump manager.
+
+**Note**: Both hubs run alpha firmware. The `/api/v1/rooms` and bus-list endpoints occasionally return HTTP 408 (bus timeout) — the integration handles this gracefully using cached data.
 
 ---
 
@@ -140,9 +183,9 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/        # 502 tests, ~1.9s
-pytest -v tests/     # verbose
-pytest --cov=custom_components/sinum tests/  # with coverage (93%+)
+pytest tests/           # 865 tests, ~3 s
+pytest -v tests/        # verbose
+pytest --cov=custom_components/sinum tests/  # with coverage (100%)
 ```
 
 ### Structure
@@ -150,66 +193,48 @@ pytest --cov=custom_components/sinum tests/  # with coverage (93%+)
 ```
 custom_components/sinum/
   ├── __init__.py
-  ├── api.py               # REST client (SinumClient)
-  ├── coordinator.py       # DataUpdateCoordinator
-  ├── config_flow.py       # UI setup flow
+  ├── api.py               # REST client (SinumClient) — aiohttp, JWT refresh
+  ├── coordinator.py       # DataUpdateCoordinator — polls all bus endpoints
+  ├── config_flow.py       # UI setup + reauth flow
   ├── climate.py           # Thermostats, fan coils, regulators, heat_pump_manager
-  ├── sensor.py            # Temperature, humidity, IAQ, PM, power, schedules, buttons, PWM
-  ├── binary_sensor.py     # Flood, motion, valve, connectivity
+  ├── sensor.py            # Temperature, humidity, IAQ, energy, weather, schedules, PWM
+  ├── binary_sensor.py     # Flood, motion, opening, valve state, connectivity
   ├── switch.py            # Relay integrators, wicket, WTP/SBUS relays, valve_pump, common_valve
-  ├── cover.py             # Blind, gate (virtual + WTP)
+  ├── cover.py             # Blind controller, gate (virtual + WTP)
   ├── light.py             # Dimmer/RGB (virtual + WTP/SBUS)
-  ├── button.py            # Scenes
+  ├── button.py            # Scenes (Lua code type)
   ├── event.py             # Button press events (SinumButtonEvent)
-  ├── number.py            # Lua variables + SBUS analog_output
-  ├── update.py            # Firmware update tracker
+  ├── number.py            # Lua environment variables + SBUS analog_output
+  ├── notify.py            # send_notification service → hub push notification
+  ├── update.py            # Parent device firmware tracker
   ├── alarm_control_panel.py
+  ├── diagnostics.py       # HA diagnostics redaction
   ├── mqtt.py              # MQTT bridge transport
-  ├── services.yaml        # send_notification service
+  ├── services.yaml        # send_notification service schema
   ├── strings.json         # UI strings (EN)
   └── translations/
       ├── en.json
       └── pl.json
 
 lua_scripts/
-  ├── mqtt_bridge.lua      # MQTT state bridge (v0.8.0)
-  └── sinapse_api.lua      # Optional HTTP diagnostics endpoint
+  ├── mqtt_bridge.lua      # MQTT state bridge (v0.8.1) — upload to hub
+  └── sinapse_api.lua      # Optional HTTP diagnostics endpoint on hub
 
 tests/
   ├── fixtures/sinum_devices.json
-  ├── test_api.py
-  ├── test_api_extended.py
-  ├── test_alarm_control_panel.py
-  ├── test_binary_sensor.py
-  ├── test_binary_sensor_setup.py
-  ├── test_button.py
-  ├── test_climate.py
-  ├── test_config_flow.py
-  ├── test_coordinator.py
-  ├── test_cover_extended.py
-  ├── test_diagnostics.py
-  ├── test_event.py
-  ├── test_fan_coil.py
-  ├── test_mqtt.py
-  ├── test_new_device_types.py
-  ├── test_new_entities.py
-  ├── test_new_sbus_types.py
-  ├── test_number_extended.py
-  ├── test_schedule_sensors.py
-  ├── test_sensor.py
-  ├── test_switch_setup.py
-  └── test_update.py
+  └── test_*.py            # 865 tests across all platforms and device types
 ```
 
 ---
 
 ## Known Limitations
 
-- `button` devices — exposed as `last_action` sensor (disabled by default); for real-time triggers use the **Event entity** with MQTT bridge
-- `custom_device` virtual type — complex Lua contracts vary per installation, intentionally skipped
+- `button` devices — exposed as `last_action` sensor (disabled by default); for real-time triggers use the **Event entity** with MQTT bridge enabled
+- `custom_device` virtual type — Lua contracts vary per installation, intentionally not mapped to HA entities
+- `thermostat_output_group` virtual type — hub-managed output group, no direct HA mapping
 - Energy Center (`/api/v1/energy`) not available on all hubs — entities will not appear where missing
-- LoRa, SLINK, video cameras not supported (require specific hardware modules)
-- Hub alpha firmware may cause intermittent HTTP 408 on bus polling — handled gracefully
+- LoRa, SLINK, video cameras require specific hardware modules installed on the hub
+- Hub alpha firmware may cause intermittent HTTP 408 on bus polling — handled gracefully with cached state
 
 ---
 

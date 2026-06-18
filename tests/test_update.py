@@ -101,3 +101,41 @@ class TestSinumParentDeviceUpdate:
             entity = SinumParentDeviceUpdate(coordinator, parent, "test_entry")
         assert entity.installed_version is None
         assert entity.in_progress is False
+
+
+class TestUpdateAsyncSetupEntry:
+    @pytest.mark.asyncio
+    async def test_setup_creates_no_entities_when_no_qualifying_parents(self):
+        """async_setup_entry: parents without software_status or version → empty list."""
+        from custom_components.sinum.update import async_setup_entry
+
+        coord = _make_coordinator(parent_devices=[
+            {"id": 1, "name": "NoVersion", "class": "wtp_parent_device"},
+        ])
+        entry = MagicMock()
+        entry.runtime_data = coord
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(MagicMock(), entry, lambda e: added.extend(e))
+
+        assert added == []
+
+    @pytest.mark.asyncio
+    async def test_setup_creates_entity_when_parent_has_software_status(self):
+        """Parents with software_status field → entity created."""
+        from custom_components.sinum.update import async_setup_entry
+
+        coord = _make_coordinator(parent_devices=[
+            {"id": 2, "name": "Gateway", "class": "wtp_parent_device", "software_status": "up_to_date"},
+        ])
+        entry = MagicMock()
+        entry.runtime_data = coord
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(MagicMock(), entry, lambda e: added.extend(e))
+
+        assert len(added) == 1

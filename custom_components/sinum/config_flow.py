@@ -19,6 +19,8 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_MQTT_ENABLED,
+    CONF_MQTT_TOPIC_PREFIX,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -85,8 +87,10 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             token = user_input[CONF_API_TOKEN].strip()
             client = self._make_client(api_token=token)
+            hub_name: str | None = None
             try:
-                await client.test_connection()
+                hub_info = await client.get_hub_info()
+                hub_name = hub_info.get("name") or hub_info.get("hostname")
             except SinumAuthError:
                 errors["base"] = "invalid_auth"
             except SinumConnectionError:
@@ -101,7 +105,8 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_AUTH_MODE: AUTH_MODE_TOKEN,
                         CONF_API_TOKEN: token,
                         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
-                    }
+                    },
+                    hub_name=hub_name,
                 )
 
         return self.async_show_form(
@@ -120,9 +125,11 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
                 username=user_input[CONF_USERNAME],
                 password=user_input[CONF_PASSWORD],
             )
+            hub_name: str | None = None
             try:
                 await client.login()
-                await client.test_connection()
+                hub_info = await client.get_hub_info()
+                hub_name = hub_info.get("name") or hub_info.get("hostname")
             except SinumAuthError:
                 errors["base"] = "invalid_auth"
             except SinumConnectionError:
@@ -138,7 +145,8 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
-                    }
+                    },
+                    hub_name=hub_name,
                 )
 
         return self.async_show_form(
@@ -148,11 +156,12 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._host},
         )
 
-    async def _create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
+    async def _create_entry(self, data: dict[str, Any], hub_name: str | None = None) -> ConfigFlowResult:
         unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
-        return self.async_create_entry(title=f"Sinum ({self._host})", data=data)
+        display = hub_name or self._host
+        return self.async_create_entry(title=f"Sinum ({display})", data=data)
 
     def _make_client(self, **kwargs: Any) -> SinumClient:
         session = async_get_clientsession(self.hass, verify_ssl=False)
@@ -203,7 +212,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
-    """Options flow: change scan interval and MQTT toggle."""
+    """Options flow: change scan interval and MQTT settings."""
 
     def __init__(self, config_entry: Any) -> None:
         self._entry = config_entry
@@ -217,8 +226,16 @@ class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
             CONF_MQTT_ENABLED,
             self._entry.data.get(CONF_MQTT_ENABLED, False),
         )
+        current_mqtt_prefix = self._entry.options.get(
+            CONF_MQTT_TOPIC_PREFIX,
+            self._entry.data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+        )
 
         if user_input is not None:
+            if CONF_MQTT_TOPIC_PREFIX in user_input:
+                user_input[CONF_MQTT_TOPIC_PREFIX] = _mqtt_topic_prefix(
+                    user_input[CONF_MQTT_TOPIC_PREFIX]
+                )
             return self.async_create_entry(title="", data=user_input)
 
         schema = vol.Schema(
@@ -227,6 +244,20 @@ class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
                     int, vol.Range(min=10, max=300)
                 ),
                 vol.Optional(CONF_MQTT_ENABLED, default=current_mqtt): bool,
+                vol.Optional(
+                    CONF_MQTT_TOPIC_PREFIX,
+                    default=current_mqtt_prefix,
+                ): _mqtt_topic_prefix,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
+
+
+def _mqtt_topic_prefix(value: str) -> str:
+    """Validate and normalize MQTT topic prefix for one Sinum hub."""
+    prefix = value.strip().strip("/")
+    if not prefix:
+        prefix = DEFAULT_MQTT_TOPIC_PREFIX
+    if "#" in prefix or "+" in prefix:
+        raise vol.Invalid("MQTT wildcards are not allowed in topic prefix")
+    return prefix

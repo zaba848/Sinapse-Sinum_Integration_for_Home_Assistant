@@ -23,6 +23,8 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_MQTT_ENABLED,
+    CONF_MQTT_TOPIC_PREFIX,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_SEND_NOTIFICATION,
@@ -94,11 +96,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
+    # Sync config entry title with actual hub name (fixes stale IP-based titles)
+    hub_name = coordinator.hub_info.get("name") or coordinator.hub_info.get("hostname")
+    if hub_name:
+        expected_title = f"Sinum ({hub_name})"
+        if entry.title != expected_title and hass.config_entries.async_get_entry(entry.entry_id):
+            hass.config_entries.async_update_entry(entry, title=expected_title)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Start MQTT bridge if enabled
     if opts.get(CONF_MQTT_ENABLED, False):
-        bridge = SinumMqttBridge(hass, coordinator)
+        bridge = SinumMqttBridge(
+            hass,
+            coordinator,
+            topic_prefix=opts.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+        )
         if await bridge.async_start():
             _MQTT_BRIDGES[entry.entry_id] = bridge
             coordinator.mqtt_bridge = bridge

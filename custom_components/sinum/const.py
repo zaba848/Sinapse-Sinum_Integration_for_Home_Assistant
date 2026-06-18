@@ -8,12 +8,14 @@ CONF_API_TOKEN = "api_token"
 CONF_AUTH_MODE = "auth_mode"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_MQTT_ENABLED = "mqtt_enabled"
+CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
 
 # Auth modes
 AUTH_MODE_TOKEN = "token"
 AUTH_MODE_PASSWORD = "password"
 
 DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_MQTT_TOPIC_PREFIX = "sinum"
 
 # REST API — all paths include /api/v1 prefix
 API_LOGIN = "/api/v1/login"

@@ -296,7 +296,7 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         key="signal",
         api_key="signal",
         source="wtp",
-        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        device_class=None,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -369,11 +369,36 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         icon="mdi:gauge",
     ),
     SinumSensorDescription(
-        key="impulse_count",
-        api_key="count",
+        key="impulse_total_count",
+        api_key="total_count",
         source="sbus",
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:counter",
+        translation_key="impulse_total_count",
+    ),
+    SinumSensorDescription(
+        key="impulse_window_count",
+        api_key="window_count",
+        source="sbus",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:counter",
+        translation_key="impulse_window_count",
+    ),
+    SinumSensorDescription(
+        key="impulse_total_value",
+        api_key="total_value",
+        source="sbus",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:sigma",
+        translation_key="impulse_total_value",
+    ),
+    SinumSensorDescription(
+        key="impulse_window_value",
+        api_key="window_value",
+        source="sbus",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:sigma",
+        translation_key="impulse_window_value",
     ),
     SinumSensorDescription(
         key="pwm_duty_cycle",
@@ -529,7 +554,7 @@ LORA_SENSORS: tuple[SinumSensorDescription, ...] = (
         key="signal",
         api_key="signal",
         source="lora",
-        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        device_class=None,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -782,12 +807,17 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
 
         device = self._get_device_dict(coordinator)
+        if not description.native_unit_of_measurement:
+            device_unit = device.get("unit") or None  # "" → None
+            if device_unit:
+                self._attr_native_unit_of_measurement = device_unit
+
         label = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=_model_for_source(self._source),
+            model=device.get("_parent_model") or _model_for_source(self._source),
             suggested_area=device.get("_area") or None,
         )
 
@@ -1234,7 +1264,7 @@ class SinumButtonSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {bus.upper()} Button",
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
             suggested_area=device.get("_area") or None,
         )
 

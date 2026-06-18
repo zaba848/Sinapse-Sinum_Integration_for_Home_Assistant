@@ -54,10 +54,12 @@
         "title": "Opcje integracji Sinum",
         "data": {
           "scan_interval": "Interwał odświeżania (sekundy)",
-          "mqtt_enabled": "Włącz transport MQTT (real-time)"
+          "mqtt_enabled": "Włącz transport MQTT (real-time)",
+          "mqtt_topic_prefix": "Prefiks topiców MQTT"
         },
         "data_description": {
-          "mqtt_enabled": "Wymaga skryptu Lua na centrali i działającego brokera MQTT w Home Assistant."
+          "mqtt_enabled": "Wymaga skryptu Lua na centrali i działającego brokera MQTT w Home Assistant.",
+          "mqtt_topic_prefix": "Musi odpowiadać TOPIC_PREFIX w mqtt_bridge.lua. Dla wielu central użyj unikalnego prefiksu, np. sinum/tablica-wtp."
         }
       }
     }
@@ -160,6 +162,27 @@
       },
       "pwm_frequency": {
         "name": "Częstotliwość"
+      },
+      "impulse_total_count": {
+        "name": "Licznik totalny"
+      },
+      "impulse_window_count": {
+        "name": "Licznik okna"
+      },
+      "impulse_total_value": {
+        "name": "Wartość totalna"
+      },
+      "impulse_window_value": {
+        "name": "Wartość okna"
+      },
+      "signal_strength": {
+        "name": "Siła sygnału"
+      },
+      "energy_consumed_today": {
+        "name": "Energia dziś"
+      },
+      "energy_consumed_yesterday": {
+        "name": "Energia wczoraj"
       }
     },
     "binary_sensor": {

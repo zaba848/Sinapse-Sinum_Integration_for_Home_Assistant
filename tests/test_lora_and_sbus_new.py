@@ -333,6 +333,7 @@ class TestAlarmArmDisarm:
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
         coordinator.client.command_alarm_device = AsyncMock(return_value=None)
+        coordinator.async_request_refresh = AsyncMock(return_value=None)
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()

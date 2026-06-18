@@ -1,11 +1,11 @@
--- Sinapse MQTT Bridge v0.8.0 (Full Device Coverage)
+-- Sinapse MQTT Bridge v0.8.1 (Full Device Coverage)
 -- Creator: zaba848 (Home Assistant Sinum Integration)
 --
 -- LICENSE: Proprietary Software
 -- Copyright (c) 2026 Tomasz Panek. All Rights Reserved.
 -- See LICENSE file for full terms. Commercial licensing: zaba9214@gmail.com
 --
--- Last updated: 2026-06-17
+-- Last updated: 2026-06-18
 --
 -- Supported device types:
 -- ✅ Virtual: thermostat, relay_integrator, blind_controller_integrator, gate, wicket,
@@ -20,8 +20,12 @@
 -- ⚠️  Optional if present: LoRa, SLINK, Video, Alarm system
 --
 -- MQTT topics published:
---   sinum/state/<device_id>      Device state JSON (all properties via safe_get)
---   sinum/event/heartbeat        Heartbeat pulse (every minute)
+--   <TOPIC_PREFIX>/state/<device_id>      Device state JSON (all properties via safe_get)
+--   <TOPIC_PREFIX>/event/heartbeat        Heartbeat pulse (every minute)
+--
+-- Multiple hubs on one MQTT broker:
+--   Use a unique TOPIC_PREFIX per hub, e.g. "sinum/tablica-wtp" and
+--   "sinum/tablica-sbus-1", and set the same prefix in the HA integration options.
 
 local CLIENT_ID   = 1
 local TOPIC_PREFIX = "sinum"

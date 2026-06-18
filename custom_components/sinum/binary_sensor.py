@@ -53,7 +53,8 @@ BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         key="motion",
         wtp_type=WTYPE_MOTION_SENSOR,
         device_class=BinarySensorDeviceClass.MOTION,
-        on_states=("motion", "detected", "alarm"),
+        state_key="motion_detected",
+        on_states=("true", "motion", "detected", "alarm"),
     ),
     SinumBinarySensorDescription(
         key="opening",
@@ -97,7 +98,8 @@ SBUS_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         wtp_type=STYPE_MOTION_SENSOR,
         source="sbus",
         device_class=BinarySensorDeviceClass.MOTION,
-        on_states=("motion", "detected", "alarm", "true"),
+        state_key="motion_detected",
+        on_states=("true", "motion", "detected", "alarm"),
     ),
 )
 
@@ -222,7 +224,7 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
+            model=device.get("_parent_model") or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
             suggested_area=device.get("_area") or None,
         )
 

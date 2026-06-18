@@ -99,7 +99,14 @@ def _hs_to_hex(hue: float, saturation: float) -> str:
     return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
 
+def _is_rgbww_animation_device(device: dict[str, Any]) -> bool:
+    """RGBWW devices (RGB-S5m/P4m) report color/brightness but only accept state via PATCH."""
+    return "rgbww" in device.get("labels", [])
+
+
 def _supported_color_modes(device: dict[str, Any]) -> set[ColorMode]:
+    if _is_rgbww_animation_device(device):
+        return {ColorMode.ONOFF}
     modes: set[ColorMode] = set()
     if "led_color" in device or device.get("color_mode") == "rgb":
         modes.add(ColorMode.HS)
@@ -124,12 +131,11 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
         device = coordinator.virtual_devices.get(device_id, {})
-        self._attr_supported_color_modes = _supported_color_modes(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
             name=_label(device),
             manufacturer="TECH Sterowniki",
-            model="Sinum Dimmer/RGB Controller",
+            model=device.get("_parent_model") or "Sinum Dimmer/RGB Controller",
             suggested_area=device.get("_area") or None,
         )
 
@@ -138,17 +144,19 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         return self.coordinator.virtual_devices.get(self._device_id, {})
 
     @property
+    def supported_color_modes(self) -> set[ColorMode]:
+        return _supported_color_modes(self._device)
+
+    @property
     def color_mode(self) -> ColorMode:
+        if _is_rgbww_animation_device(self._device):
+            return ColorMode.ONOFF
         mode = self._device.get("color_mode", "")
         if mode == "rgb":
             return ColorMode.HS
         if mode == "temperature":
             return ColorMode.COLOR_TEMP
         return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode]:
-        return self._attr_supported_color_modes
 
     @property
     def is_on(self) -> bool:
@@ -181,11 +189,9 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         if ATTR_HS_COLOR in kwargs:
             h, s = kwargs[ATTR_HS_COLOR]
             payload["led_color"] = _hs_to_hex(h, s)
-            payload["color_mode"] = "rgb"
 
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
             payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            payload["color_mode"] = "temperature"
 
         updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         self.coordinator.virtual_devices[self._device_id].update(updated)
@@ -223,7 +229,7 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {bus.upper()} Dimmer",
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} Dimmer",
             suggested_area=device.get("_area") or None,
         )
 
@@ -290,13 +296,12 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
             device_id, {}
         )
-        self._attr_supported_color_modes = _supported_color_modes(device)
         label = _label(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {bus.upper()} RGB Controller",
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} RGB Controller",
             suggested_area=device.get("_area") or None,
         )
 
@@ -309,10 +314,12 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
-        return self._attr_supported_color_modes
+        return _supported_color_modes(self._device)
 
     @property
     def color_mode(self) -> ColorMode:
+        if _is_rgbww_animation_device(self._device):
+            return ColorMode.ONOFF
         mode = self._device.get("color_mode", "")
         if mode == "rgb":
             return ColorMode.HS
@@ -344,15 +351,14 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         payload: dict[str, Any] = {"state": True}
-        if ATTR_BRIGHTNESS in kwargs:
-            payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-        if ATTR_HS_COLOR in kwargs:
-            h, s = kwargs[ATTR_HS_COLOR]
-            payload["led_color"] = _hs_to_hex(h, s)
-            payload["color_mode"] = "rgb"
-        if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            payload["color_mode"] = "temperature"
+        if not _is_rgbww_animation_device(self._device):
+            if ATTR_BRIGHTNESS in kwargs:
+                payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+            if ATTR_HS_COLOR in kwargs:
+                h, s = kwargs[ATTR_HS_COLOR]
+                payload["led_color"] = _hs_to_hex(h, s)
+            if ATTR_COLOR_TEMP_KELVIN in kwargs:
+                payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
         if self._bus == "wtp":
             updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
             self.coordinator.wtp_devices[self._device_id].update(updated)

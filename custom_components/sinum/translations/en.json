@@ -54,10 +54,12 @@
         "title": "Sinum integration options",
         "data": {
           "scan_interval": "Polling interval (seconds)",
-          "mqtt_enabled": "Enable MQTT real-time transport"
+          "mqtt_enabled": "Enable MQTT real-time transport",
+          "mqtt_topic_prefix": "MQTT topic prefix"
         },
         "data_description": {
-          "mqtt_enabled": "Requires the Lua bridge script on the hub and a working MQTT broker in Home Assistant."
+          "mqtt_enabled": "Requires the Lua bridge script on the hub and a working MQTT broker in Home Assistant.",
+          "mqtt_topic_prefix": "Must match TOPIC_PREFIX in mqtt_bridge.lua. Use a unique prefix per hub, for example sinum/tablica-wtp."
         }
       }
     }
@@ -160,6 +162,27 @@
       },
       "pwm_frequency": {
         "name": "Frequency"
+      },
+      "impulse_total_count": {
+        "name": "Total count"
+      },
+      "impulse_window_count": {
+        "name": "Window count"
+      },
+      "impulse_total_value": {
+        "name": "Total value"
+      },
+      "impulse_window_value": {
+        "name": "Window value"
+      },
+      "signal_strength": {
+        "name": "Signal strength"
+      },
+      "energy_consumed_today": {
+        "name": "Energy today"
+      },
+      "energy_consumed_yesterday": {
+        "name": "Energy yesterday"
       }
     },
     "binary_sensor": {

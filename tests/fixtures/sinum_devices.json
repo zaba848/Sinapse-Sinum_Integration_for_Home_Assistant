@@ -414,7 +414,7 @@
     "id": 46,
     "name": "SBUS Motion",
     "type": "motion_sensor",
-    "state": "motion",
+    "motion_detected": true,
     "room_id": 1,
     "class": "sbus"
   },

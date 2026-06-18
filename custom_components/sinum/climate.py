@@ -30,12 +30,6 @@ from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Phase 7B.2: Temperature regulator climate entities (optional/experimental)
-# Disabled by default pending live testing decision on whether they add value
-# Enable if users need direct control on regulators (not supervised by thermostat)
-ENABLE_EXPERIMENTAL_REGULATOR_CLIMATE = False
-
-
 # Sinum thermostat modes → HA HVAC modes
 _MODE_TO_HVAC: dict[str, HVACMode] = {
     "heating": HVACMode.HEAT,
@@ -110,21 +104,38 @@ def _is_thermostat(device: dict[str, Any]) -> bool:
 def _has_climate_control(device: dict[str, Any], source: str = "sbus") -> bool:
     """Check if fan_coil can be exposed as climate entity.
 
-    SBUS: Requires full climate fields (work_mode + target_temperature)
-    WTP: Accepts partial fields (any temperature field for Phase 7A partial support)
+    Fan coil climate entities need both mode and setpoint controls. Devices that
+    only report room temperature or fan state should stay as sensors/diagnostics.
     """
-    if source == "sbus":
-        return "work_mode" in device and "target_temperature" in device
-    # WTP: partial climate support (Option A) - any temperature field
-    return any(f in device for f in ["work_mode", "target_temperature", "room_temperature"])
+    return "work_mode" in device and "target_temperature" in device
 
 
 def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
     modes = [HVACMode.OFF]
-    for sinum_mode in device.get("available_work_modes", ["heating"]):
-        ha_mode = _MODE_TO_HVAC.get(sinum_mode)
+
+    # Explicit list (FanCoil may populate this)
+    declared = device.get("available_work_modes") or []
+    if declared:
+        for sinum_mode in declared:
+            ha_mode = _MODE_TO_HVAC.get(sinum_mode)
+            if ha_mode and ha_mode not in modes:
+                modes.append(ha_mode)
+        return modes
+
+    # Infer from mode-specific temperature fields (thermostat with null available_work_modes)
+    if device.get("target_temperature_heating_minimum") is not None:
+        modes.append(HVACMode.HEAT)
+    if device.get("target_temperature_cooling_minimum") is not None:
+        if HVACMode.COOL not in modes:
+            modes.append(HVACMode.COOL)
+
+    # Always include current active mode so it never disappears from the picker
+    current = device.get("mode") or device.get("work_mode")
+    if current and current not in ("off", ""):
+        ha_mode = _MODE_TO_HVAC.get(current)
         if ha_mode and ha_mode not in modes:
             modes.append(ha_mode)
+
     if len(modes) == 1:
         modes.append(HVACMode.HEAT)
     return modes
@@ -136,14 +147,13 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_target_temperature_step = 0.5
-    _attr_icon = "mdi:thermostat"
+    _attr_icon = "mdi:home-thermometer"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
         device = coordinator.virtual_devices.get(device_id, {})
-        self._attr_hvac_modes = _available_hvac_modes(device)
         area = device.get("_area") or device.get("_room", "")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
@@ -158,13 +168,17 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         return device.get("_device_name") or device.get("name", "Thermostat")
 
     @property
+    def hvac_modes(self) -> list[HVACMode]:
+        return _available_hvac_modes(self._device)
+
+    @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
 
     @property
     def current_temperature(self) -> float | None:
         raw = self._device.get("temperature")
-        if raw is None:
+        if not raw:
             return None
         return self.coordinator.client.decode_temperature(raw)
 
@@ -195,17 +209,39 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
 
     @property
     def min_temp(self) -> float:
-        raw_min = self._device.get("target_temperature_minimum")
-        raw_max = self._device.get("target_temperature_maximum")
-        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+        d = self._device
+        mode = self.hvac_mode
+        if mode == HVACMode.HEAT:
+            mn = d.get("target_temperature_heating_minimum")
+            mx = d.get("target_temperature_heating_maximum")
+            if mn is not None and mx is not None:
+                return mn / 10
+        elif mode == HVACMode.COOL:
+            mn = d.get("target_temperature_cooling_minimum")
+            mx = d.get("target_temperature_cooling_maximum")
+            if mn is not None and mx is not None:
+                return mn / 10
+        raw_min = d.get("target_temperature_minimum")
+        if raw_min is not None:
             return raw_min / 10
         return TEMP_MIN
 
     @property
     def max_temp(self) -> float:
-        raw_min = self._device.get("target_temperature_minimum")
-        raw_max = self._device.get("target_temperature_maximum")
-        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+        d = self._device
+        mode = self.hvac_mode
+        if mode == HVACMode.HEAT:
+            mn = d.get("target_temperature_heating_minimum")
+            mx = d.get("target_temperature_heating_maximum")
+            if mn is not None and mx is not None:
+                return mx / 10
+        elif mode == HVACMode.COOL:
+            mn = d.get("target_temperature_cooling_minimum")
+            mx = d.get("target_temperature_cooling_maximum")
+            if mn is not None and mx is not None:
+                return mx / 10
+        raw_max = d.get("target_temperature_maximum")
+        if raw_max is not None:
             return raw_max / 10
         return TEMP_MAX
 
@@ -274,7 +310,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     )
     _attr_target_temperature_step = 0.5
     _attr_fan_modes = _FAN_MODES
-    _attr_icon = "mdi:air-conditioner"
+    _attr_icon = "mdi:hvac"
 
     def __init__(
         self,
@@ -289,25 +325,14 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         self._attr_unique_id = f"{entry_id}_{source}_{device_id}"
 
         device = self._device_dict(coordinator)
-        self._attr_hvac_modes = _available_hvac_modes(device)
 
-        # Dynamically determine supported features based on available fields (Phase 7A)
-        # All fan coils support target temperature
-        features = ClimateEntityFeature.TARGET_TEMPERATURE
-        # Add fan control only if fan fields are present
+        # Dynamically determine supported features based on available fields.
+        features = ClimateEntityFeature(0)
+        if "target_temperature" in device:
+            features |= ClimateEntityFeature.TARGET_TEMPERATURE
         if "fan" in device or device.get("fan_operation_mode"):
             features |= ClimateEntityFeature.FAN_MODE
         self._attr_supported_features = features
-
-        # Use per-device temperature limits from API if available
-        raw_min = device.get("target_temperature_minimum")
-        raw_max = device.get("target_temperature_maximum")
-        if raw_min is not None and raw_max is not None and raw_max > raw_min:
-            self._attr_min_temp = raw_min / 10
-            self._attr_max_temp = raw_max / 10
-        else:
-            self._attr_min_temp = TEMP_MIN
-            self._attr_max_temp = TEMP_MAX
 
         area = device.get("_area") or None
         label = device.get("_device_name") or device.get("name", str(device_id))
@@ -316,7 +341,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {source.upper()} Fan Coil",
+            model=device.get("_parent_model") or f"Sinum {source.upper()} Fan Coil",
             suggested_area=area,
         )
 
@@ -332,7 +357,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         raw = self._device.get("room_temperature")
-        if raw is None:
+        if not raw:
             return None
         return raw / 10
 
@@ -342,6 +367,26 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
         if raw is None:
             return None
         return raw / 10
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        return _available_hvac_modes(self._device)
+
+    @property
+    def min_temp(self) -> float:
+        d = self._device
+        raw_min = d.get("target_temperature_minimum")
+        if raw_min is not None:
+            return raw_min / 10
+        return TEMP_MIN
+
+    @property
+    def max_temp(self) -> float:
+        d = self._device
+        raw_max = d.get("target_temperature_maximum")
+        if raw_max is not None:
+            return raw_max / 10
+        return TEMP_MAX
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -435,7 +480,7 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     _attr_translation_key = "temperature_regulator"
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
-    _attr_icon = "mdi:thermostat-cog"
+    _attr_icon = "mdi:home-thermometer-outline"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str = "wtp"
@@ -447,7 +492,6 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
 
         store = coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
         device = store.get(device_id, {})
-        self._attr_hvac_modes = _available_hvac_modes(device)
 
         # Dynamic features based on mode_mutable
         features = ClimateEntityFeature.TARGET_TEMPERATURE
@@ -462,7 +506,7 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             identifiers={(DOMAIN, f"{entry_id}_{bus}_regulator_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model="Sinum Temperature Regulator",
+            model=device.get("_parent_model") or "Sinum Temperature Regulator",
             suggested_area=area,
         )
 
@@ -476,9 +520,13 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     @property
     def current_temperature(self) -> float | None:
         raw = self._device.get("temperature")
-        if raw is None:
+        if not raw:
             return None
         return raw / 10
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        return _available_hvac_modes(self._device)
 
     @property
     def target_temperature(self) -> float | None:
@@ -490,16 +538,14 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
     @property
     def min_temp(self) -> float:
         raw_min = self._device.get("target_temperature_minimum")
-        raw_max = self._device.get("target_temperature_maximum")
-        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+        if raw_min is not None:
             return raw_min / 10
         return TEMP_MIN
 
     @property
     def max_temp(self) -> float:
-        raw_min = self._device.get("target_temperature_minimum")
         raw_max = self._device.get("target_temperature_maximum")
-        if raw_min is not None and raw_max is not None and raw_max > raw_min:
+        if raw_max is not None:
             return raw_max / 10
         return TEMP_MAX
 
@@ -557,6 +603,18 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             return
         system_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
         updated = await self._patch({"system_mode": system_mode})
+        if updated:
+            self._device.update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        updated = await self._patch({"system_mode": "heating"})
+        if updated:
+            self._device.update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self) -> None:
+        updated = await self._patch({"system_mode": "off"})
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -43,87 +44,64 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
 
     async def _async_update_data(self) -> dict[str, Any]:
-        # ── Hub info (always-available health check) ──────────────────────────
-        try:
-            self.hub_info = await self.client.get_hub_info()
-        except SinumConnectionError as err:
-            if not self.hub_info:
-                raise UpdateFailed(f"Cannot reach Sinum hub: {err}") from err
-            _LOGGER.debug("Hub info unavailable (%s), using cached", err)
+        # ── Group 1: metadata — all fetched in parallel ───────────────────────
+        (
+            hub_info,
+            rooms,
+            lua_info,
+            floors_list,
+            parent_devices,
+            schedules,
+        ) = await asyncio.gather(
+            _safe_fetch(self.client.get_hub_info, "hub info"),
+            _safe_fetch(self.client.get_rooms, "rooms", default=[]),
+            _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
+            _safe_fetch(self.client.get_floors, "floors", default=[]),
+            _safe_fetch(self.client.get_parent_devices, "parent devices", default=self.parent_devices),
+            _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
+        )
 
-        # ── Rooms (non-fatal — 408 on alpha firmware, use cache or empty) ─────
-        try:
-            rooms = await self.client.get_rooms()
+        # Apply metadata results (fall back to cache on None/failure)
+        if hub_info is not None:
+            self.hub_info = hub_info
+        elif not self.hub_info:
+            raise UpdateFailed("Cannot reach Sinum hub: hub info unavailable")
+        if lua_info:
+            self.hub_info.update(lua_info)
+
+        if rooms is not None:
             self.rooms = rooms
-        except SinumConnectionError as err:
-            _LOGGER.debug("Rooms endpoint unavailable (%s), using cached rooms", err)
-            rooms = self.rooms
+        rooms = self.rooms  # use cached if fetch failed
 
-        # ── Lua hub info (optional extension) ────────────────────────────────
-        try:
-            lua_info = await self.client.get_lua_hub_info()
-            if lua_info:
-                self.hub_info.update(lua_info)
-        except SinumConnectionError as err:
-            _LOGGER.debug("Optional Lua hub info endpoint not available: %s", err)
-
-        # ── Floors (REST /api/v1/floors) ──────────────────────────────────────
-        try:
-            floors_list = await self.client.get_floors()
+        if floors_list is not None:
             self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
-        except SinumConnectionError as err:
-            _LOGGER.debug("Failed to fetch floors: %s", err)
-
-        # ── Parent device statuses (/api/v1/parent-devices) ───────────────────
-        try:
-            self.parent_devices = await self.client.get_parent_devices()
-        except SinumConnectionError as err:
-            _LOGGER.debug("Failed to fetch parent devices: %s", err)
-
-        # ── Thermal schedules (/api/v1/schedules) ────────────────────────────
-        try:
-            self.schedules = await self.client.get_schedules()
-        except SinumConnectionError as err:
-            _LOGGER.debug("Failed to fetch schedules: %s", err)
+        if parent_devices is not None:
+            self.parent_devices = parent_devices
+        if schedules is not None:
+            self.schedules = schedules
 
         # ── Classify device IDs from rooms (fallback for older firmware) ──────
         virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
 
-        # ── Device collections ────────────────────────────────────────────────
-        # Firmware 1.24 exposes full class collections. Relying only on rooms
-        # misses valid devices that are not assigned to any room.
-        virtual = await self._fetch_device_collection(
-            "virtual",
-            self.client.get_virtual_devices,
-            self.client.get_virtual_device,
-            virtual_ids,
-            rooms,
-            self.virtual_devices,
-        )
-        wtp = await self._fetch_device_collection(
-            "WTP",
-            self.client.get_wtp_devices,
-            self.client.get_wtp_device,
-            wtp_ids,
-            rooms,
-            self.wtp_devices,
-        )
-        sbus = await self._fetch_device_collection(
-            "SBUS",
-            self.client.get_sbus_devices,
-            self.client.get_sbus_device,
-            sbus_ids,
-            rooms,
-            self.sbus_devices,
-        )
-
-        lora = await self._fetch_device_collection(
-            "LoRa",
-            self.client.get_lora_devices,
-            self.client.get_lora_device,
-            lora_ids,
-            rooms,
-            self.lora_devices,
+        # ── Group 2: device collections — all fetched in parallel ─────────────
+        virtual, wtp, sbus, lora, alarm_list = await asyncio.gather(
+            self._fetch_device_collection(
+                "virtual", self.client.get_virtual_devices, self.client.get_virtual_device,
+                virtual_ids, rooms, self.virtual_devices,
+            ),
+            self._fetch_device_collection(
+                "WTP", self.client.get_wtp_devices, self.client.get_wtp_device,
+                wtp_ids, rooms, self.wtp_devices,
+            ),
+            self._fetch_device_collection(
+                "SBUS", self.client.get_sbus_devices, self.client.get_sbus_device,
+                sbus_ids, rooms, self.sbus_devices,
+            ),
+            self._fetch_device_collection(
+                "LoRa", self.client.get_lora_devices, self.client.get_lora_device,
+                lora_ids, rooms, self.lora_devices,
+            ),
+            _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
         )
 
         self.virtual_devices = virtual
@@ -131,13 +109,14 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sbus_devices = sbus
         self.lora_devices = lora
 
-        # ── Alarm zones (/api/v1/devices/alarm-system) ───────────────────────
-        try:
-            alarm_list = await self.client.get_alarm_devices()
-            if alarm_list:
-                self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
-        except SinumConnectionError as err:
-            _LOGGER.debug("Alarm zones unavailable: %s", err)
+        if alarm_list:
+            self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
+
+        # ── Enrich child devices with parent hardware model ───────────────────
+        parent_maps = _build_parent_maps(self.parent_devices)
+        _inject_parent_models(wtp, "wtp", parent_maps)
+        _inject_parent_models(sbus, "sbus", parent_maps)
+        _inject_parent_models(lora, "lora", parent_maps)
 
         return {"virtual": virtual, "wtp": wtp, "sbus": sbus, "lora": lora, "schedules": self.schedules}
 
@@ -192,6 +171,15 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+
+async def _safe_fetch(coro_fn: Any, label: str, default: Any = None) -> Any:
+    """Call an async API method, returning default on SinumConnectionError."""
+    try:
+        return await coro_fn()
+    except SinumConnectionError as err:
+        _LOGGER.debug("Failed to fetch %s: %s", label, err)
+        return default
 
 
 def _collect_device_ids(
@@ -289,3 +277,33 @@ def _device_name_in_room(rooms: list[dict[str, Any]], device_id: int) -> str:
             if device.get("id") == device_id:
                 return device.get("name", str(device_id))
     return str(device_id)
+
+
+def _build_parent_maps(parent_devices: list[dict[str, Any]]) -> dict[str, dict[int, str]]:
+    """Build bus-keyed maps of {parent_id → model} from the parent-devices list."""
+    maps: dict[str, dict[int, str]] = {}
+    for p in parent_devices:
+        cls = p.get("class", "")
+        pid = p.get("id")
+        model = p.get("model")
+        if pid is not None and model and "_parent_device" in cls:
+            bus = cls.split("_parent_device")[0]  # "sbus", "wtp", "lora"
+            maps.setdefault(bus, {})[int(pid)] = model
+    return maps
+
+
+def _inject_parent_models(
+    devices: dict[int, dict[str, Any]],
+    bus: str,
+    parent_maps: dict[str, dict[int, str]],
+) -> None:
+    """Inject _parent_model from parent device hardware model into child devices."""
+    bus_map = parent_maps.get(bus, {})
+    if not bus_map:
+        return
+    for device in devices.values():
+        pid = device.get("parent_id")
+        if pid is not None:
+            model = bus_map.get(int(pid))
+            if model:
+                device["_parent_model"] = model

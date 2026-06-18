@@ -273,3 +273,71 @@ class TestSinumCommonValveSwitch:
         coordinator.client.patch_sbus_device = AsyncMock(return_value={"enabled": False})
         await entity.async_turn_off()
         coordinator.client.patch_sbus_device.assert_awaited_once_with(22, {"enabled": False})
+
+
+class TestSinumDhwSwitchFalsyUpdate:
+    """DHW switch when patch_virtual_device returns falsy value."""
+
+    @pytest.mark.asyncio
+    async def test_turn_on_with_falsy_update_does_not_raise(self):
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": False},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        await entity.async_turn_on()
+        coordinator.client.patch_virtual_device.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_with_falsy_update_does_not_raise(self):
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": True},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        await entity.async_turn_off()
+        coordinator.client.patch_virtual_device.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_turn_on_with_truthy_update_updates_state(self):
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": False},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(
+            return_value={"dhw_control": {"enabled": True}}
+        )
+        await entity.async_turn_on()
+        assert coordinator.virtual_devices[5]["dhw_control"]["enabled"] is True
+
+    @pytest.mark.asyncio
+    async def test_turn_off_with_truthy_update_updates_state(self):
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": True},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(
+            return_value={"dhw_control": {"enabled": False}}
+        )
+        await entity.async_turn_off()
+        assert coordinator.virtual_devices[5]["dhw_control"]["enabled"] is False

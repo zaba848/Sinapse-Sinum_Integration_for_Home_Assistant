@@ -59,7 +59,7 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
-            model=f"Sinum {bus.upper()} Button",
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
             suggested_area=device.get("_area") or None,
         )
         self._prev_action: str | None = device.get("action")

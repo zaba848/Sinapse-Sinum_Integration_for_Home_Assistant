@@ -227,7 +227,7 @@ class TestBusRgbLight:
         assert call_args[0][0] == 45
         payload = call_args[0][1]
         assert payload["state"] is True
-        assert payload["color_mode"] == "rgb"
+        assert "color_mode" not in payload
         assert "led_color" in payload
 
 
@@ -241,7 +241,7 @@ class TestSbusMotionSensor:
         raise KeyError("motion")
 
     def test_motion_detected(self):
-        device = dict(FIXTURES["sbus_motion"])  # state="motion"
+        device = dict(FIXTURES["sbus_motion"])  # motion_detected=True
         coordinator = MagicMock()
         coordinator.wtp_devices = {}
         coordinator.sbus_devices = {46: device}
@@ -250,7 +250,7 @@ class TestSbusMotionSensor:
 
     def test_no_motion(self):
         device = dict(FIXTURES["sbus_motion"])
-        device["state"] = "no_motion"
+        device["motion_detected"] = False
         coordinator = MagicMock()
         coordinator.wtp_devices = {}
         coordinator.sbus_devices = {46: device}

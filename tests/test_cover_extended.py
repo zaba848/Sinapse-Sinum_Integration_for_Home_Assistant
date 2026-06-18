@@ -8,15 +8,26 @@ import pytest
 from custom_components.sinum.cover import (
     SinumBlindCover,
     SinumGateCover,
+    SinumSbusBlindCover,
     SinumWtpBlindCover,
+    async_setup_entry,
 )
-from custom_components.sinum.const import GATE_STATE_CLOSING, GATE_STATE_OPENING, GATE_STATE_CLOSED
+from custom_components.sinum.const import (
+    GATE_STATE_CLOSED,
+    GATE_STATE_CLOSING,
+    GATE_STATE_OPENING,
+    STYPE_BLIND_CONTROLLER,
+    VTYPE_BLIND,
+    VTYPE_GATE,
+    WTYPE_BLIND_CONTROLLER,
+)
 
 
-def _make_coordinator(virtual_devices=None, wtp_devices=None):
+def _make_coordinator(virtual_devices=None, wtp_devices=None, sbus_devices=None):
     coord = MagicMock()
     coord.virtual_devices = virtual_devices or {}
     coord.wtp_devices = wtp_devices or {}
+    coord.sbus_devices = sbus_devices or {}
     return coord
 
 
@@ -276,3 +287,218 @@ class TestSinumWtpBlindCover:
         entity.coordinator.client.patch_wtp_device.assert_awaited_once_with(
             25, {"command": "open", "opening_percentage": 35}
         )
+
+    @pytest.mark.asyncio
+    async def test_close_sends_0_percent(self):
+        entity = _make_wtp_blind()
+        entity.coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_close_cover()
+        entity.coordinator.client.patch_wtp_device.assert_awaited_once_with(
+            25, {"command": "open", "opening_percentage": 0}
+        )
+
+    @pytest.mark.asyncio
+    async def test_stop_sends_stop_command(self):
+        entity = _make_wtp_blind()
+        entity.coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_stop_cover()
+        entity.coordinator.client.patch_wtp_device.assert_awaited_once_with(
+            25, {"command": "stop"}
+        )
+
+    def test_is_closed_none_when_no_current_opening(self):
+        coord = _make_coordinator(wtp_devices={25: {"id": 25, "type": "blind_controller"}})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        assert entity.is_closed is None
+
+    def test_is_opening_false_when_target_is_none(self):
+        device = {"id": 25, "current_opening": 30, "action_in_progress": True}
+        coord = _make_coordinator(wtp_devices={25: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        assert entity.is_opening is False
+
+    def test_is_closing_false_when_current_is_none(self):
+        device = {"id": 25, "target_opening": 10, "action_in_progress": True}
+        coord = _make_coordinator(wtp_devices={25: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        assert entity.is_closing is False
+
+
+class TestSinumBlindCoverIsOpeningClosing:
+    def test_is_opening_true(self):
+        device = _blind_device(pos=50, in_progress=True)
+        coord = _make_coordinator(virtual_devices={13: device})
+        coord.client = MagicMock()
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+        assert entity.is_opening is True
+
+    def test_is_closing_true(self):
+        device = _blind_device(pos=0, in_progress=True)
+        coord = _make_coordinator(virtual_devices={13: device})
+        coord.client = MagicMock()
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+        assert entity.is_closing is True
+
+
+class TestSinumGateCoverStop:
+    @pytest.mark.asyncio
+    async def test_stop_sends_stop(self):
+        entity = _make_gate()
+        entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        await entity.async_stop_cover()
+        entity.coordinator.client.patch_virtual_device.assert_awaited_once_with(
+            14, {"command": "stop"}
+        )
+
+
+def _make_sbus_blind(current=50, target=50, tilt=None) -> SinumSbusBlindCover:
+    device: dict = {
+        "id": 30,
+        "type": STYPE_BLIND_CONTROLLER,
+        "current_opening": current,
+        "target_opening": target,
+    }
+    if tilt is not None:
+        device["current_tilt"] = tilt
+        device["target_tilt"] = tilt
+    coord = _make_coordinator(sbus_devices={30: device})
+    coord.client = MagicMock()
+    with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+        entity = SinumSbusBlindCover(coord, 30, "test_entry")
+    entity.hass = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    return entity
+
+
+class TestSinumSbusBlindCover:
+    def test_is_closed_at_zero(self):
+        entity = _make_sbus_blind(current=0)
+        assert entity.is_closed is True
+
+    def test_is_not_closed_when_open(self):
+        entity = _make_sbus_blind(current=60)
+        assert entity.is_closed is False
+
+    def test_is_closed_none_when_no_position(self):
+        coord = _make_coordinator(sbus_devices={30: {"id": 30}})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        assert entity.is_closed is None
+
+    def test_is_opening_true(self):
+        entity = _make_sbus_blind(current=20, target=80)
+        assert entity.is_opening is True
+
+    def test_is_closing_true(self):
+        entity = _make_sbus_blind(current=80, target=20)
+        assert entity.is_closing is True
+
+    def test_is_opening_false_when_target_is_none(self):
+        device = {"id": 30, "current_opening": 30}
+        coord = _make_coordinator(sbus_devices={30: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        assert entity.is_opening is False
+
+    def test_is_closing_false_when_current_is_none(self):
+        device = {"id": 30, "target_opening": 10}
+        coord = _make_coordinator(sbus_devices={30: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        assert entity.is_closing is False
+
+    def test_is_opening_invalid_values_returns_false(self):
+        device = {"id": 30, "current_opening": "n/a", "target_opening": "n/a"}
+        coord = _make_coordinator(sbus_devices={30: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        assert entity.is_opening is False
+        assert entity.is_closing is False
+
+    def test_current_cover_position(self):
+        entity = _make_sbus_blind(current=45)
+        assert entity.current_cover_position == 45
+
+    def test_current_tilt_position(self):
+        entity = _make_sbus_blind(tilt=30)
+        assert entity.current_cover_tilt_position == 30
+
+    def test_tilt_position_none_when_absent(self):
+        entity = _make_sbus_blind()
+        assert entity.current_cover_tilt_position is None
+
+    @pytest.mark.asyncio
+    async def test_open_sends_100_percent(self):
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_open_cover()
+        entity.coordinator.client.patch_sbus_device.assert_awaited_once_with(
+            30, {"command": "open", "opening_percentage": 100}
+        )
+
+    @pytest.mark.asyncio
+    async def test_close_sends_0_percent(self):
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_close_cover()
+        entity.coordinator.client.patch_sbus_device.assert_awaited_once_with(
+            30, {"command": "open", "opening_percentage": 0}
+        )
+
+    @pytest.mark.asyncio
+    async def test_stop(self):
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_stop_cover()
+        entity.coordinator.client.patch_sbus_device.assert_awaited_once_with(
+            30, {"command": "stop"}
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_position(self):
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_set_cover_position(position=55)
+        entity.coordinator.client.patch_sbus_device.assert_awaited_once_with(
+            30, {"command": "open", "opening_percentage": 55}
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_tilt(self):
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_set_cover_tilt_position(tilt_position=40)
+        entity.coordinator.client.patch_sbus_device.assert_awaited_once_with(
+            30, {"command": "tilt", "tilt_percentage": 40}
+        )
+
+
+class TestCoverAsyncSetupEntry:
+    @pytest.mark.asyncio
+    async def test_setup_creates_gate_and_wtp_and_sbus(self):
+        coord = _make_coordinator(
+            virtual_devices={
+                1: {"id": 1, "type": VTYPE_BLIND},
+                2: {"id": 2, "type": VTYPE_GATE},
+            },
+            wtp_devices={3: {"id": 3, "type": WTYPE_BLIND_CONTROLLER}},
+            sbus_devices={4: {"id": 4, "type": STYPE_BLIND_CONTROLLER}},
+        )
+        entry = MagicMock()
+        entry.runtime_data = coord
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(MagicMock(), entry, lambda entities: added.extend(entities))
+
+        types = {type(e).__name__ for e in added}
+        assert "SinumBlindCover" in types
+        assert "SinumGateCover" in types
+        assert "SinumWtpBlindCover" in types
+        assert "SinumSbusBlindCover" in types

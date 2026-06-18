@@ -393,3 +393,79 @@ class TestApiMethods:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             await client.test_connection()
         session.request.assert_awaited_once()
+
+
+class TestApiGaps:
+    """Fill remaining api.py coverage gaps."""
+
+    @pytest.mark.asyncio
+    async def test_request_422_json_parse_error_uses_status_fallback(self, session):
+        """422 response where json() raises → details falls back to 'status 422'."""
+        resp = MagicMock()
+        resp.status = 422
+        resp.json = AsyncMock(side_effect=Exception("bad json"))
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            with pytest.raises(SinumConnectionError, match="Validation error"):
+                await client._request("PATCH", "/api/v1/devices/virtual/1", json={"state": "on"})
+
+    @pytest.mark.asyncio
+    async def test_get_parent_devices_non_dict_result_returns_empty(self, session):
+        """get_parent_devices: non-dict API result → empty list (line 243)."""
+        resp = make_response(200, {"data": "not_a_dict"})  # non-dict data → empty list
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_parent_devices()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_patch_alarm_device(self, session):
+        """patch_alarm_device sends PATCH and returns parsed response (line 327)."""
+        resp = make_response(200, {"data": {"id": 1, "state": "armed"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_alarm_device(1, {"command": "arm_away"})
+        assert result["id"] == 1
+
+    @pytest.mark.asyncio
+    async def test_command_alarm_device(self, session):
+        """command_alarm_device sends POST (lines 329-337)."""
+        resp = make_response(204, {}, content_length=0)
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.command_alarm_device(1, "arm_away", {})
+        session.request.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_lora_devices(self, session):
+        """get_lora_devices returns list on success (line 340)."""
+        resp = make_response(200, {"data": [{"id": 1, "class": "lora", "type": "temperature_sensor"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lora_devices()
+        assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_lora_device(self, session):
+        """get_lora_device fetches single device (line 343)."""
+        resp = make_response(200, {"data": {"id": 5, "class": "lora"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lora_device(5)
+        assert result["id"] == 5
+
+    @pytest.mark.asyncio
+    async def test_patch_lora_device(self, session):
+        """patch_lora_device sends PATCH (line 346)."""
+        resp = make_response(200, {"data": {"id": 5, "state": True}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_lora_device(5, {"state": True})
+        assert result["id"] == 5

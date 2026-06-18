@@ -11,6 +11,7 @@ from custom_components.sinum.const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_MQTT_ENABLED,
+    CONF_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -92,6 +93,44 @@ class TestAsyncSetupEntry:
         assert result is True
 
     @pytest.mark.asyncio
+    async def test_setup_entry_updates_title_from_hub_name(self, hass):
+        """async_setup_entry syncs stale config entry title with hub name."""
+        from custom_components.sinum import async_setup_entry
+
+        entry = MagicMock()
+        entry.entry_id = "title_entry"
+        entry.title = "Sinum (10.0.0.1)"
+        entry.data = {
+            "host": "10.0.0.1",
+            CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+            CONF_API_TOKEN: "tok",
+            "scan_interval": DEFAULT_SCAN_INTERVAL,
+        }
+        entry.options = {}
+
+        with (
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.sinum.SinumClient") as MockClient,
+            patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+            patch.object(hass.config_entries, "async_get_entry", return_value=entry),
+            patch.object(hass.config_entries, "async_update_entry") as mock_update_entry,
+        ):
+            client = MagicMock()
+            client.login = AsyncMock()
+            MockClient.return_value = client
+
+            coordinator = MagicMock()
+            coordinator.async_config_entry_first_refresh = AsyncMock()
+            coordinator.hub_info = {"name": "Living Hub"}
+            coordinator.mqtt_bridge = None
+            MockCoordinator.return_value = coordinator
+
+            await async_setup_entry(hass, entry)
+
+        mock_update_entry.assert_called_once_with(entry, title="Sinum (Living Hub)")
+
+    @pytest.mark.asyncio
     async def test_setup_entry_mqtt_bridge_started_when_enabled(self, hass):
         from custom_components.sinum import async_setup_entry, _MQTT_BRIDGES
 
@@ -104,7 +143,7 @@ class TestAsyncSetupEntry:
             CONF_MQTT_ENABLED: True,
             "scan_interval": DEFAULT_SCAN_INTERVAL,
         }
-        entry.options = {}
+        entry.options = {CONF_MQTT_TOPIC_PREFIX: "sinum/hub-a"}
 
         with (
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
@@ -130,6 +169,7 @@ class TestAsyncSetupEntry:
             await async_setup_entry(hass, entry)
 
         assert "mqtt_entry" in _MQTT_BRIDGES
+        MockBridge.assert_called_once_with(hass, coordinator, topic_prefix="sinum/hub-a")
         _MQTT_BRIDGES.pop("mqtt_entry", None)  # cleanup
 
     @pytest.mark.asyncio
@@ -222,3 +262,52 @@ class TestAsyncUpdateListener:
         with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as mock_reload:
             await _async_update_listener(hass, entry)
         mock_reload.assert_awaited_once_with("reload_entry")
+
+
+class TestSendNotificationService:
+    @pytest.mark.asyncio
+    async def test_send_notification_service_called(self, hass):
+        """Service handle_send_notification calls client.send_notification."""
+        from custom_components.sinum import async_setup_entry
+        from custom_components.sinum.const import (
+            ATTR_NOTIFICATION_MESSAGE,
+            ATTR_NOTIFICATION_TITLE,
+            DOMAIN,
+            SERVICE_SEND_NOTIFICATION,
+        )
+
+        mock_client = MagicMock()
+        mock_client.send_notification = AsyncMock(return_value=None)
+        mock_client.login = AsyncMock()
+
+        coord = MagicMock()
+        coord.async_config_entry_first_refresh = AsyncMock()
+        coord.client = mock_client
+
+        entry = MagicMock()
+        entry.entry_id = "svc_test"
+        entry.options = {}
+        entry.data = {
+            "host": "10.0.0.1",
+            "auth_mode": "token",
+            "api_token": "tok",
+            "scan_interval": 30,
+        }
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator", return_value=coord),
+            patch("custom_components.sinum.SinumClient", return_value=mock_client),
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.sinum.SinumMqttBridge"),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            await async_setup_entry(hass, entry)
+
+        # Call the registered service and verify it invokes client.send_notification
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SEND_NOTIFICATION,
+            {ATTR_NOTIFICATION_TITLE: "Test", ATTR_NOTIFICATION_MESSAGE: "Hello"},
+            blocking=True,
+        )
+        mock_client.send_notification.assert_awaited_once_with(title="Test", message="Hello")

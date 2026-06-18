@@ -150,3 +150,77 @@ class TestOptionsFlowGetMethod:
         entry = MagicMock()
         result = SinumConfigFlow.async_get_options_flow(entry)
         assert isinstance(result, SinumOptionsFlow)
+
+
+class TestReauthPasswordPath:
+    @pytest.fixture
+    def mock_aiohttp_session(self):
+        with patch(
+            "custom_components.sinum.config_flow.async_get_clientsession",
+            return_value=MagicMock(),
+        ):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_reauth_password_path_success(self, hass, mock_aiohttp_session):
+        """Reauth confirm with password auth_mode calls _make_client with username/password."""
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.test_connection = AsyncMock(return_value=None)
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+
+            mock_entry = MagicMock()
+            mock_entry.data = {
+                "host": "192.168.1.100",
+                CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
+                "username": "admin",
+                "password": "old",
+            }
+            flow._get_reauth_entry = MagicMock(return_value=mock_entry)
+            flow._host = "192.168.1.100"
+            flow.async_update_reload_and_abort = MagicMock(
+                return_value={"type": "abort", "reason": "reauth_successful"}
+            )
+
+            result = await flow.async_step_reauth_confirm(
+                {"username": "admin", "password": "newpass", "scan_interval": 30}
+            )
+
+        assert result["type"] == "abort"
+        assert result["reason"] == "reauth_successful"
+
+    @pytest.mark.asyncio
+    async def test_reauth_cannot_connect(self, hass, mock_aiohttp_session):
+        """Reauth SinumConnectionError → shows form with cannot_connect error."""
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.test_connection = AsyncMock(side_effect=SinumConnectionError("timeout"))
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+
+            mock_entry = MagicMock()
+            mock_entry.data = {
+                "host": "192.168.1.100",
+                CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+                CONF_API_TOKEN: "tok",
+            }
+            flow._get_reauth_entry = MagicMock(return_value=mock_entry)
+            flow._host = "192.168.1.100"
+
+            result = await flow.async_step_reauth_confirm(
+                {CONF_API_TOKEN: "tok2", "scan_interval": 30}
+            )
+
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "cannot_connect"

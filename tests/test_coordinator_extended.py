@@ -8,7 +8,9 @@ import pytest
 from custom_components.sinum.api import SinumConnectionError
 from custom_components.sinum.coordinator import (
     SinumCoordinator,
+    _build_parent_maps,
     _collect_device_ids,
+    _inject_parent_models,
     _inject_room_keys,
 )
 
@@ -172,3 +174,116 @@ class TestButtonSetupEntry:
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         assert len(added) == 0
+
+
+class TestCoordinatorMissingCoverage:
+    def _make_coordinator(self, mock_client):
+        hass = MagicMock()
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            return SinumCoordinator(hass, mock_client, scan_interval=30)
+
+    @pytest.mark.asyncio
+    async def test_alarm_zones_connection_error_ignored(self, mock_client):
+        """alarm_zones fetch SinumConnectionError → caught, not propagated."""
+        mock_client.get_alarm_devices = AsyncMock(
+            side_effect=SinumConnectionError("alarm down")
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+        assert data is not None  # did not raise
+
+    @pytest.mark.asyncio
+    async def test_device_with_no_id_skipped(self, mock_client):
+        """Devices without 'id' in bulk response are silently skipped."""
+        # Return a device without id in the collection
+        mock_client.get_virtual_devices = AsyncMock(
+            return_value=[{"type": "thermostat", "name": "No ID device"}]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        # Devices without id should not appear
+        assert not any(
+            d.get("name") == "No ID device" for d in coordinator.virtual_devices.values()
+        )
+
+    @pytest.mark.asyncio
+    async def test_per_device_fallback_on_error(self, mock_client):
+        """Per-device fallback: SinumConnectionError on one device is warned, others succeed."""
+        # Simulate empty bulk + fallback device fetch
+        mock_client.get_virtual_devices = AsyncMock(return_value=[])
+        mock_client.get_virtual_device = AsyncMock(
+            side_effect=SinumConnectionError("device gone")
+        )
+        # Populate parent_devices to trigger fallback loop
+        mock_client.get_parent_devices = AsyncMock(
+            return_value=[{"id": 1, "class": "virtual_parent_device", "devices": [
+                {"id": 10, "class": "virtual"}
+            ]}]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        # Should not raise, device 10 simply not added
+
+    def test_collect_device_ids_lora_class(self):
+        """_collect_device_ids classifies 'lora' class devices into lora_ids."""
+        parent_devices = [{
+            "id": 99,
+            "class": "lora_parent_device",
+            "devices": [{"id": 10, "class": "lora"}],
+        }]
+        v, w, s, l = _collect_device_ids(parent_devices)
+        assert 10 in l
+
+    @pytest.mark.asyncio
+    async def test_per_device_fallback_success(self, mock_client):
+        """Per-device fallback success path: item fetched and added to devices (lines 187-188)."""
+        mock_client.get_virtual_devices = AsyncMock(return_value=[])
+        fetched_device = {"id": 10, "class": "virtual", "type": "thermostat", "room_id": None}
+        mock_client.get_virtual_device = AsyncMock(return_value=fetched_device)
+        mock_client.get_parent_devices = AsyncMock(
+            return_value=[{"id": 1, "class": "virtual_parent_device", "devices": [
+                {"id": 10, "class": "virtual"}
+            ]}]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        assert 10 in coordinator.virtual_devices
+
+
+class TestParentModelHelpers:
+    """Unit tests for _build_parent_maps and _inject_parent_models helpers."""
+
+    def test_build_parent_maps_extracts_model(self):
+        parent_devices = [
+            {"id": 1, "class": "sbus_parent_device", "model": "PS-06m"},
+            {"id": 2, "class": "wtp_parent_device", "model": "WTP-01"},
+        ]
+        maps = _build_parent_maps(parent_devices)
+        assert maps["sbus"][1] == "PS-06m"
+        assert maps["wtp"][2] == "WTP-01"
+
+    def test_build_parent_maps_skips_without_model(self):
+        parent_devices = [{"id": 1, "class": "sbus_parent_device", "model": None}]
+        maps = _build_parent_maps(parent_devices)
+        assert "sbus" not in maps
+
+    def test_build_parent_maps_skips_non_parent_class(self):
+        parent_devices = [{"id": 1, "class": "sbus", "model": "PS-06m"}]
+        maps = _build_parent_maps(parent_devices)
+        assert not maps
+
+    def test_inject_parent_models_adds_field(self):
+        devices = {10: {"parent_id": 1}, 11: {"parent_id": 99}}
+        maps = {"sbus": {1: "PS-06m"}}
+        _inject_parent_models(devices, "sbus", maps)
+        assert devices[10]["_parent_model"] == "PS-06m"
+        assert "_parent_model" not in devices[11]
+
+    def test_inject_parent_models_no_op_when_empty_map(self):
+        devices = {10: {"parent_id": 1}}
+        _inject_parent_models(devices, "sbus", {})
+        assert "_parent_model" not in devices[10]
