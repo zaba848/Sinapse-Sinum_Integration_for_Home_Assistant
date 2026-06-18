@@ -20,7 +20,7 @@ from .const import (
     VTYPE_WICKET,
     WTYPE_RELAY,
 )
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 
 async def async_setup_entry(
@@ -175,6 +175,7 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or f"Sinum {bus.upper()} Relay",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -245,6 +246,7 @@ class SinumValvePumpSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum SBUS Valve Pump",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -301,6 +303,7 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum SBUS Common Valve",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property

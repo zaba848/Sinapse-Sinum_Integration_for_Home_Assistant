@@ -44,11 +44,16 @@ class SinumSceneButton(ButtonEntity):
         self._attr_name = scene_name
         self._attr_unique_id = f"{entry_id}_scene_{self._scene_id}"
         self._attr_icon = "mdi:play-circle-outline"
+        hub = coordinator.hub_info
+        hub_name = hub.get("name") or "Sinum"
+        model = hub.get("device_type") or "sinum"
+        sw_version = hub.get("version")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_scenes")},
-            name="Sinum Scenes",
+            name=f"{hub_name} Scenes",
             manufacturer="TECH Sterowniki",
-            model="Sinum EH-01",
+            model=model,
+            sw_version=sw_version,
         )
 
     async def async_press(self) -> None:

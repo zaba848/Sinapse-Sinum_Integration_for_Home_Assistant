@@ -26,7 +26,7 @@ from .const import (
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
 )
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,8 +113,8 @@ def _has_climate_control(device: dict[str, Any], source: str = "sbus") -> bool:
 def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
     modes = [HVACMode.OFF]
 
-    # Explicit list (FanCoil may populate this)
-    declared = device.get("available_work_modes") or []
+    # Explicit list (FanCoil may populate this); skip empty lists to fall through to inference
+    declared = device.get("available_work_modes")
     if declared:
         for sinum_mode in declared:
             ha_mode = _MODE_TO_HVAC.get(sinum_mode)
@@ -342,6 +342,7 @@ class SinumFanCoilClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or f"Sinum {source.upper()} Fan Coil",
             suggested_area=area,
+            via_device=via_device_for(device, entry_id),
         )
 
     def _device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
@@ -507,6 +508,7 @@ class SinumTemperatureRegulatorClimate(CoordinatorEntity[SinumCoordinator], Clim
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum Temperature Regulator",
             suggested_area=area,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property

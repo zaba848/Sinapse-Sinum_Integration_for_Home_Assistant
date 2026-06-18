@@ -30,7 +30,7 @@ from .const import (
     WTYPE_TEMPERATURE_REGULATOR,
     WTYPE_TWO_STATE_INPUT_SENSOR,
 )
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -220,6 +220,7 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
         self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
         device = self._get_device_dict(coordinator)
         label = device.get("_device_name") or device.get("name", str(device_id))
+        via = via_device_for(device, entry_id)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
@@ -227,6 +228,7 @@ class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity)
             model=device.get("_parent_model")
             or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
             suggested_area=device.get("_area") or None,
+            via_device=via,
         )
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:

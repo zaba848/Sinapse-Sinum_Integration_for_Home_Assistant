@@ -262,19 +262,19 @@ class TestParentModelHelpers:
             {"id": 1, "class": "sbus_parent_device", "model": "PS-06m"},
             {"id": 2, "class": "wtp_parent_device", "model": "WTP-01"},
         ]
-        maps = _build_parent_maps(parent_devices)
-        assert maps["sbus"][1] == "PS-06m"
-        assert maps["wtp"][2] == "WTP-01"
+        model_maps, _class_maps = _build_parent_maps(parent_devices)
+        assert model_maps["sbus"][1] == "PS-06m"
+        assert model_maps["wtp"][2] == "WTP-01"
 
     def test_build_parent_maps_skips_without_model(self):
         parent_devices = [{"id": 1, "class": "sbus_parent_device", "model": None}]
-        maps = _build_parent_maps(parent_devices)
-        assert "sbus" not in maps
+        model_maps, _class_maps = _build_parent_maps(parent_devices)
+        assert "sbus" not in model_maps
 
     def test_build_parent_maps_skips_non_parent_class(self):
         parent_devices = [{"id": 1, "class": "sbus", "model": "PS-06m"}]
-        maps = _build_parent_maps(parent_devices)
-        assert not maps
+        model_maps, class_maps = _build_parent_maps(parent_devices)
+        assert not model_maps and not class_maps
 
     def test_inject_parent_models_adds_field(self):
         devices = {10: {"parent_id": 1}, 11: {"parent_id": 99}}

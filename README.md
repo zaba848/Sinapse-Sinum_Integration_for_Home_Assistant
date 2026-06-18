@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-865%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-857%20passing-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://apidocs.sinum.tech)
 
@@ -105,26 +105,42 @@ sbus[42]:setValue("target_temperature", setpoint * 10)  -- Sinum stores °C × 1
 
 ## Optional MQTT Real-Time Updates
 
-MQTT is optional — REST polling is fully supported without it. With MQTT the hub pushes state changes immediately instead of waiting for the next poll cycle.
+MQTT is optional — REST polling (30 s default) works without it. With MQTT the hub pushes state changes immediately, so your entities update in under a second instead of at the next poll.
+
+### How it works
+
+The Lua script `mqtt_bridge.lua` runs on the hub as an automation. Whenever a device state changes it publishes a JSON payload to `{prefix}/state/{device_id}`. The HA integration subscribes, updates the coordinator data in-place, and refreshes entities — no REST poll needed for those updates.
 
 ### Prerequisites
 
-- MQTT broker configured in Home Assistant (e.g. Mosquitto add-on)
-- Sinum hub can reach the MQTT broker on the local network
+- **MQTT broker** reachable from both HA and the Sinum hub (e.g. Mosquitto HA add-on)
+- **Home Assistant MQTT integration** configured (Settings → Devices & Services → MQTT)
 
-### Setup
+### Step-by-step setup
 
-**1. Add MQTT client on hub**
+**Step 1 — Add an MQTT client on the hub**
 
-Open Sinum hub web UI → Integrations → Add MQTT client. Note the assigned **Client ID**.
+1. Open the Sinum web UI (e.g. `http://10.0.61.132`)
+2. Go to **System → Integrations → MQTT**
+3. Click **Add** and fill in:
+   - **Host**: IP address of your MQTT broker (e.g. `10.0.0.5`)
+   - **Port**: `1883` (or `8883` for TLS)
+   - **Username / Password**: as configured in your broker
+4. Save and note the assigned **Client ID** (e.g. `1`)
 
-**2. Upload Lua bridge script**
+**Step 2 — Upload the Lua bridge script**
 
-Sinum hub web UI → Settings → Lua Scripts → New script.  
-Paste contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua).  
-Set `CLIENT_ID = <id from step 1>`, save and enable.
+1. Open the Sinum web UI → **Automations → New** (+ button, top right)
+2. Set a name, e.g. `mqtt_bridge`
+3. Paste the full contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua)
+4. At the top of the script, set:
+   ```lua
+   local CLIENT_ID    = 1          -- MQTT client ID from Step 1
+   local TOPIC_PREFIX = "sinum"    -- must match HA integration option
+   ```
+5. Click **Save** and enable the automation
 
-The script publishes the full device state JSON every time a device property changes:
+The script publishes the full device state on every change:
 
 ```lua
 -- excerpt from mqtt_bridge.lua
@@ -134,22 +150,40 @@ mqtt[CLIENT_ID]:publish(
 )
 ```
 
-For multiple Sinum hubs connected to the same MQTT broker, set a unique `TOPIC_PREFIX` in each Lua script — for example `sinum/tablica-wtp` and `sinum/tablica-sbus-1` — and use the same prefix in the integration options for that hub.
+**Multiple hubs**: use a unique `TOPIC_PREFIX` per hub (e.g. `sinum/hub1` and `sinum/hub2`) so messages don't cross between integrations.
 
-Verify by checking hub logs for `[Sinapse] Published:` entries.
+**Step 3 — Enable MQTT in the HA integration**
 
-**3. Enable in HA**
+1. Settings → Devices & Services → find your **Sinum (Sinapse)** entry
+2. Click **Configure** (three dots → Configure)
+3. Enable **"MQTT real-time transport"**
+4. Set **Topic prefix** to match the `TOPIC_PREFIX` in your Lua script
+5. Click **Submit**
 
-Sinum integration → Options → Enable MQTT real-time transport → Save.
+### Verifying it works
 
-### MQTT Topics
+- Check hub logs (Sinum web UI → Logs) for lines like `[Sinapse] Published: sinum/state/42`
+- In HA → Developer Tools → Events, listen for `sinum_heartbeat` — should fire every minute
+- Toggle a relay and watch the HA entity update instantly (no 30 s delay)
+
+### MQTT topics
 
 | Topic | Direction | Content |
 |---|---|---|
-| `{topic_prefix}/state/{device_id}` | Hub → HA | Full device state JSON |
-| `{topic_prefix}/event/heartbeat` | Hub → HA | Heartbeat every minute |
+| `{prefix}/state/{device_id}` | Hub → HA | Full device state JSON with `source` field |
+| `{prefix}/event/heartbeat` | Hub → HA | Heartbeat JSON every 60 s |
+| `{prefix}/event/{type}` | Hub → HA | Any hub event (button_press, scene_activated, …) |
 
-Default `topic_prefix` is `sinum`.
+The `source` field in state payloads (`"virtual"`, `"wtp"`, `"sbus"`, `"lora"`) tells HA which device store to update. Payloads without `source` are treated as virtual devices.
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Entities still updating at 30 s intervals | MQTT not enabled in integration options, or `TOPIC_PREFIX` mismatch |
+| No `[Sinapse] Published:` in hub logs | Lua automation disabled or MQTT client offline |
+| HA MQTT integration not configured | Go to Settings → Devices & Services → Add integration → MQTT |
+| `sinum_heartbeat` event never fires | Script running but MQTT client not connected to broker |
 
 ---
 

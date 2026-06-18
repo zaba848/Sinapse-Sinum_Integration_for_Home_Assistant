@@ -25,7 +25,7 @@ from .const import (
     WTYPE_DIMMER,
     WTYPE_RGB_CONTROLLER,
 )
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 
 async def async_setup_entry(
@@ -160,7 +160,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def is_on(self) -> bool:
-        return self._device.get("state") not in (None, "off", False)
+        return bool(self._device.get("state"))
 
     @property
     def brightness(self) -> int | None:
@@ -181,7 +181,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         return self._device.get("white_temperature")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        payload: dict[str, Any] = {"state": "on"}
+        payload: dict[str, Any] = {"state": True}
 
         if ATTR_BRIGHTNESS in kwargs:
             payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
@@ -199,7 +199,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"state": "off"}
+            self._device_id, {"state": False}
         )
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
@@ -231,6 +231,7 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or f"Sinum {bus.upper()} Dimmer",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -278,12 +279,12 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
 
 class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
-    """SBUS or WTP rgb_controller — brightness, color (HS), and color temperature."""
+    """SBUS or WTP rgb_controller — state only (API limitation: brightness/color PATCH returns 422)."""
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_min_color_temp_kelvin = 1000
-    _attr_max_color_temp_kelvin = 6500
+    _attr_supported_color_modes: set[ColorMode] = {ColorMode.ONOFF}
+    _attr_color_mode = ColorMode.ONOFF
     _attr_icon = "mdi:lightbulb-variant"
 
     def __init__(
@@ -303,6 +304,7 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or f"Sinum {bus.upper()} RGB Controller",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -313,57 +315,19 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         return store.get(self._device_id, {})
 
     @property
-    def supported_color_modes(self) -> set[ColorMode]:
-        return _supported_color_modes(self._device)
-
-    @property
-    def color_mode(self) -> ColorMode:
-        if _is_rgbww_animation_device(self._device):
-            return ColorMode.ONOFF
-        mode = self._device.get("color_mode", "")
-        if mode == "rgb":
-            return ColorMode.HS
-        if mode == "temperature":
-            return ColorMode.COLOR_TEMP
-        return ColorMode.BRIGHTNESS
-
-    @property
     def is_on(self) -> bool:
         return bool(self._device.get("state"))
 
-    @property
-    def brightness(self) -> int | None:
-        raw = self._device.get("brightness")
-        if raw is None:
-            return None
-        return round(raw / 100 * 255)
-
-    @property
-    def hs_color(self) -> tuple[float, float] | None:
-        hex_color = self._device.get("led_color") or self._device.get("color")
-        if not hex_color:
-            return None
-        return _hex_to_hs(hex_color)
-
-    @property
-    def color_temp_kelvin(self) -> int | None:
-        return self._device.get("white_temperature")
-
     async def async_turn_on(self, **kwargs: Any) -> None:
-        payload: dict[str, Any] = {"state": True}
-        if not _is_rgbww_animation_device(self._device):
-            if ATTR_BRIGHTNESS in kwargs:
-                payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-            if ATTR_HS_COLOR in kwargs:
-                h, s = kwargs[ATTR_HS_COLOR]
-                payload["led_color"] = _hs_to_hex(h, s)
-            if ATTR_COLOR_TEMP_KELVIN in kwargs:
-                payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": True}
+            )
             self.coordinator.wtp_devices[self._device_id].update(updated)
         else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": True}
+            )
             self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 

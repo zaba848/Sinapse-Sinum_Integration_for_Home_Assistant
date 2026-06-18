@@ -25,7 +25,7 @@ from .const import (
     VTYPE_GATE,
     WTYPE_BLIND_CONTROLLER,
 )
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 
 async def async_setup_entry(
@@ -246,6 +246,7 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum WTP Blind Controller",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -346,6 +347,7 @@ class SinumSbusBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum SBUS Blind Controller",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property

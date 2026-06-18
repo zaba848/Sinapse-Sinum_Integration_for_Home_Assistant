@@ -130,11 +130,11 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if alarm_list:
             self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
 
-        # ── Enrich child devices with parent hardware model ───────────────────
-        parent_maps = _build_parent_maps(self.parent_devices)
-        _inject_parent_models(wtp, "wtp", parent_maps)
-        _inject_parent_models(sbus, "sbus", parent_maps)
-        _inject_parent_models(lora, "lora", parent_maps)
+        # ── Enrich child devices with parent hardware model and class ─────────
+        parent_maps, parent_class_maps = _build_parent_maps(self.parent_devices)
+        _inject_parent_models(wtp, "wtp", parent_maps, parent_class_maps)
+        _inject_parent_models(sbus, "sbus", parent_maps, parent_class_maps)
+        _inject_parent_models(lora, "lora", parent_maps, parent_class_maps)
 
         return {
             "virtual": virtual,
@@ -303,31 +303,56 @@ def _device_name_in_room(rooms: list[dict[str, Any]], device_id: int) -> str:
     return str(device_id)
 
 
-def _build_parent_maps(parent_devices: list[dict[str, Any]]) -> dict[str, dict[int, str]]:
-    """Build bus-keyed maps of {parent_id → model} from the parent-devices list."""
-    maps: dict[str, dict[int, str]] = {}
+def _build_parent_maps(
+    parent_devices: list[dict[str, Any]],
+) -> tuple[dict[str, dict[int, str]], dict[str, dict[int, str]]]:
+    """Build bus-keyed maps from the parent-devices list.
+
+    Returns (model_maps, class_maps) where each is {bus → {parent_id → value}}.
+    """
+    model_maps: dict[str, dict[int, str]] = {}
+    class_maps: dict[str, dict[int, str]] = {}
     for p in parent_devices:
         cls = p.get("class", "")
         pid = p.get("id")
         model = p.get("model")
-        if pid is not None and model and "_parent_device" in cls:
+        if pid is not None and "_parent_device" in cls:
             bus = cls.split("_parent_device")[0]  # "sbus", "wtp", "lora"
-            maps.setdefault(bus, {})[int(pid)] = model
-    return maps
+            pid = int(pid)
+            if model:
+                model_maps.setdefault(bus, {})[pid] = model
+            class_maps.setdefault(bus, {})[pid] = cls
+    return model_maps, class_maps
 
 
 def _inject_parent_models(
     devices: dict[int, dict[str, Any]],
     bus: str,
     parent_maps: dict[str, dict[int, str]],
+    parent_class_maps: dict[str, dict[int, str]] | None = None,
 ) -> None:
-    """Inject _parent_model from parent device hardware model into child devices."""
+    """Inject _parent_model and _parent_class from parent device info into child devices."""
     bus_map = parent_maps.get(bus, {})
-    if not bus_map:
+    class_map = (parent_class_maps or {}).get(bus, {})
+    if not bus_map and not class_map:
         return
     for device in devices.values():
         pid = device.get("parent_id")
         if pid is not None:
-            model = bus_map.get(int(pid))
+            pid = int(pid)
+            model = bus_map.get(pid)
             if model:
                 device["_parent_model"] = model
+            cls = class_map.get(pid)
+            if cls:
+                device["_parent_class"] = cls
+                device["_parent_id"] = pid
+
+
+def via_device_for(device: dict[str, Any], entry_id: str) -> tuple[str, str] | None:
+    """Return (DOMAIN, unique_key) for the parent hardware device, or None."""
+    cls = device.get("_parent_class")
+    pid = device.get("_parent_id")
+    if cls and pid is not None:
+        return (DOMAIN, f"{entry_id}_parent_{cls}_{pid}")
+    return None

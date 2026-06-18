@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .api import SinumConnectionError
 from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,6 +114,7 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum SBUS Analog Output",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property
@@ -157,6 +158,7 @@ class SinumPwmNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or "Sinum SBUS PWM",
             suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
         )
 
     @property

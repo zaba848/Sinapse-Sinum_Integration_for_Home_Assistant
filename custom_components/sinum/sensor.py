@@ -35,7 +35,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .api import SinumConnectionError
 from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -813,12 +813,14 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
                 self._attr_native_unit_of_measurement = device_unit
 
         label = device.get("_device_name") or device.get("name", str(device_id))
+        via = via_device_for(device, entry_id)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model") or _model_for_source(self._source),
             suggested_area=device.get("_area") or None,
+            via_device=via,
         )
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:

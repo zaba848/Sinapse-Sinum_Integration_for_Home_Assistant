@@ -201,23 +201,18 @@ class TestBusRgbLight:
         entity = SinumBusRgbLight(coordinator, 45, "test_entry", "sbus")
         assert entity.is_on is True
 
-    def test_sbus_rgb_brightness(self):
-        device = dict(FIXTURES["sbus_rgb"])  # brightness=80
+    def test_sbus_rgb_is_onoff_only(self):
+        """Bus RGB controllers are ONOFF-only (API limitation: brightness/color PATCH returns 422)."""
+        from homeassistant.components.light import ColorMode
+        device = dict(FIXTURES["sbus_rgb"])
         coordinator = _make_coordinator(sbus={45: device})
         entity = SinumBusRgbLight(coordinator, 45, "test_entry", "sbus")
-        assert entity.brightness == round(80 / 100 * 255)
-
-    def test_sbus_rgb_hs_color(self):
-        device = dict(FIXTURES["sbus_rgb"])  # led_color=#FF8800
-        coordinator = _make_coordinator(sbus={45: device})
-        entity = SinumBusRgbLight(coordinator, 45, "test_entry", "sbus")
-        hs = entity.hs_color
-        assert hs is not None
-        h, s = hs
-        assert 30 < h < 35  # orange hue ~32°
+        assert entity.supported_color_modes == {ColorMode.ONOFF}
+        assert entity.color_mode == ColorMode.ONOFF
 
     @pytest.mark.asyncio
-    async def test_sbus_rgb_turn_on_with_color(self):
+    async def test_sbus_rgb_turn_on_only_sends_state(self):
+        """Color/brightness kwargs are ignored — API only accepts state:bool."""
         device = dict(FIXTURES["sbus_rgb"])
         coordinator = _make_coordinator(sbus={45: device})
         entity = _wire(SinumBusRgbLight(coordinator, 45, "test_entry", "sbus"))
@@ -226,9 +221,7 @@ class TestBusRgbLight:
         call_args = coordinator.client.patch_sbus_device.call_args
         assert call_args[0][0] == 45
         payload = call_args[0][1]
-        assert payload["state"] is True
-        assert "color_mode" not in payload
-        assert "led_color" in payload
+        assert payload == {"state": True}
 
 
 # ── Binary sensor (SBUS motion) ────────────────────────────────────────────────
