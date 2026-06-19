@@ -19,7 +19,6 @@ from custom_components.sinum.switch import (
     SinumCommonValveSwitch,
     SinumDhwSwitch,
     SinumRelaySwitch,
-    SinumValvePumpSwitch,
     SinumWicketSwitch,
     async_setup_entry,
 )
@@ -138,13 +137,14 @@ class TestAsyncSetupEntry:
         assert any(isinstance(e, SinumBusRelaySwitch) for e in added)
 
     @pytest.mark.asyncio
-    async def test_sbus_valve_pump_creates_valve_pump_switch(self):
+    async def test_sbus_valve_pump_not_in_switch_setup(self):
+        # valve_pump is hub-managed (read-only state) — lives in binary_sensor, not switch
         sbus = {21: {"id": 21, "type": STYPE_VALVE_PUMP, "name": "Pump", "state": False}}
         coordinator = _make_coordinator(sbus=sbus)
         entry = _make_entry(coordinator)
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
-        assert any(isinstance(e, SinumValvePumpSwitch) for e in added)
+        assert len(added) == 0
 
     @pytest.mark.asyncio
     async def test_sbus_common_valve_creates_common_valve_switch(self):
@@ -251,26 +251,6 @@ class TestSinumBusRelaySwitch:
         coordinator.client.patch_sbus_device = AsyncMock(return_value={"state": False})
         await entity.async_turn_off()
         coordinator.client.patch_sbus_device.assert_awaited_once_with(20, {"state": False})
-
-
-class TestSinumValvePumpSwitch:
-    @pytest.mark.asyncio
-    async def test_turn_on(self):
-        device = {"id": 21, "type": STYPE_VALVE_PUMP, "name": "Pump", "state": False}
-        coordinator = _make_coordinator(sbus={21: device})
-        entity = _wire(SinumValvePumpSwitch(coordinator, 21, "test_entry"))
-        coordinator.client.patch_sbus_device = AsyncMock(return_value={"state": True})
-        await entity.async_turn_on()
-        coordinator.client.patch_sbus_device.assert_awaited_once_with(21, {"state": True})
-
-    @pytest.mark.asyncio
-    async def test_turn_off(self):
-        device = {"id": 21, "type": STYPE_VALVE_PUMP, "name": "Pump", "state": True}
-        coordinator = _make_coordinator(sbus={21: device})
-        entity = _wire(SinumValvePumpSwitch(coordinator, 21, "test_entry"))
-        coordinator.client.patch_sbus_device = AsyncMock(return_value={"state": False})
-        await entity.async_turn_off()
-        coordinator.client.patch_sbus_device.assert_awaited_once_with(21, {"state": False})
 
 
 class TestSinumCommonValveSwitch:

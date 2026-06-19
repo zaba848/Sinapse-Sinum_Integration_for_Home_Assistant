@@ -22,11 +22,16 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
-    try:
-        scenes = await coordinator.client.get_scenes()
-    except SinumConnectionError:
-        _LOGGER.debug("Scenes endpoint not available on this hub firmware")
-        scenes = []
+    cached_scenes = getattr(coordinator, "scenes", [])
+    scenes = cached_scenes if isinstance(cached_scenes, list) else []
+    if not scenes:
+        try:
+            scenes = await coordinator.client.get_scenes()
+        except SinumConnectionError:
+            _LOGGER.debug("Scenes endpoint not available on this hub firmware")
+            scenes = []
+        else:
+            coordinator.scenes = scenes
 
     entities = [SinumSceneButton(coordinator, scene, entry.entry_id) for scene in scenes]
     async_add_entities(entities)

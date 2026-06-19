@@ -78,7 +78,6 @@ class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.BLIND
-    _attr_icon = "mdi:blinds"
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -168,7 +167,6 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.GATE
-    _attr_icon = "mdi:gate"
     _attr_supported_features = (
         CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
     )
@@ -199,24 +197,24 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         return self._device.get("state") == GATE_STATE_CLOSING
 
     async def async_open_cover(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
+        await self.coordinator.client.patch_virtual_device(
             self._device_id, {"command": "full_open"}
         )
-        self.coordinator.virtual_devices[self._device_id].update(updated)
+        # Hub returns 304 for gate commands (async relay pulse) — update optimistically
+        self.coordinator.virtual_devices[self._device_id]["state"] = GATE_STATE_OPENING
         self.async_write_ha_state()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
+        await self.coordinator.client.patch_virtual_device(
             self._device_id, {"command": "close"}
         )
-        self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.coordinator.virtual_devices[self._device_id]["state"] = GATE_STATE_CLOSING
         self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
+        await self.coordinator.client.patch_virtual_device(
             self._device_id, {"command": "stop"}
         )
-        self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
 
@@ -226,7 +224,6 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.BLIND
-    _attr_icon = "mdi:blinds-horizontal"
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -325,7 +322,6 @@ class SinumSbusBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = CoverDeviceClass.BLIND
-    _attr_icon = "mdi:blinds"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)

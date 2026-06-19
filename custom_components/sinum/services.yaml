@@ -16,3 +16,31 @@ send_notification:
       example: "The front door was opened."
       selector:
         text:
+
+update_schedule:
+  name: Update schedule
+  description: Updates a Sinum thermal schedule using the hub schedule API.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Required when more than one Sinum hub is loaded.
+      required: false
+      selector:
+        text:
+    schedule_id:
+      name: Schedule ID
+      description: Numeric Sinum schedule ID.
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    payload:
+      name: Payload
+      description: Partial schedule payload accepted by the Sinum API.
+      required: true
+      example:
+        name: "Morning"
+      selector:
+        object:

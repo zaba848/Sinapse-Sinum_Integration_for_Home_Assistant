@@ -222,18 +222,18 @@ class TestSinumDimmerLight:
 
         assert entity.color_mode == ColorMode.COLOR_TEMP
 
-    def test_color_mode_default_brightness(self):
+    def test_color_mode_default_hs_for_rgb_type(self):
         entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D"})
         from homeassistant.components.light import ColorMode
 
-        assert entity.color_mode == ColorMode.BRIGHTNESS
+        assert entity.color_mode == ColorMode.HS
 
-    def test_supported_color_modes_brightness_only(self):
-        """Line 148: supported_color_modes returns {BRIGHTNESS} when no color fields."""
+    def test_supported_color_modes_rgb_type_defaults_to_hs(self):
+        """RGB-capable device types expose the HA color picker even before state has led_color."""
         from homeassistant.components.light import ColorMode
 
         entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D"})
-        assert entity.supported_color_modes == {ColorMode.BRIGHTNESS}
+        assert entity.supported_color_modes == {ColorMode.HS}
 
     def test_supported_color_modes_hs_when_led_color(self):
         """Lines 108-117: _supported_color_modes returns HS when led_color present."""
@@ -253,23 +253,23 @@ class TestSinumDimmerLight:
         )
         assert ColorMode.COLOR_TEMP in entity.supported_color_modes
 
-    def test_supported_color_modes_onoff_for_rgbww(self):
-        """Lines 108-109: _supported_color_modes returns {ONOFF} for rgbww devices."""
+    def test_supported_color_modes_hs_and_color_temp_for_rgbww(self):
+        """RGBWW devices expose color and white-temperature controls."""
         from homeassistant.components.light import ColorMode
 
         entity, _ = self._make(
             {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]}
         )
-        assert entity.supported_color_modes == {ColorMode.ONOFF}
+        assert entity.supported_color_modes == {ColorMode.HS, ColorMode.COLOR_TEMP}
 
-    def test_color_mode_onoff_for_rgbww(self):
-        """Line 153: color_mode returns ONOFF for rgbww animation device."""
+    def test_color_mode_hs_for_rgbww(self):
+        """RGBWW devices default to color mode unless the hub reports temperature mode."""
         from homeassistant.components.light import ColorMode
 
         entity, _ = self._make(
             {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]}
         )
-        assert entity.color_mode == ColorMode.ONOFF
+        assert entity.color_mode == ColorMode.HS
 
     @pytest.mark.asyncio
     async def test_async_turn_on_basic(self):
@@ -378,32 +378,30 @@ class TestSinumBusRgbLight:
         assert entity.is_on is True
 
     def test_brightness_not_exposed(self):
-        """Bus RGB controllers are ONOFF-only; brightness property removed."""
         entity, _ = self._make_wtp()
-        assert not hasattr(entity, "brightness") or entity.brightness is None
+        assert entity.brightness == round(80 / 100 * 255)
 
-    def test_hs_color_not_exposed(self):
-        """Bus RGB controllers are ONOFF-only; hs_color property removed."""
+    def test_hs_color_exposed(self):
         entity, _ = self._make_wtp()
-        assert not hasattr(entity, "hs_color") or entity.hs_color is None
+        hs = entity.hs_color
+        assert hs is not None
+        assert hs[0] == pytest.approx(120.0, abs=1)
 
     @pytest.mark.asyncio
-    async def test_turn_on_wtp_only_sends_state(self):
-        """API limitation: brightness/color PATCH returns 422; only state is sent."""
+    async def test_turn_on_wtp_sends_color(self):
         entity, coordinator = self._make_wtp()
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_HS_COLOR: (240.0, 100.0)})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True}
+        assert payload == {"state": True, "led_color": "#0000FF"}
 
     @pytest.mark.asyncio
-    async def test_turn_on_with_color_temp_only_sends_state(self):
-        """API limitation: white_temperature PATCH returns 422; only state is sent."""
+    async def test_turn_on_with_color_temp_sends_white_temperature(self):
         entity, coordinator = self._make_wtp()
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_COLOR_TEMP_KELVIN: 3000})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True}
+        assert payload == {"state": True, "white_temperature": 3000}
 
     @pytest.mark.asyncio
     async def test_turn_off_sbus(self):
@@ -416,15 +414,13 @@ class TestSinumBusRgbLight:
 
     # ---- new tests to improve coverage ----
 
-    def test_supported_color_modes_is_onoff(self):
-        """Bus RGB controllers are ONOFF-only (API limitation: color PATCH returns 422)."""
+    def test_supported_color_modes_is_hs(self):
         from homeassistant.components.light import ColorMode
 
         entity, _ = self._make_wtp()
-        assert entity.supported_color_modes == {ColorMode.ONOFF}
+        assert entity.supported_color_modes == {ColorMode.HS}
 
-    def test_color_mode_is_always_onoff(self):
-        """color_mode is always ONOFF regardless of device fields."""
+    def test_color_mode_uses_device_color_mode(self):
         from homeassistant.components.light import ColorMode
 
         d = {
@@ -436,20 +432,18 @@ class TestSinumBusRgbLight:
             "led_color": "#FF0000",
         }
         entity, _ = self._make_wtp(d)
-        assert entity.color_mode == ColorMode.ONOFF
+        assert entity.color_mode == ColorMode.HS
 
     @pytest.mark.asyncio
-    async def test_turn_on_with_brightness_only_sends_state(self):
-        """brightness kwarg is ignored — only state:True is sent (API limitation)."""
+    async def test_turn_on_with_brightness_sends_brightness(self):
         entity, coordinator = self._make_wtp()
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_BRIGHTNESS: 128})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True}
+        assert payload == {"state": True, "brightness": round(128 / 255 * 100)}
 
     @pytest.mark.asyncio
-    async def test_turn_on_rgbww_device_only_sends_state(self):
-        """Lines 353-354, 362-368: RGBWW device ignores color/brightness kwargs."""
+    async def test_turn_on_rgbww_device_sends_color_and_brightness(self):
         d = {
             "id": 4,
             "type": WTYPE_RGB_CONTROLLER,
@@ -462,8 +456,11 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 200})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        # Only state should be sent — no brightness or color
-        assert payload == {"state": True}
+        assert payload == {
+            "state": True,
+            "brightness": round(200 / 255 * 100),
+            "led_color": "#00FF00",
+        }
 
     @pytest.mark.asyncio
     async def test_turn_off_wtp(self):

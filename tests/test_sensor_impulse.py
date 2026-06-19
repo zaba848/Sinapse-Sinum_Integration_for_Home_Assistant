@@ -1,4 +1,5 @@
 """Tests for impulse_meter sensors and analog_input dynamic unit support."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,9 +18,13 @@ def _make_coordinator(*, sbus=None, hub_info=None, lora=None):
     c.lora_devices = lora or {}
     c.hub_info = hub_info or {}
     c.schedules = []
+    c.automations = []
     c.client = MagicMock()
     c.client.get_weather = AsyncMock(side_effect=SinumConnectionError("no weather"))
     c.client.get_energy = AsyncMock(side_effect=SinumConnectionError("no energy"))
+    c.client.get_energy_center_summary = AsyncMock(
+        side_effect=SinumConnectionError("no energy center")
+    )
     c.client.decode_temperature = lambda raw: raw / 10
     return c
 
@@ -170,7 +175,11 @@ class TestSensorGaps:
 
     def test_energy_sensor_sentinel_returns_none(self):
         """_SENTINEL_INT16 in data → native_value is None."""
-        from custom_components.sinum.sensor import SinumEnergySensor, ENERGY_SENSORS, _SENTINEL_INT16
+        from custom_components.sinum.sensor import (
+            _SENTINEL_INT16,
+            ENERGY_SENSORS,
+            SinumEnergySensor,
+        )
 
         desc = ENERGY_SENSORS[0]
         client = MagicMock()
@@ -182,7 +191,7 @@ class TestSensorGaps:
     @pytest.mark.asyncio
     async def test_energy_sensor_update_error_logged(self):
         """get_energy SinumConnectionError → logs warning, no exception."""
-        from custom_components.sinum.sensor import SinumEnergySensor, ENERGY_SENSORS
+        from custom_components.sinum.sensor import ENERGY_SENSORS, SinumEnergySensor
 
         desc = ENERGY_SENSORS[0]
         client = MagicMock()
@@ -221,7 +230,7 @@ class TestSensorGaps:
 
     def test_energy_sensor_normal_value(self):
         """Non-sentinel value → native_value = raw * scale (line 964)."""
-        from custom_components.sinum.sensor import SinumEnergySensor, ENERGY_SENSORS
+        from custom_components.sinum.sensor import ENERGY_SENSORS, SinumEnergySensor
 
         desc = ENERGY_SENSORS[0]
         client = MagicMock()
@@ -233,7 +242,6 @@ class TestSensorGaps:
 
     def test_active_period_sensor_loop_body_with_matching_window(self):
         """Schedule with entry covering all minutes → 'Active' returned (lines 1173-1176)."""
-        from datetime import datetime
         from custom_components.sinum.sensor import SinumScheduleActivePeriodSensor
 
         # Populate ALL weekdays with an all-day window so the loop runs regardless of test day

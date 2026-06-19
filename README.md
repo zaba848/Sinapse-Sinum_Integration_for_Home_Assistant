@@ -4,8 +4,8 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-866%20passing-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-880%20passing-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://apidocs.sinum.tech)
 
 Local-first integration: REST polling is the baseline, with an optional Lua/MQTT bridge for lower-latency real-time updates.
@@ -17,7 +17,7 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 | Platform | Description | Status |
 |---|---|---|
 | `climate` | Virtual thermostats, SBUS/WTP fan coils, SBUS/WTP temperature regulators, heat pump manager | ✅ |
-| `sensor` | Temperature, humidity, illuminance, CO₂, pressure, PM, IAQ, power, energy, voltage, current, weather, hub diagnostics, thermal schedule summaries, SBUS regulator target temp | ✅ |
+| `sensor` | Temperature, humidity, illuminance, CO₂, pressure, PM, IAQ, power, energy, voltage, current, weather, hub diagnostics, Energy Center diagnostics, automation status, thermal schedule summaries, SBUS regulator target temp | ✅ |
 | `binary_sensor` | Flood, motion, opening, smoke, two-state input, WTP fan coil valve state, parent device connectivity | ✅ |
 | `switch` | Virtual relay integrators, wicket (electric strike), WTP/SBUS physical relays, valve_pump, common_valve | ✅ |
 | `cover` | Virtual blind controller, gate, WTP blind controller | ✅ |
@@ -30,7 +30,7 @@ Local-first integration: REST polling is the baseline, with an optional Lua/MQTT
 
 ### Supported Device Types
 
-**Virtual devices**: `thermostat`, `relay_integrator`, `blind_controller_integrator`, `gate`, `wicket`, `dimmer_rgb_controller_integrator`, `dimmer_rgb_integrator`, `heat_pump_manager`
+**Virtual devices**: `thermostat`, `relay_integrator`, `blind_controller_integrator`, `gate`, `wicket`, `dimmer_rgb_controller_integrator`, `dimmer_rgb_integrator`, `heat_pump_manager`, `thermostat_output_group` diagnostics
 
 **WTP bus**: `temperature_sensor`, `humidity_sensor`, `pressure_sensor`, `light_sensor`, `co2_sensor`, `iaq_sensor`, `aq_sensor`, `motion_sensor`, `flood_sensor`, `opening_sensor`, `smoke_sensor`, `two_state_input_sensor`, `relay`, `dimmer`, `rgb_controller`, `blind_controller`, `energy_meter`, `fan_coil`, `fan_coil_v2`, `temperature_regulator`, `button`
 
@@ -120,10 +120,10 @@ The Lua script `mqtt_bridge.lua` runs on the hub as an automation. Whenever a de
 
 **Step 1 — Add an MQTT client on the hub**
 
-1. Open the Sinum web UI (e.g. `http://10.0.61.132`)
-2. Go to **System → Integrations → MQTT**
+1. Open the Sinum web UI (e.g. `http://10.0.61.132` or sinum.local)
+2. Go to **Settings → System → Integrations → MQTT**
 3. Click **Add** and fill in:
-   - **Host**: IP address of your MQTT broker (e.g. `10.0.0.5`)
+   - **Host**: IP address of your MQTT broker (e.g. `10.0.0.5` for example in Home Asistant)
    - **Port**: `1883` (or `8883` for TLS)
    - **Username / Password**: as configured in your broker
 4. Save and note the assigned **Client ID** (e.g. `1`)
@@ -217,9 +217,9 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/           # 866 tests, ~3 s
+pytest tests/           # 880 tests, ~3 s
 pytest -v tests/        # verbose
-pytest --cov=custom_components/sinum tests/  # with coverage (100%)
+pytest --cov=custom_components/sinum tests/  # with coverage (98%)
 ```
 
 ### Structure
@@ -231,7 +231,10 @@ custom_components/sinum/
   ├── coordinator.py       # DataUpdateCoordinator — polls all bus endpoints
   ├── config_flow.py       # UI setup + reauth flow
   ├── climate.py           # Thermostats, fan coils, regulators, heat_pump_manager
-  ├── sensor.py            # Temperature, humidity, IAQ, energy, weather, schedules, PWM
+  ├── sensor.py            # Sensor platform setup
+  ├── sensor_bus.py        # WTP/SBUS/LoRa sensors
+  ├── sensor_virtual.py    # Virtual, weather, energy, hub diagnostic sensors
+  ├── sensor_schedule.py   # Thermal schedule sensors
   ├── binary_sensor.py     # Flood, motion, opening, valve state, connectivity
   ├── switch.py            # Relay integrators, wicket, WTP/SBUS relays, valve_pump, common_valve
   ├── cover.py             # Blind controller, gate (virtual + WTP)
@@ -244,7 +247,7 @@ custom_components/sinum/
   ├── alarm_control_panel.py
   ├── diagnostics.py       # HA diagnostics redaction
   ├── mqtt.py              # MQTT bridge transport
-  ├── services.yaml        # send_notification service schema
+  ├── services.yaml        # send_notification and update_schedule service schemas
   ├── strings.json         # UI strings (EN)
   └── translations/
       ├── en.json
@@ -256,7 +259,7 @@ lua_scripts/
 
 tests/
   ├── fixtures/sinum_devices.json
-  └── test_*.py            # 866 tests across all platforms and device types
+  └── test_*.py            # 880 tests across all platforms and device types
 ```
 
 ---
@@ -264,10 +267,11 @@ tests/
 ## Known Limitations
 
 - `button` devices — exposed as `last_action` sensor (disabled by default); for real-time triggers use the **Event entity** with MQTT bridge enabled
-- `custom_device` virtual type — Lua contracts vary per installation, intentionally not mapped to HA entities
-- `thermostat_output_group` virtual type — hub-managed output group, no direct HA mapping
-- Energy Center (`/api/v1/energy`) not available on all hubs — entities will not appear where missing
-- LoRa, SLINK, video cameras require specific hardware modules installed on the hub
+- `custom_device` virtual type — Lua contracts vary per installation, intentionally not mapped to HA entities; scene/automation Lua details are available through read-only API helpers
+- `thermostat_output_group` virtual type — exposed as a disabled-by-default diagnostic output-count sensor, not as direct control entities
+- Energy Center differs by firmware — legacy `/api/v1/energy` sensors and `/api/v1/energy-center/*` diagnostics appear only where the hub exposes those endpoints
+- Schedules support read-only sensors and the explicit `sinum.update_schedule` service; full schedule editing UI is not implemented
+- LoRa, SLINK, video cameras require specific hardware modules installed on the hub; video streams and SLINK devices are not mapped to HA entities yet
 - Hub alpha firmware may cause intermittent HTTP 408 on bus polling — handled gracefully with cached state
 
 ---

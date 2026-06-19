@@ -99,17 +99,57 @@ def _hs_to_hex(hue: float, saturation: float) -> str:
     return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
 
+def _labels(device: dict[str, Any]) -> set[str]:
+    labels = device.get("labels", [])
+    if not isinstance(labels, list):
+        return set()
+    return {str(label).lower() for label in labels}
+
+
+def _supports_rgb(device: dict[str, Any]) -> bool:
+    labels = _labels(device)
+    dev_type = device.get("type")
+    mode = str(device.get("color_mode", "")).lower()
+    return (
+        "led_color" in device
+        or mode in {"rgb", "hs", "color"}
+        or any("rgb" in label for label in labels)
+        or dev_type in (VTYPE_DIMMER_RGB, VTYPE_DIMMER_RGB_INTEGRATOR)
+        or dev_type in (WTYPE_RGB_CONTROLLER, STYPE_RGB_CONTROLLER)
+    )
+
+
+def _supports_color_temperature(device: dict[str, Any]) -> bool:
+    labels = _labels(device)
+    mode = str(device.get("color_mode", "")).lower()
+    return (
+        "white_temperature" in device
+        or mode in {"temperature", "color_temp", "white_temperature"}
+        or "rgbww" in labels
+        or "ww" in labels
+    )
+
+
 def _supported_color_modes(device: dict[str, Any]) -> set[ColorMode]:
-    if "rgbww" in device.get("labels", []):
-        return {ColorMode.ONOFF}
     modes: set[ColorMode] = set()
-    if "led_color" in device or device.get("color_mode") == "rgb":
+    if _supports_rgb(device):
         modes.add(ColorMode.HS)
-    if "white_temperature" in device or device.get("color_mode") == "temperature":
+    if _supports_color_temperature(device):
         modes.add(ColorMode.COLOR_TEMP)
     if not modes:
         modes.add(ColorMode.BRIGHTNESS)
     return modes
+
+
+def _color_mode(device: dict[str, Any]) -> ColorMode:
+    mode = str(device.get("color_mode", "")).lower()
+    if mode in {"temperature", "color_temp", "white_temperature"}:
+        return ColorMode.COLOR_TEMP
+    if mode in {"rgb", "hs", "color"} or _supports_rgb(device):
+        return ColorMode.HS
+    if _supports_color_temperature(device):
+        return ColorMode.COLOR_TEMP
+    return ColorMode.BRIGHTNESS
 
 
 class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
@@ -119,7 +159,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_name = None
     _attr_min_color_temp_kelvin = 1000
     _attr_max_color_temp_kelvin = 6500
-    _attr_icon = "mdi:lightbulb"
+    _attr_icon = "mdi:led-strip-variant"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -144,14 +184,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def color_mode(self) -> ColorMode:
-        if "rgbww" in self._device.get("labels", []):
-            return ColorMode.ONOFF
-        mode = self._device.get("color_mode", "")
-        if mode == "rgb":
-            return ColorMode.HS
-        if mode == "temperature":
-            return ColorMode.COLOR_TEMP
-        return ColorMode.BRIGHTNESS
+        return _color_mode(self._device)
 
     @property
     def is_on(self) -> bool:
@@ -207,7 +240,7 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_name = None
     _attr_supported_color_modes: set[ColorMode] = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
-    _attr_icon = "mdi:lightbulb-on"
+    _attr_icon = "mdi:lightbulb-on-outline"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
@@ -274,13 +307,13 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
 
 class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
-    """SBUS or WTP rgb_controller — state only (API limitation: brightness/color PATCH returns 422)."""
+    """SBUS or WTP rgb_controller."""
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_supported_color_modes: set[ColorMode] = {ColorMode.ONOFF}
-    _attr_color_mode = ColorMode.ONOFF
-    _attr_icon = "mdi:lightbulb-variant"
+    _attr_min_color_temp_kelvin = 1000
+    _attr_max_color_temp_kelvin = 6500
+    _attr_icon = "mdi:led-strip-variant"
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
@@ -313,17 +346,51 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     def is_on(self) -> bool:
         return bool(self._device.get("state"))
 
+    @property
+    def supported_color_modes(self) -> set[ColorMode]:
+        return _supported_color_modes(self._device)
+
+    @property
+    def color_mode(self) -> ColorMode:
+        return _color_mode(self._device)
+
+    @property
+    def brightness(self) -> int | None:
+        raw = self._device.get("brightness")
+        if raw is None:
+            return None
+        return round(raw / 100 * 255)
+
+    @property
+    def hs_color(self) -> tuple[float, float] | None:
+        hex_color = self._device.get("led_color")
+        if not hex_color:
+            return None
+        return _hex_to_hs(hex_color)
+
+    @property
+    def color_temp_kelvin(self) -> int | None:
+        return self._device.get("white_temperature")
+
     async def async_turn_on(self, **kwargs: Any) -> None:
+        payload: dict[str, Any] = {"state": True}
+
+        if ATTR_BRIGHTNESS in kwargs:
+            payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+
+        if ATTR_HS_COLOR in kwargs:
+            h, s = kwargs[ATTR_HS_COLOR]
+            payload["led_color"] = _hs_to_hex(h, s)
+
+        if ATTR_COLOR_TEMP_KELVIN in kwargs:
+            payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
+
         if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": True}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
+            updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+            self.coordinator.wtp_devices[self._device_id].update({**payload, **(updated or {})})
         else:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": True}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
+            updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
+            self.coordinator.sbus_devices[self._device_id].update({**payload, **(updated or {})})
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:

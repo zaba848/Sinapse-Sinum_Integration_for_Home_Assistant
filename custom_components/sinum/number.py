@@ -24,13 +24,14 @@ async def async_setup_entry(
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
     variables = getattr(coordinator, "variables", None)
-    if not isinstance(variables, list):
+    if not isinstance(variables, list) or not variables:
+        cached_variables = variables if isinstance(variables, list) else []
         try:
             variables = await coordinator.client.get_variables()
             coordinator.variables = variables
         except SinumConnectionError:
             _LOGGER.debug("Variables endpoint not available on this hub firmware")
-            variables = []
+            variables = cached_variables
 
     entities: list[NumberEntity] = []
     for var in variables:
@@ -116,7 +117,7 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
     _attr_has_entity_name = True
     _attr_name = None
     _attr_mode = NumberMode.SLIDER
-    _attr_icon = "mdi:knob"
+    _attr_icon = "mdi:tune-vertical"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -160,7 +161,7 @@ class SinumPwmNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_mode = NumberMode.SLIDER
-    _attr_icon = "mdi:sine-wave"
+    _attr_icon = "mdi:pulse"
     _attr_native_min_value = 0.0
     _attr_native_max_value = 100.0
     _attr_native_step = 1.0

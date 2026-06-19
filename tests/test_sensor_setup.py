@@ -1,4 +1,5 @@
 """Tests for sensor async_setup_entry and entity class coverage."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -6,37 +7,54 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.sinum.api import SinumConnectionError
+from custom_components.sinum.const import STYPE_BUTTON, WTYPE_BUTTON
 from custom_components.sinum.sensor import (
+    ENERGY_SENSORS,
+    SBUS_REGULATOR_SENSORS,
+    SBUS_SENSORS,
+    VIRTUAL_SENSORS,
+    WEATHER_SENSORS,
+    WTP_SENSORS,
+    SinumAutomationStatusSensor,
     SinumButtonSensor,
+    SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
     SinumHubUptimeSensor,
     SinumHubWifiSensor,
-    SinumScheduleAssociationCountSensor,
     SinumScheduleActivePeriodSensor,
+    SinumScheduleAssociationCountSensor,
     SinumSensor,
     SinumTemperatureRegulatorSensor,
+    SinumThermostatOutputGroupSensor,
     SinumWeatherSensor,
-    VIRTUAL_SENSORS,
-    WTP_SENSORS,
-    SBUS_SENSORS,
-    SBUS_REGULATOR_SENSORS,
-    WEATHER_SENSORS,
-    ENERGY_SENSORS,
     async_setup_entry,
 )
-from custom_components.sinum.const import STYPE_BUTTON, WTYPE_BUTTON
 
 
-def _make_coordinator(*, virtual=None, wtp=None, sbus=None, hub_info=None, schedules=None):
+def _make_coordinator(
+    *,
+    virtual=None,
+    wtp=None,
+    sbus=None,
+    lora=None,
+    hub_info=None,
+    schedules=None,
+    automations=None,
+):
     c = MagicMock()
     c.virtual_devices = virtual or {}
     c.wtp_devices = wtp or {}
     c.sbus_devices = sbus or {}
+    c.lora_devices = lora or {}
     c.hub_info = hub_info or {}
     c.schedules = schedules or []
+    c.automations = automations or []
     c.client = MagicMock()
     c.client.get_weather = AsyncMock(side_effect=SinumConnectionError("no weather"))
     c.client.get_energy = AsyncMock(side_effect=SinumConnectionError("no energy"))
+    c.client.get_energy_center_summary = AsyncMock(
+        side_effect=SinumConnectionError("no energy center")
+    )
     c.client.decode_temperature = lambda raw: raw / 10
     return c
 
@@ -61,6 +79,24 @@ class TestAsyncSetupEntry:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         sensors = [e for e in added if isinstance(e, SinumSensor) and e._source == "virtual"]
         assert len(sensors) >= 1
+
+    @pytest.mark.asyncio
+    async def test_thermostat_output_group_creates_diagnostic_sensor(self):
+        virtual = {
+            9: {
+                "id": 9,
+                "type": "thermostat_output_group",
+                "name": "Heating outputs",
+                "outputs": [{"id": 1}, {"id": 2}],
+            }
+        }
+        coordinator = _make_coordinator(virtual=virtual)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        groups = [e for e in added if isinstance(e, SinumThermostatOutputGroupSensor)]
+        assert len(groups) == 1
+        assert groups[0].native_value == 2
 
     @pytest.mark.asyncio
     async def test_wtp_generic_sensor_created(self):
@@ -170,6 +206,22 @@ class TestAsyncSetupEntry:
         assert len(energy) >= 1
 
     @pytest.mark.asyncio
+    async def test_energy_center_summary_creates_status_sensor(self):
+        coordinator = _make_coordinator()
+        coordinator.client.get_energy_center_summary = AsyncMock(
+            return_value={
+                "available_endpoints": ["associations", "prices"],
+                "missing_endpoints": ["flow_monitor"],
+            }
+        )
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        statuses = [e for e in added if isinstance(e, SinumEnergyCenterStatusSensor)]
+        assert len(statuses) == 1
+        assert statuses[0].native_value == 2
+
+    @pytest.mark.asyncio
     async def test_hub_uptime_sensor_created_when_hub_info_present(self):
         coordinator = _make_coordinator(hub_info={"uptime": 12345, "firmware": "1.24.0"})
         entry = _make_entry(coordinator)
@@ -206,7 +258,8 @@ class TestAsyncSetupEntry:
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         sched_sensors = [
-            e for e in added
+            e
+            for e in added
             if isinstance(e, (SinumScheduleAssociationCountSensor, SinumScheduleActivePeriodSensor))
         ]
         assert len(sched_sensors) == 2
@@ -220,12 +273,25 @@ class TestAsyncSetupEntry:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         assert len(added) == 0
 
+    @pytest.mark.asyncio
+    async def test_automation_status_sensor_created(self):
+        automations = [{"id": 3, "name": "Evening", "enabled": True}]
+        coordinator = _make_coordinator(automations=automations)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        statuses = [e for e in added if isinstance(e, SinumAutomationStatusSensor)]
+        assert len(statuses) == 1
+        assert statuses[0].native_value == "enabled"
+
 
 class TestSinumSensorNativeValue:
     def _make(self, api_key: str, value):
         desc = next(d for d in WTP_SENSORS if d.source == "wtp" and not d.is_text)
         coordinator = MagicMock()
-        coordinator.wtp_devices = {1: {"id": 1, "type": "temperature_sensor", "name": "T", desc.api_key: value}}
+        coordinator.wtp_devices = {
+            1: {"id": 1, "type": "temperature_sensor", "name": "T", desc.api_key: value}
+        }
         return SinumSensor(coordinator, 1, desc, "test_entry"), desc
 
     def test_text_value_returns_str(self):
@@ -233,7 +299,9 @@ class TestSinumSensorNativeValue:
         if desc is None:
             pytest.skip("No text descriptor found")
         coordinator = MagicMock()
-        coordinator.wtp_devices = {1: {"id": 1, "type": "something", "name": "T", desc.api_key: "active"}}
+        coordinator.wtp_devices = {
+            1: {"id": 1, "type": "something", "name": "T", desc.api_key: "active"}
+        }
         entity = SinumSensor(coordinator, 1, desc, "test_entry")
         assert entity.native_value == "active"
 
@@ -327,7 +395,8 @@ class TestSinumScheduleAssociationCountSensor:
 
     def test_extra_state_attributes(self):
         schedule = {
-            "id": 2, "name": "S",
+            "id": 2,
+            "name": "S",
             "associations": {"thermostats": [1], "fan_coils": [2, 3]},
         }
         coordinator = MagicMock()
@@ -359,8 +428,16 @@ class TestSinumScheduleActivePeriodSensor:
 class TestSinumButtonSensor:
     def test_buzzer_attribute_when_present(self):
         coordinator = MagicMock()
-        coordinator.wtp_devices = {1: {"id": 1, "type": WTYPE_BUTTON, "name": "Btn",
-                                        "action": "1", "buttons_count": 2, "buzzer": True}}
+        coordinator.wtp_devices = {
+            1: {
+                "id": 1,
+                "type": WTYPE_BUTTON,
+                "name": "Btn",
+                "action": "1",
+                "buttons_count": 2,
+                "buzzer": True,
+            }
+        }
         entity = SinumButtonSensor(coordinator, 1, "entry", "wtp")
         attrs = entity.extra_state_attributes
         assert attrs["buttons_count"] == 2

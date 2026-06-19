@@ -77,6 +77,25 @@ class TestAlarmSetup:
         await async_setup_entry(MagicMock(), entry, async_add_entities)
 
         assert len(added) == 2
+        assert sorted(coordinator.alarm_zones) == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_cached_zones_are_used_without_second_endpoint_fetch(self):
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: _make_zone(1)}
+        coordinator.client.get_alarm_devices = AsyncMock(
+            side_effect=SinumConnectionError("transient")
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+        added = []
+        async_add_entities = MagicMock(side_effect=lambda e: added.extend(e))
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+
+        assert len(added) == 1
+        coordinator.client.get_alarm_devices.assert_not_awaited()
 
 
 class TestAlarmZoneState:

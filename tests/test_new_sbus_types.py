@@ -87,64 +87,50 @@ class TestButtonSensor:
         assert "last_action" in entity.unique_id
 
 
-# ── Valve pump switch ──────────────────────────────────────────────────────────
+# ── Valve pump binary sensor ───────────────────────────────────────────────────
 
-class TestValvePumpSwitch:
+class TestValvePumpBinarySensor:
     def test_is_on_when_state_true(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
+        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.const import STYPE_VALVE_PUMP
 
+        desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)
         device = dict(FIXTURES["sbus_valve_pump"])
         coordinator = _make_coordinator(sbus={52: device})
-        entity = SinumValvePumpSwitch(coordinator, 52, "test_entry")
+        with __import__("unittest.mock", fromlist=["patch"]).patch(
+            "homeassistant.helpers.frame.report_usage", return_value=None
+        ):
+            entity = SinumBinarySensor(coordinator, 52, desc, "test_entry")
         assert entity.is_on is True
 
     def test_is_off_when_state_false(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
+        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.const import STYPE_VALVE_PUMP
 
+        desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)
         device = dict(FIXTURES["sbus_valve_pump"])
         device["state"] = False
         coordinator = _make_coordinator(sbus={52: device})
-        entity = SinumValvePumpSwitch(coordinator, 52, "test_entry")
+        with __import__("unittest.mock", fromlist=["patch"]).patch(
+            "homeassistant.helpers.frame.report_usage", return_value=None
+        ):
+            entity = SinumBinarySensor(coordinator, 52, desc, "test_entry")
         assert entity.is_on is False
 
-    @pytest.mark.asyncio
-    async def test_turn_on_patches_state_true(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
+    def test_unique_id_contains_pump_key(self):
+        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.const import STYPE_VALVE_PUMP
 
+        desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)
         device = dict(FIXTURES["sbus_valve_pump"])
         coordinator = _make_coordinator(sbus={52: device})
-        entity = _wire(SinumValvePumpSwitch(coordinator, 52, "test_entry"))
-        await entity.async_turn_on()
-        coordinator.client.patch_sbus_device.assert_called_once_with(52, {"state": True})
-
-    @pytest.mark.asyncio
-    async def test_turn_off_patches_state_false(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
-
-        device = dict(FIXTURES["sbus_valve_pump"])
-        coordinator = _make_coordinator(sbus={52: device})
-        entity = _wire(SinumValvePumpSwitch(coordinator, 52, "test_entry"))
-        await entity.async_turn_off()
-        coordinator.client.patch_sbus_device.assert_called_once_with(52, {"state": False})
-
-    def test_extra_attributes_include_thresholds(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
-
-        device = dict(FIXTURES["sbus_valve_pump"])
-        coordinator = _make_coordinator(sbus={52: device})
-        entity = SinumValvePumpSwitch(coordinator, 52, "test_entry")
-        attrs = entity.extra_state_attributes
-        assert attrs["blockade"] is False
-        assert attrs["threshold_heating_c"] == 35.0
-        assert attrs["threshold_cooling_c"] == 15.0
-
-    def test_unique_id(self):
-        from custom_components.sinum.switch import SinumValvePumpSwitch
-
-        device = dict(FIXTURES["sbus_valve_pump"])
-        coordinator = _make_coordinator(sbus={52: device})
-        entity = SinumValvePumpSwitch(coordinator, 52, "entry_y")
-        assert entity.unique_id == "entry_y_sbus_52"
+        with __import__("unittest.mock", fromlist=["patch"]).patch(
+            "homeassistant.helpers.frame.report_usage", return_value=None
+        ):
+            entity = SinumBinarySensor(coordinator, 52, desc, "entry_y")
+        assert "entry_y" in entity.unique_id
+        assert "52" in entity.unique_id
+        assert "pump" in entity.unique_id
 
 
 # ── Common valve switch ────────────────────────────────────────────────────────

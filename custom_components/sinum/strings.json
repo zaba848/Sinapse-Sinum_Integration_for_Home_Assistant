@@ -142,6 +142,15 @@
       "energy_storage": {
         "name": "Energy storage"
       },
+      "energy_center_status": {
+        "name": "Energy Center status"
+      },
+      "thermostat_output_group": {
+        "name": "Output group"
+      },
+      "automation_status": {
+        "name": "Automation status"
+      },
       "button_last_action": {
         "name": "Last action"
       },
@@ -231,6 +240,24 @@
         "message": {
           "name": "Message",
           "description": "Notification body."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Update schedule",
+      "description": "Updates a Sinum thermal schedule using the hub schedule API.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Required when more than one Sinum hub is loaded."
+        },
+        "schedule_id": {
+          "name": "Schedule ID",
+          "description": "Numeric Sinum schedule ID."
+        },
+        "payload": {
+          "name": "Payload",
+          "description": "Partial schedule payload accepted by the Sinum API."
         }
       }
     }

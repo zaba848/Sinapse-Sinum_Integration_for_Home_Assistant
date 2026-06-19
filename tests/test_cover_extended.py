@@ -4,6 +4,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.components.cover import CoverDeviceClass
 
 from custom_components.sinum.cover import (
     SinumBlindCover,
@@ -128,9 +129,9 @@ class TestSinumBlindCover:
             entity = SinumBlindCover(coord, 13, "test_entry")
         assert entity.current_cover_tilt_position == 30
 
-    def test_icon(self):
+    def test_device_class(self):
         entity = _make_blind()
-        assert entity._attr_icon == "mdi:blinds"
+        assert entity._attr_device_class == CoverDeviceClass.BLIND
 
     @pytest.mark.asyncio
     async def test_open_sends_100_percent(self):
@@ -202,9 +203,9 @@ class TestSinumGateCover:
         entity = _make_gate(state=GATE_STATE_CLOSING)
         assert entity.is_closing is True
 
-    def test_icon(self):
+    def test_device_class(self):
         entity = _make_gate()
-        assert entity._attr_icon == "mdi:gate"
+        assert entity._attr_device_class == CoverDeviceClass.GATE
 
     @pytest.mark.asyncio
     async def test_open_sends_full_open(self):
@@ -216,6 +217,13 @@ class TestSinumGateCover:
         )
 
     @pytest.mark.asyncio
+    async def test_open_sets_state_opening_optimistically(self):
+        entity = _make_gate(state="open")
+        entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        await entity.async_open_cover()
+        assert entity.coordinator.virtual_devices[14]["state"] == GATE_STATE_OPENING
+
+    @pytest.mark.asyncio
     async def test_close_sends_close(self):
         entity = _make_gate()
         entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
@@ -223,6 +231,13 @@ class TestSinumGateCover:
         entity.coordinator.client.patch_virtual_device.assert_awaited_once_with(
             14, {"command": "close"}
         )
+
+    @pytest.mark.asyncio
+    async def test_close_sets_state_closing_optimistically(self):
+        entity = _make_gate(state="open")
+        entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        await entity.async_close_cover()
+        assert entity.coordinator.virtual_devices[14]["state"] == GATE_STATE_CLOSING
 
 
 class TestSinumWtpBlindCover:
@@ -250,9 +265,9 @@ class TestSinumWtpBlindCover:
         entity = _make_wtp_blind(current=65)
         assert entity.current_cover_position == 65
 
-    def test_icon(self):
+    def test_device_class(self):
         entity = _make_wtp_blind()
-        assert entity._attr_icon == "mdi:blinds-horizontal"
+        assert entity._attr_device_class == CoverDeviceClass.BLIND
 
     def test_is_opening_with_invalid_values_returns_false(self):
         """Defensive: non-numeric target/current should not raise."""

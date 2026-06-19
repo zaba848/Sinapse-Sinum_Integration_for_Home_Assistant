@@ -71,7 +71,9 @@ class TestSinumCoordinator:
         assert 10 in data["virtual"]
         assert 20 in data["wtp"]
         assert data["sbus"] == {}
+        assert data["scenes"] == FIXTURES["scenes"]
         assert data["schedules"] == FIXTURES["schedules"]
+        assert coordinator.scenes == FIXTURES["scenes"]
         assert coordinator.schedules == FIXTURES["schedules"]
         assert data["virtual"][10]["type"] == "thermostat"
         assert data["wtp"][20]["type"] == "temperature_sensor"

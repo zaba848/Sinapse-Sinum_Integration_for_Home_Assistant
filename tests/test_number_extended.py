@@ -232,6 +232,27 @@ class TestSinumVariableNumberSetup:
         assert var_entity._variable_id == 5
 
     @pytest.mark.asyncio
+    async def test_empty_variable_cache_is_refetched(self):
+        from custom_components.sinum.number import async_setup_entry
+
+        variable = _make_variable(var_id=6, name="RetryVar", value=22)
+        coordinator = _make_coordinator()
+        coordinator.variables = []
+        coordinator.client.get_variables = AsyncMock(return_value=[variable])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+
+        assert any(
+            isinstance(entity, SinumVariableNumber) and entity._variable_id == 6
+            for entity in added
+        )
+        assert coordinator.variables == [variable]
+
+    @pytest.mark.asyncio
     async def test_setup_entry_variables_endpoint_unavailable(self):
         """Lines 28-30: SinumConnectionError from get_variables → no variable entities."""
         from custom_components.sinum.api import SinumConnectionError as ConnErr

@@ -142,6 +142,15 @@
       "energy_storage": {
         "name": "Magazyn energii"
       },
+      "energy_center_status": {
+        "name": "Status Energy Center"
+      },
+      "thermostat_output_group": {
+        "name": "Grupa wyjść"
+      },
+      "automation_status": {
+        "name": "Status automatyzacji"
+      },
       "button_last_action": {
         "name": "Ostatnia akcja"
       },
@@ -231,6 +240,24 @@
         "message": {
           "name": "Wiadomość",
           "description": "Treść powiadomienia."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Aktualizuj harmonogram",
+      "description": "Aktualizuje harmonogram termiczny Sinum przez API centrali.",
+      "fields": {
+        "entry_id": {
+          "name": "ID wpisu konfiguracji",
+          "description": "Wymagane, gdy załadowana jest więcej niż jedna centrala Sinum."
+        },
+        "schedule_id": {
+          "name": "ID harmonogramu",
+          "description": "Numeryczny identyfikator harmonogramu Sinum."
+        },
+        "payload": {
+          "name": "Payload",
+          "description": "Częściowy payload harmonogramu akceptowany przez API Sinum."
         }
       }
     }

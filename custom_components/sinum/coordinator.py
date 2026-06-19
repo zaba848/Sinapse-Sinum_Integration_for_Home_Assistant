@@ -39,7 +39,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.floors: dict[int, dict[str, Any]] = {}  # floor_id → {id, name, level}
         self.hub_info: dict[str, Any] = {}  # from /api/v1/info
         self.parent_devices: list[dict[str, Any]] = []  # flat list from /api/v1/parent-devices
+        self.scenes: list[dict[str, Any]] = []  # buttons/scripts from /api/v1/scenes
         self.schedules: list[dict[str, Any]] = []  # thermal schedules from /api/v1/schedules
+        self.automations: list[dict[str, Any]] = []  # scripts/automations from /api/v1/automations
         self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
@@ -52,7 +54,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             lua_info,
             floors_list,
             parent_devices,
+            scenes,
             schedules,
+            automations,
             variables,
         ) = await asyncio.gather(
             _safe_fetch(self.client.get_hub_info, "hub info"),
@@ -62,7 +66,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _safe_fetch(
                 self.client.get_parent_devices, "parent devices", default=self.parent_devices
             ),
+            _safe_fetch(self.client.get_scenes, "scenes", default=self.scenes),
             _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
+            _safe_fetch(self.client.get_automations, "automations", default=self.automations),
             _safe_fetch(self.client.get_variables, "variables", default=self.variables),
         )
 
@@ -82,13 +88,24 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
         if parent_devices is not None:
             self.parent_devices = parent_devices
+        if scenes is not None:
+            self.scenes = scenes
         if schedules is not None:
             self.schedules = schedules
+        if automations is not None:
+            self.automations = automations
         if variables is not None:
             self.variables = variables
 
-        # ── Classify device IDs from rooms (fallback for older firmware) ──────
-        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
+        # ── Classify device IDs from rooms and parent-device trees ────────────
+        room_ids = _collect_device_ids(rooms)
+        parent_ids = _collect_device_ids(self.parent_devices)
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = (
+            _unique_ids([*room_ids[0], *parent_ids[0]]),
+            _unique_ids([*room_ids[1], *parent_ids[1]]),
+            _unique_ids([*room_ids[2], *parent_ids[2]]),
+            _unique_ids([*room_ids[3], *parent_ids[3]]),
+        )
 
         # ── Group 2: device collections — all fetched in parallel ─────────────
         virtual, wtp, sbus, lora, alarm_list = await asyncio.gather(
@@ -146,7 +163,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "wtp": wtp,
             "sbus": sbus,
             "lora": lora,
+            "scenes": self.scenes,
             "schedules": self.schedules,
+            "automations": self.automations,
             "variables": self.variables,
         }
 
@@ -171,28 +190,37 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             collection = await list_getter()
             bulk_ok = True
-        except SinumConnectionError as err:
+        except Exception as err:
             _LOGGER.debug("Failed to fetch %s device collection: %s", label, err)
             collection = []
 
         if collection:
             for device in collection:
+                if not isinstance(device, dict):
+                    continue
                 device_id = device.get("id")
                 if device_id is None:
                     continue
-                device_id = int(device_id)
+                device_id = _device_id_as_int(device_id)
+                if device_id is None:
+                    continue
+                device.setdefault("class", _source_from_label(label))
                 _inject_room_keys(device, device_id, rooms, self.floors)
                 devices[device_id] = device
             return devices
 
         # Bulk succeeded but returned empty → try per-device (old firmware).
-        # Bulk failed → return cached data to avoid 400+ WARNING log entries.
-        if not bulk_ok:
+        # Bulk failed with cache → keep entities available and avoid 400+ requests.
+        # Bulk failed on cold start → try per-device IDs so entities are still provided.
+        if not bulk_ok and cached:
             return cached
 
         for device_id in fallback_ids:
             try:
                 device = await item_getter(device_id)
+                if not isinstance(device, dict):
+                    continue
+                device.setdefault("class", _source_from_label(label))
                 _inject_room_keys(device, device_id, rooms, self.floors)
                 devices[device_id] = device
             except SinumConnectionError as err:
@@ -204,10 +232,10 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 
 async def _safe_fetch(coro_fn: Any, label: str, default: Any = None) -> Any:
-    """Call an async API method, returning default on SinumConnectionError."""
+    """Call an async API method, returning default on any non-cancellation error."""
     try:
         return await coro_fn()
-    except SinumConnectionError as err:
+    except Exception as err:
         _LOGGER.debug("Failed to fetch %s: %s", label, err)
         return default
 
@@ -223,9 +251,13 @@ def _collect_device_ids(
     seen: set[tuple[str, int]] = set()
 
     for room in rooms:
+        if not isinstance(room, dict):
+            continue
         for device in room.get("devices", []):
-            cls = device.get("class") or device.get("source", "")
-            dev_id = device.get("id")
+            if not isinstance(device, dict):
+                continue
+            cls = _device_class(device)
+            dev_id = _device_id_as_int(device.get("id"))
             if dev_id is None:
                 continue
             key = (cls, dev_id)
@@ -245,6 +277,42 @@ def _collect_device_ids(
     return virtual_ids, wtp_ids, sbus_ids, lora_ids
 
 
+def _device_id_as_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _device_class(device: dict[str, Any]) -> str:
+    raw = device.get("class") or device.get("source") or device.get("bus") or ""
+    cls = str(raw).lower()
+    if cls.startswith("virtual"):
+        return "virtual"
+    if cls.startswith("wtp"):
+        return "wtp"
+    if cls.startswith("sbus"):
+        return "sbus"
+    if cls.startswith("lora"):
+        return "lora"
+    return cls
+
+
+def _source_from_label(label: str) -> str:
+    return "lora" if label.lower() == "lora" else label.lower()
+
+
+def _unique_ids(values: list[int]) -> list[int]:
+    ids: list[int] = []
+    seen: set[int] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ids.append(value)
+    return ids
+
+
 def _inject_room_keys(
     device: dict[str, Any],
     device_id: int,
@@ -261,9 +329,16 @@ def _inject_room_keys(
                 return
 
     for room in rooms:
+        if not isinstance(room, dict):
+            continue
         for dev in room.get("devices", []):
-            dev_class = dev.get("class") or dev.get("source")
-            if dev.get("id") == device_id and dev_class == device.get("class"):
+            if not isinstance(dev, dict):
+                continue
+            dev_id = _device_id_as_int(dev.get("id"))
+            if dev_id is None:
+                continue
+            dev_class = _device_class(dev)
+            if dev_id == device_id and dev_class == _device_class(device):
                 device["_device_name"] = dev.get("name") or device.get("name", str(device_id))
                 _apply_room_keys(device, room, floors)
                 return
@@ -295,16 +370,24 @@ def _apply_room_keys(
 
 def _room_name_for_device(rooms: list[dict[str, Any]], device_id: int) -> str:
     for room in rooms:
+        if not isinstance(room, dict):
+            continue
         for device in room.get("devices", []):
-            if device.get("id") == device_id:
+            if not isinstance(device, dict):
+                continue
+            if _device_id_as_int(device.get("id")) == device_id:
                 return room.get("name", "")
     return ""
 
 
 def _device_name_in_room(rooms: list[dict[str, Any]], device_id: int) -> str:
     for room in rooms:
+        if not isinstance(room, dict):
+            continue
         for device in room.get("devices", []):
-            if device.get("id") == device_id:
+            if not isinstance(device, dict):
+                continue
+            if _device_id_as_int(device.get("id")) == device_id:
                 return device.get("name", str(device_id))
     return str(device_id)
 

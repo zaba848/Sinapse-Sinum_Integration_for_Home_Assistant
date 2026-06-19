@@ -48,11 +48,17 @@ async def async_setup_entry(
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[AlarmControlPanelEntity] = []
 
-    try:
-        alarm_devices = await coordinator.client.get_alarm_devices()
-    except SinumConnectionError:
-        _LOGGER.debug("Alarm system endpoint not available on this hub")
-        return
+    cached_zones = getattr(coordinator, "alarm_zones", {})
+    alarm_devices = list(cached_zones.values()) if isinstance(cached_zones, dict) else []
+    if not alarm_devices:
+        try:
+            alarm_devices = await coordinator.client.get_alarm_devices()
+        except SinumConnectionError:
+            _LOGGER.debug("Alarm system endpoint not available on this hub")
+            return
+        coordinator.alarm_zones = {
+            int(device["id"]): device for device in alarm_devices if "id" in device
+        }
 
     for device in alarm_devices:
         entities.append(SinumAlarmZone(coordinator, device, entry.entry_id))

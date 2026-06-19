@@ -1,4 +1,5 @@
 """Extended coordinator tests covering fallback paths and edge cases."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -33,7 +34,7 @@ class TestCoordinatorMissingPaths:
         # Now hub info fails
         mock_client.get_hub_info = AsyncMock(side_effect=SinumConnectionError("down"))
         with patch.object(coordinator, "async_set_updated_data"):
-            data = await coordinator._async_update_data()
+            await coordinator._async_update_data()
         # Should not raise, uses cached hub_info
         assert coordinator.hub_info is not None
 
@@ -88,6 +89,26 @@ class TestCoordinatorMissingPaths:
             data = await coordinator._async_update_data()
         assert data is not None
 
+    @pytest.mark.asyncio
+    async def test_automations_stored_in_data(self, mock_client):
+        """Automations endpoint is cached and returned in coordinator data."""
+        mock_client.get_automations = AsyncMock(return_value=[{"id": 1, "name": "Night"}])
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+        assert data["automations"] == [{"id": 1, "name": "Night"}]
+        assert coordinator.automations == [{"id": 1, "name": "Night"}]
+
+    @pytest.mark.asyncio
+    async def test_automations_failure_ignored(self, mock_client):
+        """Automations endpoint failure keeps coordinator update healthy."""
+        mock_client.get_automations = AsyncMock(side_effect=SinumConnectionError("down"))
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            data = await coordinator._async_update_data()
+        assert data is not None
+        assert coordinator.automations == []
+
 
 class TestCollectDeviceIdsEdgeCases:
     def test_skips_device_with_no_id(self):
@@ -113,6 +134,11 @@ class TestCollectDeviceIdsEdgeCases:
         virtual_ids, _, _, _ = _collect_device_ids(rooms)
         assert 20 in virtual_ids
 
+    def test_normalizes_string_ids_and_class_prefixes(self):
+        rooms = [{"devices": [{"class": "wtp_device", "id": "42"}]}]
+        _, wtp_ids, _, _ = _collect_device_ids(rooms)
+        assert wtp_ids == [42]
+
 
 class TestInjectRoomKeys:
     def test_injects_room_name_when_room_id_matches(self):
@@ -131,13 +157,29 @@ class TestInjectRoomKeys:
         assert device.get("_floor_name") == "Ground Floor"
 
     def test_injects_device_name_from_room_devices_list(self):
-        rooms = [{"id": 1, "name": "Hall", "devices": [
-            {"id": 10, "class": "virtual", "name": "Hall Thermostat"}
-        ]}]
+        rooms = [
+            {
+                "id": 1,
+                "name": "Hall",
+                "devices": [{"id": 10, "class": "virtual", "name": "Hall Thermostat"}],
+            }
+        ]
         floors = {}
         device = {"id": 10, "type": "thermostat", "class": "virtual"}
         _inject_room_keys(device, 10, rooms, floors)
         assert device.get("_device_name") == "Hall Thermostat"
+
+    def test_injects_device_name_with_source_and_string_id(self):
+        rooms = [
+            {
+                "id": 1,
+                "name": "Hall",
+                "devices": [{"id": "10", "source": "wtp", "name": "Hall Sensor"}],
+            }
+        ]
+        device = {"id": 10, "type": "temperature_sensor", "class": "wtp"}
+        _inject_room_keys(device, 10, rooms, {})
+        assert device.get("_device_name") == "Hall Sensor"
 
 
 class TestButtonSetupEntry:
@@ -158,6 +200,25 @@ class TestButtonSetupEntry:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         assert len(added) == 2
         assert all(isinstance(e, SinumSceneButton) for e in added)
+
+    @pytest.mark.asyncio
+    async def test_cached_scenes_create_button_entities_without_refetch(self, mock_client):
+        from custom_components.sinum.button import SinumSceneButton, async_setup_entry
+
+        mock_client.get_scenes = AsyncMock(side_effect=SinumConnectionError("transient"))
+        coordinator = MagicMock()
+        coordinator.client = mock_client
+        coordinator.scenes = [{"id": 1, "name": "Evening"}]
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+
+        assert len(added) == 1
+        assert isinstance(added[0], SinumSceneButton)
+        mock_client.get_scenes.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_scenes_endpoint_unavailable_creates_no_buttons(self):
@@ -185,9 +246,7 @@ class TestCoordinatorMissingCoverage:
     @pytest.mark.asyncio
     async def test_alarm_zones_connection_error_ignored(self, mock_client):
         """alarm_zones fetch SinumConnectionError → caught, not propagated."""
-        mock_client.get_alarm_devices = AsyncMock(
-            side_effect=SinumConnectionError("alarm down")
-        )
+        mock_client.get_alarm_devices = AsyncMock(side_effect=SinumConnectionError("alarm down"))
         coordinator = self._make_coordinator(mock_client)
         with patch.object(coordinator, "async_set_updated_data"):
             data = await coordinator._async_update_data()
@@ -213,14 +272,16 @@ class TestCoordinatorMissingCoverage:
         """Per-device fallback: SinumConnectionError on one device is warned, others succeed."""
         # Simulate empty bulk + fallback device fetch
         mock_client.get_virtual_devices = AsyncMock(return_value=[])
-        mock_client.get_virtual_device = AsyncMock(
-            side_effect=SinumConnectionError("device gone")
-        )
+        mock_client.get_virtual_device = AsyncMock(side_effect=SinumConnectionError("device gone"))
         # Populate parent_devices to trigger fallback loop
         mock_client.get_parent_devices = AsyncMock(
-            return_value=[{"id": 1, "class": "virtual_parent_device", "devices": [
-                {"id": 10, "class": "virtual"}
-            ]}]
+            return_value=[
+                {
+                    "id": 1,
+                    "class": "virtual_parent_device",
+                    "devices": [{"id": 10, "class": "virtual"}],
+                }
+            ]
         )
         coordinator = self._make_coordinator(mock_client)
         with patch.object(coordinator, "async_set_updated_data"):
@@ -229,13 +290,15 @@ class TestCoordinatorMissingCoverage:
 
     def test_collect_device_ids_lora_class(self):
         """_collect_device_ids classifies 'lora' class devices into lora_ids."""
-        parent_devices = [{
-            "id": 99,
-            "class": "lora_parent_device",
-            "devices": [{"id": 10, "class": "lora"}],
-        }]
-        v, w, s, l = _collect_device_ids(parent_devices)
-        assert 10 in l
+        parent_devices = [
+            {
+                "id": 99,
+                "class": "lora_parent_device",
+                "devices": [{"id": 10, "class": "lora"}],
+            }
+        ]
+        _virtual_ids, _wtp_ids, _sbus_ids, lora_ids = _collect_device_ids(parent_devices)
+        assert 10 in lora_ids
 
     @pytest.mark.asyncio
     async def test_per_device_fallback_success(self, mock_client):
@@ -244,14 +307,65 @@ class TestCoordinatorMissingCoverage:
         fetched_device = {"id": 10, "class": "virtual", "type": "thermostat", "room_id": None}
         mock_client.get_virtual_device = AsyncMock(return_value=fetched_device)
         mock_client.get_parent_devices = AsyncMock(
-            return_value=[{"id": 1, "class": "virtual_parent_device", "devices": [
-                {"id": 10, "class": "virtual"}
-            ]}]
+            return_value=[
+                {
+                    "id": 1,
+                    "class": "virtual_parent_device",
+                    "devices": [{"id": 10, "class": "virtual"}],
+                }
+            ]
         )
         coordinator = self._make_coordinator(mock_client)
         with patch.object(coordinator, "async_set_updated_data"):
             await coordinator._async_update_data()
         assert 10 in coordinator.virtual_devices
+
+    @pytest.mark.asyncio
+    async def test_per_device_fallback_uses_parent_devices_when_rooms_empty(self, mock_client):
+        """Parent-device trees provide fallback IDs when /rooms has no devices."""
+        mock_client.get_rooms = AsyncMock(return_value=[])
+        mock_client.get_virtual_devices = AsyncMock(return_value=[])
+        mock_client.get_virtual_device = AsyncMock(
+            return_value={"id": "10", "type": "thermostat", "temperature": 210}
+        )
+        mock_client.get_parent_devices = AsyncMock(
+            return_value=[
+                {
+                    "id": 1,
+                    "class": "virtual_parent_device",
+                    "devices": [{"id": "10", "class": "virtual"}],
+                }
+            ]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        assert 10 in coordinator.virtual_devices
+        assert coordinator.virtual_devices[10]["class"] == "virtual"
+        mock_client.get_virtual_device.assert_awaited_once_with(10)
+
+    @pytest.mark.asyncio
+    async def test_cold_start_bulk_failure_uses_per_device_fallback(self, mock_client):
+        """If a bulk endpoint fails before cache exists, fallback IDs still create entities."""
+        mock_client.get_rooms = AsyncMock(return_value=[])
+        mock_client.get_sbus_devices = AsyncMock(side_effect=SinumConnectionError("bus timeout"))
+        mock_client.get_sbus_device = AsyncMock(
+            return_value={"id": 300, "class": "sbus", "type": "rgb_controller"}
+        )
+        mock_client.get_parent_devices = AsyncMock(
+            return_value=[
+                {
+                    "id": 1,
+                    "class": "sbus_parent_device",
+                    "devices": [{"id": 300, "class": "sbus"}],
+                }
+            ]
+        )
+        coordinator = self._make_coordinator(mock_client)
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+        assert 300 in coordinator.sbus_devices
+        mock_client.get_sbus_device.assert_awaited_once_with(300)
 
 
 class TestParentModelHelpers:

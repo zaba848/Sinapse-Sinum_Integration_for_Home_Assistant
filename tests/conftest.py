@@ -1,10 +1,11 @@
 """Shared pytest fixtures for Sinapse tests."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -52,6 +53,7 @@ def fixture_mock_client(fixtures: dict[str, Any]) -> MagicMock:
     client.get_weather = AsyncMock(return_value=fixtures["weather"])
     client.get_energy = AsyncMock(return_value=fixtures["energy"])
     client.get_schedules = AsyncMock(return_value=fixtures["schedules"])
+    client.get_automations = AsyncMock(return_value=[])
     client.get_alarm_devices = AsyncMock(return_value=fixtures["alarm_devices"])
     client.login = AsyncMock(return_value=None)
     client.test_connection = AsyncMock(return_value=None)

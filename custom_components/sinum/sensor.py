@@ -132,7 +132,7 @@ async def async_setup_entry(
         entities.append(
             SinumEnergyCenterStatusSensor(coordinator.client, energy_center, entry.entry_id)
         )
-    except SinumConnectionError:
+    except Exception:
         _LOGGER.debug("Energy Center endpoints not available on this hub")
 
     # Hub diagnostic sensors (from /api/v1/info — always available)

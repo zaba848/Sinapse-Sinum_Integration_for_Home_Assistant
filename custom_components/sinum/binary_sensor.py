@@ -22,6 +22,7 @@ from .const import (
     LTYPE_SMOKE_SENSOR,
     LTYPE_TWO_STATE_INPUT_SENSOR,
     STYPE_MOTION_SENSOR,
+    STYPE_VALVE_PUMP,
     WTYPE_FAN_COIL,
     WTYPE_FLOOD_SENSOR,
     WTYPE_MOTION_SENSOR,
@@ -100,6 +101,15 @@ SBUS_BINARY_SENSOR_TYPES: tuple[SinumBinarySensorDescription, ...] = (
         device_class=BinarySensorDeviceClass.MOTION,
         state_key="motion_detected",
         on_states=("true", "motion", "detected", "alarm"),
+    ),
+    # valve_pump state is hub-managed (read-only) — expose as running binary sensor
+    SinumBinarySensorDescription(
+        key="pump",
+        wtp_type=STYPE_VALVE_PUMP,
+        source="sbus",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        state_key="state",
+        on_states=("true",),
     ),
 )
 

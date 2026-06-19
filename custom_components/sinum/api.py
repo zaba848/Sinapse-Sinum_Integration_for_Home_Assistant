@@ -60,7 +60,47 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 10
+
+
+def _dict_list(items: Any) -> list[dict[str, Any]]:
+    """Return only dictionary items from a list-like API collection."""
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
+    """Normalize Sinum list responses across firmware variants.
+
+    Most documented endpoints return a bare list after the {"data": ...} envelope
+    is unwrapped. Some firmware builds return maps keyed by id/bus, or wrap the
+    list once more in keys such as "items" or "devices".
+    """
+    if isinstance(result, list):
+        return _dict_list(result)
+    if not isinstance(result, dict):
+        return []
+
+    for key in (*preferred_keys, "items", "devices", "results", "data"):
+        value = result.get(key)
+        if isinstance(value, list):
+            return _dict_list(value)
+        if isinstance(value, dict):
+            nested = _list_result(value)
+            if nested:
+                return nested
+
+    if "id" in result:
+        return [result]
+
+    flattened: list[dict[str, Any]] = []
+    for value in result.values():
+        if isinstance(value, list):
+            flattened.extend(_dict_list(value))
+        elif isinstance(value, dict) and "id" in value:
+            flattened.append(value)
+    return flattened
 
 
 class SinumAuthError(Exception):
@@ -201,10 +241,13 @@ class SinumClient:
             if not refreshed:
                 self._jwt = None
                 await self.login()
-            async with asyncio.timeout(REQUEST_TIMEOUT):
-                resp = await self._session.request(
-                    method, self._url(path), headers=self._headers(), ssl=False, **kwargs
-                )
+            try:
+                async with asyncio.timeout(REQUEST_TIMEOUT):
+                    resp = await self._session.request(
+                        method, self._url(path), headers=self._headers(), ssl=False, **kwargs
+                    )
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                raise SinumConnectionError(f"Request failed on retry: {err}") from err
 
         # 304 means no change (PATCH returned same data) — treat as success
         if resp.status == 304:
@@ -246,32 +289,26 @@ class SinumClient:
 
     async def get_rooms(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_ROOMS)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "rooms")
 
     # ----------------------------------------------------------------- floors
 
     async def get_floors(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_FLOORS)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "floors")
 
     # --------------------------------------------------------- parent devices
 
     async def get_parent_devices(self) -> list[dict[str, Any]]:
         """Return a flat list of all parent devices across all classes."""
         result = await self._request("GET", API_PARENT_DEVICES)
-        if not isinstance(result, dict):
-            return []
-        flat: list[dict[str, Any]] = []
-        for devices in result.values():
-            if isinstance(devices, list):
-                flat.extend(devices)
-        return flat
+        return _list_result(result, "parent_devices", "parents", "devices")
 
     # --------------------------------------------------------- virtual devices
 
     async def get_virtual_devices(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_VIRTUAL_DEVICES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "virtual", "devices")
 
     async def get_virtual_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_VIRTUAL_DEVICE.format(id=device_id))
@@ -283,7 +320,7 @@ class SinumClient:
 
     async def get_wtp_devices(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_WTP_DEVICES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "wtp", "devices")
 
     async def get_wtp_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_WTP_DEVICE.format(id=device_id))
@@ -295,7 +332,7 @@ class SinumClient:
 
     async def get_sbus_devices(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SBUS_DEVICES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "sbus", "devices")
 
     async def get_sbus_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_SBUS_DEVICE.format(id=device_id))
@@ -307,7 +344,7 @@ class SinumClient:
 
     async def get_scenes(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SCENES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "scenes")
 
     async def get_scene(self, scene_id: int) -> dict[str, Any]:
         result = await self._request("GET", API_SCENE.format(id=scene_id))
@@ -319,7 +356,7 @@ class SinumClient:
 
     async def get_scene_lua_extensions(self, scene_id: int) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SCENE_LUA_EXTENSIONS.format(id=scene_id))
-        return result if isinstance(result, list) else []
+        return _list_result(result, "lua_extensions", "extensions")
 
     async def get_scene_schema(self, scene_id: int) -> dict[str, Any]:
         result = await self._request("GET", API_SCENE_SCHEMA.format(id=scene_id))
@@ -327,7 +364,7 @@ class SinumClient:
 
     async def get_scene_logs(self, scene_id: int) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SCENE_LOGS.format(id=scene_id))
-        return result if isinstance(result, list) else []
+        return _list_result(result, "logs")
 
     async def run_scene(self, scene_id: int) -> None:
         await self._request("POST", API_SCENE_ACTIVATE.format(id=scene_id))
@@ -336,7 +373,7 @@ class SinumClient:
 
     async def get_automations(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_AUTOMATIONS)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "automations")
 
     async def get_automation(self, automation_id: int) -> dict[str, Any]:
         result = await self._request("GET", API_AUTOMATION.format(id=automation_id))
@@ -348,7 +385,7 @@ class SinumClient:
 
     async def get_automation_lua_extensions(self, automation_id: int) -> list[dict[str, Any]]:
         result = await self._request("GET", API_AUTOMATION_LUA_EXTENSIONS.format(id=automation_id))
-        return result if isinstance(result, list) else []
+        return _list_result(result, "lua_extensions", "extensions")
 
     async def get_automation_schema(self, automation_id: int) -> dict[str, Any]:
         result = await self._request("GET", API_AUTOMATION_SCHEMA.format(id=automation_id))
@@ -356,13 +393,13 @@ class SinumClient:
 
     async def get_automation_logs(self, automation_id: int) -> list[dict[str, Any]]:
         result = await self._request("GET", API_AUTOMATION_LOGS.format(id=automation_id))
-        return result if isinstance(result, list) else []
+        return _list_result(result, "logs")
 
     # ------------------------------------------------------------ variables
 
     async def get_variables(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_VARIABLES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "variables")
 
     async def set_variable(self, variable_id: int, value: Any) -> dict[str, Any]:
         return await self._request(
@@ -373,7 +410,7 @@ class SinumClient:
 
     async def get_schedules(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SCHEDULES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "schedules")
 
     async def get_schedule(self, schedule_id: int) -> dict[str, Any]:
         result = await self._request("GET", API_SCHEDULE.format(id=schedule_id))
@@ -387,7 +424,7 @@ class SinumClient:
 
     async def get_alarm_devices(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_ALARM_DEVICES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "alarm_system", "alarm_devices", "devices")
 
     async def get_alarm_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_ALARM_DEVICE.format(id=device_id))
@@ -408,7 +445,7 @@ class SinumClient:
 
     async def get_lora_devices(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_LORA_DEVICES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "lora", "devices")
 
     async def get_lora_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_LORA_DEVICE.format(id=device_id))
@@ -450,7 +487,7 @@ class SinumClient:
 
     async def get_energy_center_prices_sources(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_ENERGY_CENTER_PRICES_SOURCES)
-        return result if isinstance(result, list) else []
+        return _list_result(result, "sources")
 
     async def get_energy_center_storage(self) -> dict[str, Any]:
         result = await self._request("GET", API_ENERGY_CENTER_STORAGE)
@@ -465,22 +502,40 @@ class SinumClient:
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_summary(self) -> dict[str, Any]:
-        endpoints = {
-            "associations": self.get_energy_center_associations,
-            "flow_monitor": self.get_energy_center_flow_monitor,
-            "prices": self.get_energy_center_prices,
-            "prices_settings": self.get_energy_center_prices_settings,
-            "prices_sources": self.get_energy_center_prices_sources,
-            "storage": self.get_energy_center_storage,
-            "consumption": self.get_energy_center_consumption,
-            "production": self.get_energy_center_production,
-        }
-        summary: dict[str, Any] = {"available_endpoints": [], "missing_endpoints": []}
-        for key, getter in endpoints.items():
+        keys = [
+            "associations",
+            "flow_monitor",
+            "prices",
+            "prices_settings",
+            "prices_sources",
+            "storage",
+            "consumption",
+            "production",
+        ]
+        getters = [
+            self.get_energy_center_associations,
+            self.get_energy_center_flow_monitor,
+            self.get_energy_center_prices,
+            self.get_energy_center_prices_settings,
+            self.get_energy_center_prices_sources,
+            self.get_energy_center_storage,
+            self.get_energy_center_consumption,
+            self.get_energy_center_production,
+        ]
+
+        async def _try(getter: Any) -> Any:
             try:
-                summary[key] = await getter()
+                return await getter()
+            except Exception:
+                return None
+
+        results = await asyncio.gather(*(_try(g) for g in getters))
+        summary: dict[str, Any] = {"available_endpoints": [], "missing_endpoints": []}
+        for key, result in zip(keys, results):
+            if result is not None:
+                summary[key] = result
                 summary["available_endpoints"].append(key)
-            except SinumConnectionError:
+            else:
                 summary["missing_endpoints"].append(key)
         if not summary["available_endpoints"]:
             raise SinumConnectionError("Energy Center endpoints unavailable")

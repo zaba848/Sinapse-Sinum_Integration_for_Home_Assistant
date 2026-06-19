@@ -7,8 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.sinum.const import (
+    ATTR_ENTRY_ID,
     ATTR_NOTIFICATION_MESSAGE,
     ATTR_NOTIFICATION_TITLE,
+    ATTR_PAYLOAD,
+    ATTR_SCHEDULE_ID,
     AUTH_MODE_PASSWORD,
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
@@ -18,6 +21,7 @@ from custom_components.sinum.const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_SEND_NOTIFICATION,
+    SERVICE_UPDATE_SCHEDULE,
 )
 
 
@@ -392,3 +396,137 @@ class TestSendNotificationService:
 
         client_a.send_notification.assert_awaited_once_with(title="Test", message="Hello")
         client_b.send_notification.assert_awaited_once_with(title="Test", message="Hello")
+
+
+class TestUpdateScheduleService:
+    @pytest.mark.asyncio
+    async def test_update_schedule_single_hub_without_entry_id(self, hass):
+        from custom_components.sinum import async_setup_entry
+
+        mock_client = MagicMock()
+        mock_client.login = AsyncMock()
+        mock_client.patch_schedule = AsyncMock(return_value={"id": 1, "name": "Morning"})
+
+        coordinator = MagicMock()
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+        coordinator.client = mock_client
+        coordinator.hub_info = {"name": "Hub A"}
+        coordinator.mqtt_bridge = None
+        coordinator.schedules = [{"id": 1, "name": "Old"}]
+        coordinator.data = {"schedules": coordinator.schedules}
+        coordinator.async_set_updated_data = MagicMock()
+
+        entry = MagicMock()
+        entry.entry_id = "hub_a"
+        entry.title = "Sinum (Hub A)"
+        entry.options = {}
+        entry.data = {
+            "host": "10.0.61.132",
+            "auth_mode": "token",
+            "api_token": "tok-a",
+            "scan_interval": 30,
+        }
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator", return_value=coordinator),
+            patch("custom_components.sinum.SinumClient", return_value=mock_client),
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            await async_setup_entry(hass, entry)
+
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPDATE_SCHEDULE,
+            {ATTR_SCHEDULE_ID: 1, ATTR_PAYLOAD: {"name": "Morning"}},
+            blocking=True,
+        )
+
+        mock_client.patch_schedule.assert_awaited_once_with(1, {"name": "Morning"})
+        assert coordinator.schedules[0]["name"] == "Morning"
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_schedule_two_hubs_requires_and_routes_entry_id(self, hass):
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.sinum import async_setup_entry
+
+        client_a = MagicMock()
+        client_a.login = AsyncMock()
+        client_a.patch_schedule = AsyncMock(return_value={})
+        client_b = MagicMock()
+        client_b.login = AsyncMock()
+        client_b.patch_schedule = AsyncMock(return_value={"id": 7, "name": "Evening"})
+
+        coordinator_a = MagicMock()
+        coordinator_a.async_config_entry_first_refresh = AsyncMock()
+        coordinator_a.client = client_a
+        coordinator_a.hub_info = {"name": "Hub A"}
+        coordinator_a.mqtt_bridge = None
+        coordinator_a.schedules = [{"id": 7, "name": "A"}]
+        coordinator_a.data = {}
+        coordinator_a.async_set_updated_data = MagicMock()
+        coordinator_b = MagicMock()
+        coordinator_b.async_config_entry_first_refresh = AsyncMock()
+        coordinator_b.client = client_b
+        coordinator_b.hub_info = {"name": "Hub B"}
+        coordinator_b.mqtt_bridge = None
+        coordinator_b.schedules = [{"id": 7, "name": "Old"}]
+        coordinator_b.data = {}
+        coordinator_b.async_set_updated_data = MagicMock()
+
+        entry_a = MagicMock()
+        entry_a.entry_id = "hub_a"
+        entry_a.title = "Sinum (Hub A)"
+        entry_a.options = {}
+        entry_a.data = {
+            "host": "10.0.61.132",
+            "auth_mode": "token",
+            "api_token": "tok-a",
+            "scan_interval": 30,
+        }
+        entry_b = MagicMock()
+        entry_b.entry_id = "hub_b"
+        entry_b.title = "Sinum (Hub B)"
+        entry_b.options = {}
+        entry_b.data = {
+            "host": "10.0.62.167",
+            "auth_mode": "token",
+            "api_token": "tok-b",
+            "scan_interval": 30,
+        }
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator") as mock_coordinator,
+            patch("custom_components.sinum.SinumClient") as mock_client_cls,
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            mock_client_cls.side_effect = [client_a, client_b]
+            mock_coordinator.side_effect = [coordinator_a, coordinator_b]
+            await async_setup_entry(hass, entry_a)
+            await async_setup_entry(hass, entry_b)
+
+        with pytest.raises(HomeAssistantError, match="entry_id is required"):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_UPDATE_SCHEDULE,
+                {ATTR_SCHEDULE_ID: 7, ATTR_PAYLOAD: {"name": "Skipped"}},
+                blocking=True,
+            )
+
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPDATE_SCHEDULE,
+            {
+                ATTR_ENTRY_ID: "hub_b",
+                ATTR_SCHEDULE_ID: 7,
+                ATTR_PAYLOAD: {"name": "Evening"},
+            },
+            blocking=True,
+        )
+
+        client_a.patch_schedule.assert_not_awaited()
+        client_b.patch_schedule.assert_awaited_once_with(7, {"name": "Evening"})
+        assert coordinator_b.schedules[0]["name"] == "Evening"
