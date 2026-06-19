@@ -85,6 +85,24 @@ def _hex_to_hs(hex_color: str) -> tuple[float, float]:
     return h, s
 
 
+def _kelvin_to_hex(kelvin: int) -> str:
+    """Convert color temperature in Kelvin to approximate #RRGGBB for RGB-only strips."""
+    t = max(1000, min(40000, kelvin)) / 100
+    if t <= 66:
+        r = 255
+        g = max(0, min(255, round(99.4708025861 * math.log(t) - 161.1195681661)))
+    else:
+        r = max(0, min(255, round(329.698727446 * ((t - 60) ** -0.1332047592))))
+        g = max(0, min(255, round(288.1221695283 * ((t - 60) ** -0.0755148492))))
+    if t >= 66:
+        b = 255
+    elif t <= 19:
+        b = 0
+    else:
+        b = max(0, min(255, round(138.5177312231 * math.log(t - 10) - 305.0447927307)))
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 def _hs_to_hex(hue: float, saturation: float) -> str:
     """Convert (hue 0-360, saturation 0-100) to #RRGGBB."""
     h = hue / 60
@@ -219,7 +237,11 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             payload["led_color"] = _hs_to_hex(h, s)
 
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            if self._device.get("led_strip_type", "").lower() == "rgb":
+                payload["led_color"] = _kelvin_to_hex(kelvin)
+            else:
+                payload["white_temperature"] = kelvin
 
         updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         self.coordinator.virtual_devices[self._device_id].update(updated)
@@ -383,7 +405,11 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             payload["led_color"] = _hs_to_hex(h, s)
 
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            payload["white_temperature"] = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            if self._device.get("led_strip_type", "").lower() == "rgb":
+                payload["led_color"] = _kelvin_to_hex(kelvin)
+            else:
+                payload["white_temperature"] = kelvin
 
         if self._bus == "wtp":
             updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)

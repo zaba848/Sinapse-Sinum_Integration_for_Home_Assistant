@@ -211,6 +211,10 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "stop"})
+        # Re-fetch actual state: gate may have stopped at unknown position
+        updated = await self.coordinator.client.get_virtual_device(self._device_id)
+        if updated:
+            self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
 

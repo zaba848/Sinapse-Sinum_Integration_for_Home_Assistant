@@ -365,10 +365,21 @@ class TestSinumGateCoverStop:
     async def test_stop_sends_stop(self):
         entity = _make_gate()
         entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        entity.coordinator.client.get_virtual_device = AsyncMock(return_value={"state": "open"})
         await entity.async_stop_cover()
         entity.coordinator.client.patch_virtual_device.assert_awaited_once_with(
             14, {"command": "stop"}
         )
+
+    @pytest.mark.asyncio
+    async def test_stop_refetches_state(self):
+        entity = _make_gate(state="opening")
+        entity.coordinator.client.patch_virtual_device = AsyncMock(return_value={})
+        entity.coordinator.client.get_virtual_device = AsyncMock(
+            return_value={"state": "open", "status": "online"}
+        )
+        await entity.async_stop_cover()
+        assert entity.coordinator.virtual_devices[14]["state"] == "open"
 
 
 def _make_sbus_blind(current=50, target=50, tilt=None) -> SinumSbusBlindCover:
