@@ -120,6 +120,24 @@ class TestAsyncSetupEntry:
         assert relays[0]._bus == "sbus"
 
     @pytest.mark.asyncio
+    async def test_sbus_relay_managed_by_thermostat_skipped(self):
+        sbus = {20: {"id": 20, "type": STYPE_RELAY, "name": "Managed Relay", "labels": ["managed_by_thermostat"]}}
+        coordinator = _make_coordinator(sbus=sbus)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        assert not any(isinstance(e, SinumBusRelaySwitch) for e in added)
+
+    @pytest.mark.asyncio
+    async def test_sbus_relay_not_managed_created(self):
+        sbus = {20: {"id": 20, "type": STYPE_RELAY, "name": "Free Relay", "labels": ["in_room"]}}
+        coordinator = _make_coordinator(sbus=sbus)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        assert any(isinstance(e, SinumBusRelaySwitch) for e in added)
+
+    @pytest.mark.asyncio
     async def test_sbus_valve_pump_creates_valve_pump_switch(self):
         sbus = {21: {"id": 21, "type": STYPE_VALVE_PUMP, "name": "Pump", "state": False}}
         coordinator = _make_coordinator(sbus=sbus)

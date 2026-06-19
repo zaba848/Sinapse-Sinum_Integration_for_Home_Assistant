@@ -48,7 +48,7 @@ async def async_setup_entry(
 
     for device_id, device in coordinator.sbus_devices.items():
         dev_type = device.get("type")
-        if dev_type == STYPE_RELAY:
+        if dev_type == STYPE_RELAY and "managed_by_thermostat" not in device.get("labels", []):
             entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "sbus"))
         elif dev_type == STYPE_VALVE_PUMP:
             entities.append(SinumValvePumpSwitch(coordinator, device_id, entry.entry_id))
