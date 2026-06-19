@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import cast
+from typing import TypeAlias, cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
@@ -60,7 +60,7 @@ NOTIFY_SCHEMA = vol.Schema(
     }
 )
 
-SinumConfigEntry = ConfigEntry[SinumCoordinator]
+SinumConfigEntry: TypeAlias = ConfigEntry[SinumCoordinator]
 
 _MQTT_BRIDGES: dict[str, SinumMqttBridge] = {}
 

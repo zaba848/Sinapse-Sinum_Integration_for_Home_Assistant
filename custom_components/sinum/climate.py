@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -304,6 +304,11 @@ class _BusClimateMixin:
     _current_temperature_key = "temperature"
     _mode_key = "system_mode"
     _patch_mode_key = "system_mode"
+
+    if TYPE_CHECKING:
+        coordinator: SinumCoordinator
+
+        def async_write_ha_state(self) -> None: ...
 
     @property
     def _bus_name(self) -> str:

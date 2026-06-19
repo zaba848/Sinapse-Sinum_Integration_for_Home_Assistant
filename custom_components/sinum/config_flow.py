@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import (  # type: ignore[attr-defined]
+from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -56,7 +56,7 @@ STEP_PASSWORD_SCHEMA = vol.Schema(
 )
 
 
-class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
+class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     VERSION = 1
 
     def __init__(self) -> None:
@@ -213,7 +213,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class SinumOptionsFlow(OptionsFlow):  # type: ignore[misc]
+class SinumOptionsFlow(OptionsFlow):
     """Options flow: change scan interval and MQTT settings."""
 
     def __init__(self, config_entry: Any) -> None:
