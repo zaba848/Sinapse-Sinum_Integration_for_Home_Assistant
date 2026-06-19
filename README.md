@@ -4,7 +4,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-857%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-866%20passing-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](tests/)
 [![Sinum API](https://img.shields.io/badge/Sinum%20API-1.4-informational)](https://apidocs.sinum.tech)
 
@@ -217,7 +217,7 @@ pip install -r requirements-dev.txt
 ### Tests
 
 ```bash
-pytest tests/           # 865 tests, ~3 s
+pytest tests/           # 866 tests, ~3 s
 pytest -v tests/        # verbose
 pytest --cov=custom_components/sinum tests/  # with coverage (100%)
 ```
@@ -256,7 +256,7 @@ lua_scripts/
 
 tests/
   ├── fixtures/sinum_devices.json
-  └── test_*.py            # 865 tests across all platforms and device types
+  └── test_*.py            # 866 tests across all platforms and device types
 ```
 
 ---

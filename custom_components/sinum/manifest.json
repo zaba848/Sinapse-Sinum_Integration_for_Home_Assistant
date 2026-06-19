@@ -4,6 +4,7 @@
   "version": "0.2.0",
   "documentation": "https://github.com/zaba848/Sinum_HomeAsistant_connector",
   "issue_tracker": "https://github.com/zaba848/Sinum_HomeAsistant_connector/issues",
+  "homeassistant": "2024.1.0",
   "requirements": ["aiohttp>=3.9.0"],
   "dependencies": [],
   "codeowners": ["@zaba848"],

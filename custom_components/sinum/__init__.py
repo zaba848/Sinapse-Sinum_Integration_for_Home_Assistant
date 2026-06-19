@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from typing import cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
@@ -34,6 +36,8 @@ from .mqtt import SinumMqttBridge
 
 _LOGGER = logging.getLogger(__name__)
 
+DATA_NOTIFICATION_CLIENTS = "notification_clients"
+
 PLATFORMS: list[Platform] = [
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
@@ -59,6 +63,11 @@ NOTIFY_SCHEMA = vol.Schema(
 SinumConfigEntry = ConfigEntry[SinumCoordinator]
 
 _MQTT_BRIDGES: dict[str, SinumMqttBridge] = {}
+
+
+def _notification_clients(hass: HomeAssistant) -> dict[str, SinumClient]:
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    return cast(dict[str, SinumClient], domain_data.setdefault(DATA_NOTIFICATION_CLIENTS, {}))
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: SinumConfigEntry) -> None:
@@ -118,19 +127,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    # Push notification service
+    _notification_clients(hass)[entry.entry_id] = client
+
+    # Push notification service. Register once per HA instance; with multiple hubs loaded,
+    # the service broadcasts to all currently loaded Sinum clients.
     async def handle_send_notification(call: ServiceCall) -> None:
-        await client.send_notification(
-            title=call.data[ATTR_NOTIFICATION_TITLE],
-            message=call.data[ATTR_NOTIFICATION_MESSAGE],
+        await asyncio.gather(
+            *(
+                notification_client.send_notification(
+                    title=call.data[ATTR_NOTIFICATION_TITLE],
+                    message=call.data[ATTR_NOTIFICATION_MESSAGE],
+                )
+                for notification_client in _notification_clients(hass).values()
+            )
         )
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SEND_NOTIFICATION,
-        handle_send_notification,
-        schema=NOTIFY_SCHEMA,
-    )
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SEND_NOTIFICATION,
+            handle_send_notification,
+            schema=NOTIFY_SCHEMA,
+        )
 
     return True
 
@@ -142,6 +160,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bo
         await bridge.async_stop()
 
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded and not hass.config_entries.async_entries(DOMAIN):
+    if unloaded:
+        _notification_clients(hass).pop(entry.entry_id, None)
+    if (
+        unloaded
+        and not hass.config_entries.async_entries(DOMAIN)
+        and hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION)
+    ):
         hass.services.async_remove(DOMAIN, SERVICE_SEND_NOTIFICATION)
     return unloaded

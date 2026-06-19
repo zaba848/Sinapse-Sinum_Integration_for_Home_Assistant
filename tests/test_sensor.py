@@ -1,20 +1,25 @@
 """Tests for Sinum sensor entities."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+
 from custom_components.sinum.sensor import (
+    ENERGY_SENSORS,
+    LORA_SENSORS,
     SBUS_SENSORS,
+    VIRTUAL_SENSORS,
+    WEATHER_SENSORS,
     WTP_SENSORS,
     SinumSensor,
     SinumTemperatureRegulatorSensor,
 )
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _description(key: str):
@@ -48,15 +53,53 @@ class TestSbusSensors:
         assert entity.native_value == 52.0
 
 
+class TestSensorStateClassContracts:
+    def test_measurement_device_classes_have_state_class(self):
+        descriptors = VIRTUAL_SENSORS + WTP_SENSORS + SBUS_SENSORS + LORA_SENSORS + WEATHER_SENSORS
+        measurement_classes = {
+            SensorDeviceClass.TEMPERATURE,
+            SensorDeviceClass.HUMIDITY,
+            SensorDeviceClass.ILLUMINANCE,
+            SensorDeviceClass.CO2,
+            SensorDeviceClass.PRESSURE,
+        }
+
+        missing = [
+            (desc.source, desc.key)
+            for desc in descriptors
+            if desc.device_class in measurement_classes
+            and desc.state_class != SensorStateClass.MEASUREMENT
+        ]
+
+        assert missing == []
+
+    def test_energy_and_impulse_totals_are_total_increasing(self):
+        descriptors = WTP_SENSORS + SBUS_SENSORS + ENERGY_SENSORS
+        total_keys = {
+            "energy_consumed_total",
+            "energy_consumed_today",
+            "energy_consumption",
+            "energy_production",
+            "impulse_total_count",
+            "impulse_total_value",
+        }
+
+        missing = [
+            (desc.source, desc.key)
+            for desc in descriptors
+            if desc.key in total_keys and desc.state_class != SensorStateClass.TOTAL_INCREASING
+        ]
+
+        assert missing == []
+
+
 class TestPhase7BTemperatureRegulators:
     """Phase 7B: Temperature regulator sensors."""
 
     def _wtp_regulator_description(self, key: str):
         """Get WTP regulator sensor description by key."""
         return next(
-            desc
-            for desc in WTP_SENSORS
-            if desc.key == key and desc.source == "wtp_regulator"
+            desc for desc in WTP_SENSORS if desc.key == key and desc.source == "wtp_regulator"
         )
 
     def _make_wtp_coordinator(self, device_id: int, device: dict):
@@ -125,4 +168,3 @@ class TestPhase7BTemperatureRegulators:
         # Attributes should only include fields that exist
         attrs = entity.extra_state_attributes
         assert len(attrs) == 0  # No mode, parent_id, etc. in partial device
-

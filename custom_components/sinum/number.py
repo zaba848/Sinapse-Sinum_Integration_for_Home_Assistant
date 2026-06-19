@@ -23,11 +23,14 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
-    try:
-        variables = await coordinator.client.get_variables()
-    except SinumConnectionError:
-        _LOGGER.debug("Variables endpoint not available on this hub firmware")
-        variables = []
+    variables = getattr(coordinator, "variables", None)
+    if not isinstance(variables, list):
+        try:
+            variables = await coordinator.client.get_variables()
+            coordinator.variables = variables
+        except SinumConnectionError:
+            _LOGGER.debug("Variables endpoint not available on this hub firmware")
+            variables = []
 
     entities: list[NumberEntity] = []
     for var in variables:
@@ -43,7 +46,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class SinumVariableNumber(NumberEntity):
+class SinumVariableNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
     """Sinum global variable exposed as a HA number entity."""
 
     _attr_has_entity_name = True
@@ -52,9 +55,12 @@ class SinumVariableNumber(NumberEntity):
     def __init__(
         self, coordinator: SinumCoordinator, variable: dict[str, Any], entry_id: str
     ) -> None:
-        self._coordinator = coordinator
+        super().__init__(coordinator)
         self._variable_id: int = variable["id"]
-        self._variable = variable
+        if not isinstance(getattr(coordinator, "variables", None), list):
+            coordinator.variables = []
+        if not any(item.get("id") == self._variable_id for item in coordinator.variables):
+            coordinator.variables.append(variable)
         self._attr_name = variable.get("name", f"Variable {self._variable_id}")
         self._attr_unique_id = f"{entry_id}_variable_{self._variable_id}"
         self._attr_native_min_value = float(variable.get("min", -999999))
@@ -66,28 +72,42 @@ class SinumVariableNumber(NumberEntity):
             identifiers={(DOMAIN, f"{entry_id}_variables")},
             name="Sinum Variables",
             manufacturer="TECH Sterowniki",
-            model="Sinum EH-01",
+            model=_hub_model(coordinator.hub_info),
         )
 
     @property
-    def native_value(self) -> float:
-        return float(self._variable.get("value", 0))
-
-    async def async_set_native_value(self, value: float) -> None:
-        updated = await self._coordinator.client.set_variable(self._variable_id, value)
-        self._variable.update(updated)
-        self.async_write_ha_state()
-
-    async def async_update(self) -> None:
-        try:
-            variables = await self._coordinator.client.get_variables()
-        except SinumConnectionError as err:
-            _LOGGER.warning("Variable update failed for %s: %s", self._variable_id, err)
-            return
+    def _variable(self) -> dict[str, Any]:
+        variables = getattr(self.coordinator, "variables", [])
         for variable in variables:
             if variable.get("id") == self._variable_id:
-                self._variable.update(variable)
-                break
+                return variable
+        return {}
+
+    @property
+    def native_value(self) -> float | None:
+        value = self._variable.get("value")
+        return float(value) if value is not None else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        updated = await self.coordinator.client.set_variable(self._variable_id, value)
+        variable = self._variable
+        if variable:
+            variable.update(updated)
+        else:
+            self.coordinator.variables.append(updated)
+        self.async_write_ha_state()
+
+
+def _hub_model(hub_info: dict[str, Any]) -> str:
+    if not isinstance(hub_info, dict):
+        return "Sinum EH-01"
+    model_map = {
+        "sinum_plus": "Sinum Plus",
+        "sinum_pro": "Sinum Pro",
+        "sinum_lite": "Sinum Lite",
+        "sinum": "Sinum EH-01",
+    }
+    return hub_info.get("model") or model_map.get(hub_info.get("device_type", "")) or "Sinum EH-01"
 
 
 class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):

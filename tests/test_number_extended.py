@@ -1,4 +1,5 @@
 """Extended tests for number entities (improves 56% → 80%+ coverage)."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,11 +16,19 @@ from custom_components.sinum.number import (
 def _make_coordinator(sbus_devices=None):
     coord = MagicMock()
     coord.sbus_devices = sbus_devices or {}
+    coord.async_request_refresh = AsyncMock()
     return coord
 
 
 def _make_variable(var_id=1, name="Setpoint", value=50, min_val=0, max_val=100, var_type="integer"):
-    return {"id": var_id, "name": name, "value": value, "min": min_val, "max": max_val, "type": var_type}
+    return {
+        "id": var_id,
+        "name": name,
+        "value": value,
+        "min": min_val,
+        "max": max_val,
+        "type": var_type,
+    }
 
 
 def _make_analog_device(device_id=40, value=500, v_min=0, v_max=10000, unit=""):
@@ -81,24 +90,19 @@ class TestSinumVariableNumber:
         coordinator.client.set_variable.assert_awaited_once_with(1, 75.0)
 
     @pytest.mark.asyncio
-    async def test_async_update_refreshes_value(self):
+    async def test_async_update_requests_coordinator_refresh(self):
         entity, coordinator = self._make_entity(_make_variable(value=50))
-        coordinator.client.get_variables = AsyncMock(
-            return_value=[{"id": 1, "name": "Setpoint", "value": 99}]
-        )
+
         await entity.async_update()
-        assert entity._variable["value"] == 99
 
-    @pytest.mark.asyncio
-    async def test_async_update_connection_error_does_not_raise(self):
-        """Lines 84-86: SinumConnectionError in async_update is caught gracefully."""
-        from custom_components.sinum.api import SinumConnectionError as ConnErr
+        coordinator.async_request_refresh.assert_awaited_once()
 
+    def test_native_value_follows_coordinator_cache(self):
         entity, coordinator = self._make_entity(_make_variable(value=50))
-        coordinator.client.get_variables = AsyncMock(side_effect=ConnErr("timeout"))
-        # Should not raise; _variable remains unchanged
-        await entity.async_update()
-        assert entity._variable["value"] == 50
+
+        coordinator.variables[0]["value"] = 99
+
+        assert entity.native_value == 99
 
 
 class TestSinumAnalogOutputNumber:
@@ -250,8 +254,13 @@ class TestSinumVariableNumberSetup:
         """Lines 38-39: sbus_devices with analog_output type → SinumAnalogOutputNumber."""
         from custom_components.sinum.number import async_setup_entry
 
-        device = {"id": 40, "type": "analog_output", "value": 500,
-                  "value_minimum": 0, "value_maximum": 10000}
+        device = {
+            "id": 40,
+            "type": "analog_output",
+            "value": 500,
+            "value_minimum": 0,
+            "value_maximum": 10000,
+        }
         coordinator = _make_coordinator(sbus_devices={40: device})
         coordinator.client.get_variables = AsyncMock(return_value=[])
         entry = MagicMock()
@@ -269,8 +278,12 @@ class TestSinumVariableNumberSetup:
         """Lines 40-41: sbus_devices with pulse_width_modulation type → SinumPwmNumber."""
         from custom_components.sinum.number import async_setup_entry
 
-        device = {"id": 10, "type": "pulse_width_modulation", "duty_cycle": 50,
-                  "name": "PWM Output"}
+        device = {
+            "id": 10,
+            "type": "pulse_width_modulation",
+            "duty_cycle": 50,
+            "name": "PWM Output",
+        }
         coordinator = _make_coordinator(sbus_devices={10: device})
         coordinator.client.get_variables = AsyncMock(return_value=[])
         entry = MagicMock()

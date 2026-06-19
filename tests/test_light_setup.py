@@ -1,4 +1,5 @@
 """Tests for light async_setup_entry and entity methods."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -188,7 +189,9 @@ class TestSinumDimmerLight:
         assert entity.brightness is None
 
     def test_hs_color_from_led_color(self):
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "led_color": "#FF0000"})
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "led_color": "#FF0000"}
+        )
         hs = entity.hs_color
         assert hs is not None
         assert hs[0] == pytest.approx(0.0, abs=1)
@@ -198,57 +201,81 @@ class TestSinumDimmerLight:
         assert entity.hs_color is None
 
     def test_color_temp_kelvin(self):
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "white_temperature": 4000})
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "white_temperature": 4000}
+        )
         assert entity.color_temp_kelvin == 4000
 
     def test_color_mode_rgb(self):
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "color_mode": "rgb"})
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "color_mode": "rgb"}
+        )
         from homeassistant.components.light import ColorMode
+
         assert entity.color_mode == ColorMode.HS
 
     def test_color_mode_temperature(self):
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "color_mode": "temperature"})
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "color_mode": "temperature"}
+        )
         from homeassistant.components.light import ColorMode
+
         assert entity.color_mode == ColorMode.COLOR_TEMP
 
     def test_color_mode_default_brightness(self):
         entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D"})
         from homeassistant.components.light import ColorMode
+
         assert entity.color_mode == ColorMode.BRIGHTNESS
 
     def test_supported_color_modes_brightness_only(self):
         """Line 148: supported_color_modes returns {BRIGHTNESS} when no color fields."""
         from homeassistant.components.light import ColorMode
+
         entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D"})
         assert entity.supported_color_modes == {ColorMode.BRIGHTNESS}
 
     def test_supported_color_modes_hs_when_led_color(self):
         """Lines 108-117: _supported_color_modes returns HS when led_color present."""
         from homeassistant.components.light import ColorMode
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "led_color": "#FF0000"})
+
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "led_color": "#FF0000"}
+        )
         assert ColorMode.HS in entity.supported_color_modes
 
     def test_supported_color_modes_color_temp_when_white_temperature(self):
         """Lines 108-117: _supported_color_modes returns COLOR_TEMP when white_temperature present."""
         from homeassistant.components.light import ColorMode
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "white_temperature": 4000})
+
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "white_temperature": 4000}
+        )
         assert ColorMode.COLOR_TEMP in entity.supported_color_modes
 
     def test_supported_color_modes_onoff_for_rgbww(self):
         """Lines 108-109: _supported_color_modes returns {ONOFF} for rgbww devices."""
         from homeassistant.components.light import ColorMode
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]})
+
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]}
+        )
         assert entity.supported_color_modes == {ColorMode.ONOFF}
 
     def test_color_mode_onoff_for_rgbww(self):
         """Line 153: color_mode returns ONOFF for rgbww animation device."""
         from homeassistant.components.light import ColorMode
-        entity, _ = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]})
+
+        entity, _ = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "labels": ["rgbww"]}
+        )
         assert entity.color_mode == ColorMode.ONOFF
 
     @pytest.mark.asyncio
     async def test_async_turn_on_basic(self):
-        entity, coordinator = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "off"})
+        entity, coordinator = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "off"}
+        )
         coordinator.client.patch_virtual_device = AsyncMock(return_value={"state": True})
         await entity.async_turn_on()
         coordinator.client.patch_virtual_device.assert_awaited_once()
@@ -257,7 +284,9 @@ class TestSinumDimmerLight:
 
     @pytest.mark.asyncio
     async def test_async_turn_on_with_brightness(self):
-        entity, coordinator = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "off"})
+        entity, coordinator = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "off"}
+        )
         coordinator.client.patch_virtual_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_BRIGHTNESS: 128})
         payload = coordinator.client.patch_virtual_device.await_args.args[1]
@@ -281,7 +310,9 @@ class TestSinumDimmerLight:
 
     @pytest.mark.asyncio
     async def test_async_turn_off(self):
-        entity, coordinator = self._make({"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "on"})
+        entity, coordinator = self._make(
+            {"id": 1, "type": VTYPE_DIMMER_RGB, "name": "D", "state": "on"}
+        )
         coordinator.client.patch_virtual_device = AsyncMock(return_value={})
         await entity.async_turn_off()
         payload = coordinator.client.patch_virtual_device.await_args.args[1]
@@ -330,8 +361,14 @@ class TestSinumBusDimmerLight:
 
 class TestSinumBusRgbLight:
     def _make_wtp(self, device: dict | None = None):
-        d = device or {"id": 4, "type": WTYPE_RGB_CONTROLLER, "name": "RGB",
-                       "state": True, "brightness": 80, "led_color": "#00FF00"}
+        d = device or {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "brightness": 80,
+            "led_color": "#00FF00",
+        }
         coordinator = _make_coordinator(wtp={4: d})
         entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
         return entity, coordinator
@@ -382,14 +419,22 @@ class TestSinumBusRgbLight:
     def test_supported_color_modes_is_onoff(self):
         """Bus RGB controllers are ONOFF-only (API limitation: color PATCH returns 422)."""
         from homeassistant.components.light import ColorMode
+
         entity, _ = self._make_wtp()
         assert entity.supported_color_modes == {ColorMode.ONOFF}
 
     def test_color_mode_is_always_onoff(self):
         """color_mode is always ONOFF regardless of device fields."""
         from homeassistant.components.light import ColorMode
-        d = {"id": 4, "type": WTYPE_RGB_CONTROLLER, "name": "RGB", "state": True,
-             "color_mode": "rgb", "led_color": "#FF0000"}
+
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "color_mode": "rgb",
+            "led_color": "#FF0000",
+        }
         entity, _ = self._make_wtp(d)
         assert entity.color_mode == ColorMode.ONOFF
 
@@ -405,8 +450,13 @@ class TestSinumBusRgbLight:
     @pytest.mark.asyncio
     async def test_turn_on_rgbww_device_only_sends_state(self):
         """Lines 353-354, 362-368: RGBWW device ignores color/brightness kwargs."""
-        d = {"id": 4, "type": WTYPE_RGB_CONTROLLER, "name": "RGB", "state": False,
-             "labels": ["rgbww"]}
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": False,
+            "labels": ["rgbww"],
+        }
         coordinator = _make_coordinator(wtp={4: d})
         entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})

@@ -99,13 +99,8 @@ def _hs_to_hex(hue: float, saturation: float) -> str:
     return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
 
-def _is_rgbww_animation_device(device: dict[str, Any]) -> bool:
-    """RGBWW devices (RGB-S5m/P4m) report color/brightness but only accept state via PATCH."""
-    return "rgbww" in device.get("labels", [])
-
-
 def _supported_color_modes(device: dict[str, Any]) -> set[ColorMode]:
-    if _is_rgbww_animation_device(device):
+    if "rgbww" in device.get("labels", []):
         return {ColorMode.ONOFF}
     modes: set[ColorMode] = set()
     if "led_color" in device or device.get("color_mode") == "rgb":
@@ -149,7 +144,7 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def color_mode(self) -> ColorMode:
-        if _is_rgbww_animation_device(self._device):
+        if "rgbww" in self._device.get("labels", []):
             return ColorMode.ONOFF
         mode = self._device.get("color_mode", "")
         if mode == "rgb":

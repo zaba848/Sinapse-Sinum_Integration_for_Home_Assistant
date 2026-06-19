@@ -1,4 +1,5 @@
 """Tests for Sinum MQTT bridge."""
+
 from __future__ import annotations
 
 import json
@@ -28,7 +29,10 @@ class TestSinumMqttBridge:
         bridge = SinumMqttBridge(hass, coordinator)
 
         with (
-            patch("custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client", AsyncMock(return_value=False)),
+            patch(
+                "custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client",
+                AsyncMock(return_value=False),
+            ),
             patch("custom_components.sinum.mqtt.mqtt.async_subscribe", AsyncMock()) as subscribe,
         ):
             assert await bridge.async_start() is False
@@ -43,7 +47,10 @@ class TestSinumMqttBridge:
         bridge = SinumMqttBridge(hass, coordinator)
 
         with (
-            patch("custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client", AsyncMock(return_value=True)),
+            patch(
+                "custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client",
+                AsyncMock(return_value=True),
+            ),
             patch(
                 "custom_components.sinum.mqtt.mqtt.async_subscribe",
                 AsyncMock(side_effect=[unsub_state, unsub_event]),
@@ -64,7 +71,10 @@ class TestSinumMqttBridge:
         bridge = SinumMqttBridge(hass, coordinator, topic_prefix="sinum/tablica-wtp")
 
         with (
-            patch("custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client", AsyncMock(return_value=True)),
+            patch(
+                "custom_components.sinum.mqtt.mqtt.async_wait_for_mqtt_client",
+                AsyncMock(return_value=True),
+            ),
             patch(
                 "custom_components.sinum.mqtt.mqtt.async_subscribe",
                 AsyncMock(side_effect=[MagicMock(), MagicMock()]),
@@ -87,6 +97,69 @@ class TestSinumMqttBridge:
 
         assert coordinator.virtual_devices[10]["state"] is True
         coordinator.async_set_updated_data.assert_called_once()
+
+    def test_state_update_without_source_falls_back_to_virtual_store(self, coordinator):
+        hass = MagicMock()
+        bridge = SinumMqttBridge(hass, coordinator)
+        msg = SimpleNamespace(
+            topic="sinum/state/10",
+            payload=json.dumps({"state": True}),
+        )
+
+        bridge._handle_state(msg)
+
+        assert coordinator.virtual_devices[10]["state"] is True
+        assert 10 not in coordinator.wtp_devices
+        assert 10 not in coordinator.sbus_devices
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_wtp_and_sbus_same_device_id_route_by_source(self, coordinator):
+        hass = MagicMock()
+        coordinator.wtp_devices = {42: {"id": 42, "source": "wtp", "state": False}}
+        coordinator.sbus_devices = {42: {"id": 42, "source": "sbus", "state": False}}
+        bridge = SinumMqttBridge(hass, coordinator)
+
+        bridge._handle_state(
+            SimpleNamespace(
+                topic="sinum/state/42",
+                payload=json.dumps({"source": "wtp", "state": True}),
+            )
+        )
+        bridge._handle_state(
+            SimpleNamespace(
+                topic="sinum/state/42",
+                payload=json.dumps({"source": "sbus", "temperature": 215}),
+            )
+        )
+
+        assert coordinator.wtp_devices[42]["state"] is True
+        assert "temperature" not in coordinator.wtp_devices[42]
+        assert coordinator.sbus_devices[42]["state"] is False
+        assert coordinator.sbus_devices[42]["temperature"] == 215
+        assert coordinator.async_set_updated_data.call_count == 2
+
+    def test_state_update_merges_multi_field_payload(self, coordinator):
+        hass = MagicMock()
+        coordinator.wtp_devices = {
+            50: {
+                "id": 50,
+                "source": "wtp",
+                "type": "temperature_sensor",
+                "state": False,
+                "temperature": 200,
+            }
+        }
+        bridge = SinumMqttBridge(hass, coordinator)
+        msg = SimpleNamespace(
+            topic="sinum/state/50",
+            payload=json.dumps({"source": "wtp", "state": True, "temperature": 215}),
+        )
+
+        bridge._handle_state(msg)
+
+        assert coordinator.wtp_devices[50]["state"] is True
+        assert coordinator.wtp_devices[50]["temperature"] == 215
+        assert coordinator.wtp_devices[50]["type"] == "temperature_sensor"
 
     def test_state_update_ignores_topic_outside_bridge_prefix(self, coordinator):
         hass = MagicMock()
@@ -170,6 +243,22 @@ class TestSinumMqttBridge:
         hass.bus.async_fire.assert_called_once_with(
             "sinum_heartbeat",
             {"ts": 123, "topic_prefix": "sinum"},
+        )
+
+    @pytest.mark.parametrize("event_type", ["button_press", "heartbeat", "unknown"])
+    def test_event_type_variety_fires_home_assistant_event(self, coordinator, event_type):
+        hass = MagicMock()
+        bridge = SinumMqttBridge(hass, coordinator)
+        msg = SimpleNamespace(
+            topic=f"sinum/event/{event_type}",
+            payload=json.dumps({"device_id": 10}),
+        )
+
+        bridge._handle_event(msg)
+
+        hass.bus.async_fire.assert_called_once_with(
+            f"sinum_{event_type}",
+            {"device_id": 10, "topic_prefix": "sinum"},
         )
 
     def test_event_message_ignores_topic_outside_bridge_prefix(self, coordinator):

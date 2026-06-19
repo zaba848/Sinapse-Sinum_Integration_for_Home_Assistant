@@ -40,6 +40,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hub_info: dict[str, Any] = {}  # from /api/v1/info
         self.parent_devices: list[dict[str, Any]] = []  # flat list from /api/v1/parent-devices
         self.schedules: list[dict[str, Any]] = []  # thermal schedules from /api/v1/schedules
+        self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
 
@@ -52,6 +53,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             floors_list,
             parent_devices,
             schedules,
+            variables,
         ) = await asyncio.gather(
             _safe_fetch(self.client.get_hub_info, "hub info"),
             _safe_fetch(self.client.get_rooms, "rooms", default=[]),
@@ -61,6 +63,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.client.get_parent_devices, "parent devices", default=self.parent_devices
             ),
             _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
+            _safe_fetch(self.client.get_variables, "variables", default=self.variables),
         )
 
         # Apply metadata results (fall back to cache on None/failure)
@@ -81,6 +84,8 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.parent_devices = parent_devices
         if schedules is not None:
             self.schedules = schedules
+        if variables is not None:
+            self.variables = variables
 
         # ── Classify device IDs from rooms (fallback for older firmware) ──────
         virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
@@ -142,6 +147,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "sbus": sbus,
             "lora": lora,
             "schedules": self.schedules,
+            "variables": self.variables,
         }
 
     async def _fetch_device_collection(
