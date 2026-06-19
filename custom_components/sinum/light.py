@@ -405,11 +405,8 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             payload["led_color"] = _hs_to_hex(h, s)
 
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            if self._device.get("led_strip_type", "").lower() == "rgb":
-                payload["led_color"] = _kelvin_to_hex(kelvin)
-            else:
-                payload["white_temperature"] = kelvin
+            # white_temperature is read-only on rgb_controller (hub computes it from led_color)
+            payload["led_color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
 
         if self._bus == "wtp":
             updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)

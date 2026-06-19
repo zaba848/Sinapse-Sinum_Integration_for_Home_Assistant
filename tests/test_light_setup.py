@@ -396,12 +396,14 @@ class TestSinumBusRgbLight:
         assert payload == {"state": True, "led_color": "#0000FF"}
 
     @pytest.mark.asyncio
-    async def test_turn_on_with_color_temp_sends_white_temperature(self):
+    async def test_turn_on_with_color_temp_converts_to_led_color(self):
         entity, coordinator = self._make_wtp()
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_COLOR_TEMP_KELVIN: 3000})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True, "white_temperature": 3000}
+        assert payload["state"] is True
+        assert "led_color" in payload
+        assert "white_temperature" not in payload
 
     @pytest.mark.asyncio
     async def test_turn_off_sbus(self):
