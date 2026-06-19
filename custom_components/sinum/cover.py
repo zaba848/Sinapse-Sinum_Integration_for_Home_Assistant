@@ -205,16 +205,12 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self.async_write_ha_state()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"command": "close"}
-        )
+        await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "close"})
         self.coordinator.virtual_devices[self._device_id]["state"] = GATE_STATE_CLOSING
         self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
-        await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"command": "stop"}
-        )
+        await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "stop"})
         self.async_write_ha_state()
 
 

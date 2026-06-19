@@ -128,7 +128,13 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
         now = datetime.now()
         current_minutes = now.hour * 60 + now.minute
         weekday_names = [
-            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
         ]
         weekday = weekday_names[now.weekday()]
         entries = self._day_entries(self._schedule.get(weekday))
@@ -143,7 +149,13 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
 
         now = datetime.now()
         weekday_names = [
-            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
         ]
         weekday = weekday_names[now.weekday()]
         entries = self._day_entries(self._schedule.get(weekday))
@@ -154,7 +166,11 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
                 {
                     "start": e.get("start"),
                     "end": e.get("end"),
-                    **({"target_temp": e.get("target_temperature", 0) / 10} if is_thermal else {"state": e.get("state")}),
+                    **(
+                        {"target_temp": e.get("target_temperature", 0) / 10}
+                        if is_thermal
+                        else {"state": e.get("state")}
+                    ),
                 }
                 for e in entries
             ],
