@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError
-from .const import STYPE_BUTTON, WTYPE_BUTTON
+from .const import STYPE_BUTTON, VTYPE_THERMOSTAT_OUTPUT_GROUP, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 from .sensor_bus import (
     _SENTINEL_INT16,
@@ -32,9 +32,12 @@ from .sensor_virtual import (
     ENERGY_SENSORS,
     VIRTUAL_SENSORS,
     WEATHER_SENSORS,
+    SinumAutomationStatusSensor,
+    SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
     SinumHubUptimeSensor,
     SinumHubWifiSensor,
+    SinumThermostatOutputGroupSensor,
     SinumWeatherSensor,
 )
 
@@ -51,6 +54,10 @@ async def async_setup_entry(
 
     # Virtual thermostat sensors
     for device_id, device in coordinator.virtual_devices.items():
+        if device.get("type") == VTYPE_THERMOSTAT_OUTPUT_GROUP:
+            entities.append(
+                SinumThermostatOutputGroupSensor(coordinator, device_id, entry.entry_id)
+            )
         for desc in VIRTUAL_SENSORS:
             if desc.api_key in device:
                 entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
@@ -119,6 +126,15 @@ async def async_setup_entry(
     except SinumConnectionError:
         _LOGGER.debug("Energy endpoint not available on this hub")
 
+    # Energy Center diagnostic endpoint coverage (best-effort)
+    try:
+        energy_center = await coordinator.client.get_energy_center_summary()
+        entities.append(
+            SinumEnergyCenterStatusSensor(coordinator.client, energy_center, entry.entry_id)
+        )
+    except SinumConnectionError:
+        _LOGGER.debug("Energy Center endpoints not available on this hub")
+
     # Hub diagnostic sensors (from /api/v1/info — always available)
     if coordinator.hub_info:
         entities.append(SinumHubUptimeSensor(coordinator, entry.entry_id))
@@ -127,15 +143,23 @@ async def async_setup_entry(
         if isinstance(wifi, dict) and wifi.get("signal") is not None:
             entities.append(SinumHubWifiSensor(coordinator, entry.entry_id))
 
-    # Thermal schedule sensors are coordinator-backed, so values refresh with polling/MQTT updates.
+    # Schedule sensors (all schedules get active period + association count).
+    # Temperature sensors only for thermal schedules; relay/boolean schedules lack those fields.
     for schedule in coordinator.schedules:
         schedule_id = schedule.get("id")
         if schedule_id is None:
             continue
-        entities.append(SinumScheduleTargetTempSensor(coordinator, schedule, entry.entry_id))
-        entities.append(SinumScheduleFallbackTempSensor(coordinator, schedule, entry.entry_id))
+        is_thermal = schedule.get("type") == "thermal"
+        if is_thermal:
+            entities.append(SinumScheduleTargetTempSensor(coordinator, schedule, entry.entry_id))
+            entities.append(SinumScheduleFallbackTempSensor(coordinator, schedule, entry.entry_id))
         entities.append(SinumScheduleActivePeriodSensor(coordinator, schedule, entry.entry_id))
         entities.append(SinumScheduleAssociationCountSensor(coordinator, schedule, entry.entry_id))
+
+    # Automation diagnostics are read-only and disabled by default in the entity registry.
+    for automation in coordinator.automations:
+        if automation.get("id") is not None:
+            entities.append(SinumAutomationStatusSensor(coordinator, automation, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -148,7 +172,9 @@ __all__ = [
     "VIRTUAL_SENSORS",
     "WEATHER_SENSORS",
     "WTP_SENSORS",
+    "SinumAutomationStatusSensor",
     "SinumButtonSensor",
+    "SinumEnergyCenterStatusSensor",
     "SinumEnergySensor",
     "SinumHubUptimeSensor",
     "SinumHubWifiSensor",
@@ -160,6 +186,7 @@ __all__ = [
     "SinumSensor",
     "SinumSensorDescription",
     "SinumTemperatureRegulatorSensor",
+    "SinumThermostatOutputGroupSensor",
     "SinumWeatherSensor",
     "_SENTINEL_INT16",
     "async_setup_entry",

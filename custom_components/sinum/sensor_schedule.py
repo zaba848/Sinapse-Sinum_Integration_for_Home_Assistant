@@ -31,7 +31,7 @@ class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             identifiers={(DOMAIN, f"schedule_{self._schedule_id}_{entry_id}")},
             name=f"Sinum Schedule {schedule.get('name', self._schedule_id)}",
             manufacturer="TECH Sterowniki",
-            model="Thermal Schedule",
+            model="Schedule",
         )
 
     @property
@@ -111,6 +111,15 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
     ) -> None:
         super().__init__(coordinator, schedule, entry_id, "active_period")
 
+    @staticmethod
+    def _day_entries(day_data: Any) -> list[dict[str, Any]]:
+        """Normalise day schedule data: handles both list (thermal) and dict (relay) formats."""
+        if isinstance(day_data, list):
+            return [e for e in day_data if isinstance(e, dict)]
+        if isinstance(day_data, dict):
+            return [e for e in day_data.get("configuration", []) if isinstance(e, dict)]
+        return []
+
     @property
     def native_value(self) -> str:
         """Return 'Active' if in scheduled period, else 'Fallback'."""
@@ -119,23 +128,13 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
         now = datetime.now()
         current_minutes = now.hour * 60 + now.minute
         weekday_names = [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
+            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
         ]
         weekday = weekday_names[now.weekday()]
-
-        day_schedule = self._schedule.get(weekday, [])
-        for entry in day_schedule:
-            if not isinstance(entry, dict):
-                continue
+        entries = self._day_entries(self._schedule.get(weekday))
+        for entry in entries:
             if entry.get("start", 0) <= current_minutes < entry.get("end", 0):
                 return "Active"
-
         return "Fallback"
 
     @property
@@ -144,27 +143,20 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
 
         now = datetime.now()
         weekday_names = [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
+            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
         ]
         weekday = weekday_names[now.weekday()]
-        day_schedule = self._schedule.get(weekday, [])
-
+        entries = self._day_entries(self._schedule.get(weekday))
+        is_thermal = self._schedule.get("type") == "thermal"
         return {
-            "entries_today": len(day_schedule),
+            "entries_today": len(entries),
             "schedule_entries": [
                 {
                     "start": e.get("start"),
                     "end": e.get("end"),
-                    "target_temp": e.get("target_temperature", 0) / 10,
+                    **({"target_temp": e.get("target_temperature", 0) / 10} if is_thermal else {"state": e.get("state")}),
                 }
-                for e in day_schedule
-                if isinstance(e, dict)
+                for e in entries
             ],
         }
 
@@ -186,14 +178,11 @@ class SinumScheduleAssociationCountSensor(SinumScheduleSensor):
 
     @property
     def native_value(self) -> int:
-        """Return count of associated thermostats and fan coils."""
+        """Return total count of all associated devices."""
         assoc = self._schedule.get("associations", {})
-        return len(assoc.get("thermostats", [])) + len(assoc.get("fan_coils", []))
+        return sum(len(v) for v in assoc.values() if isinstance(v, list))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         assoc = self._schedule.get("associations", {})
-        return {
-            "thermostats": assoc.get("thermostats", []),
-            "fan_coils": assoc.get("fan_coils", []),
-        }
+        return {k: v for k, v in assoc.items() if isinstance(v, list)}

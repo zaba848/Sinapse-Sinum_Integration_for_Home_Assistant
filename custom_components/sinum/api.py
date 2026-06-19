@@ -10,7 +10,22 @@ from .const import (
     API_ALARM_COMMAND,
     API_ALARM_DEVICE,
     API_ALARM_DEVICES,
+    API_AUTOMATION,
+    API_AUTOMATION_LOGS,
+    API_AUTOMATION_LUA,
+    API_AUTOMATION_LUA_EXTENSIONS,
+    API_AUTOMATION_SCHEMA,
+    API_AUTOMATIONS,
     API_ENERGY,
+    API_NOTIFICATIONS,
+    API_ENERGY_CENTER_ASSOCIATIONS,
+    API_ENERGY_CENTER_CONSUMPTION,
+    API_ENERGY_CENTER_FLOW_MONITOR,
+    API_ENERGY_CENTER_PRICES,
+    API_ENERGY_CENTER_PRICES_SETTINGS,
+    API_ENERGY_CENTER_PRICES_SOURCES,
+    API_ENERGY_CENTER_PRODUCTION,
+    API_ENERGY_CENTER_STORAGE,
     API_FLOORS,
     API_INFO,
     API_LOGIN,
@@ -22,8 +37,14 @@ from .const import (
     API_ROOMS,
     API_SBUS_DEVICE,
     API_SBUS_DEVICES,
+    API_SCENE,
     API_SCENE_ACTIVATE,
+    API_SCENE_LOGS,
+    API_SCENE_LUA,
+    API_SCENE_LUA_EXTENSIONS,
+    API_SCENE_SCHEMA,
     API_SCENES,
+    API_SCHEDULE,
     API_SCHEDULES,
     API_VARIABLE,
     API_VARIABLES,
@@ -288,8 +309,54 @@ class SinumClient:
         result = await self._request("GET", API_SCENES)
         return result if isinstance(result, list) else []
 
+    async def get_scene(self, scene_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_SCENE.format(id=scene_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_scene_lua(self, scene_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_SCENE_LUA.format(id=scene_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_scene_lua_extensions(self, scene_id: int) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_SCENE_LUA_EXTENSIONS.format(id=scene_id))
+        return result if isinstance(result, list) else []
+
+    async def get_scene_schema(self, scene_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_SCENE_SCHEMA.format(id=scene_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_scene_logs(self, scene_id: int) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_SCENE_LOGS.format(id=scene_id))
+        return result if isinstance(result, list) else []
+
     async def run_scene(self, scene_id: int) -> None:
         await self._request("POST", API_SCENE_ACTIVATE.format(id=scene_id))
+
+    # ------------------------------------------------------------ automations
+
+    async def get_automations(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_AUTOMATIONS)
+        return result if isinstance(result, list) else []
+
+    async def get_automation(self, automation_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_AUTOMATION.format(id=automation_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_automation_lua(self, automation_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_AUTOMATION_LUA.format(id=automation_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_automation_lua_extensions(self, automation_id: int) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_AUTOMATION_LUA_EXTENSIONS.format(id=automation_id))
+        return result if isinstance(result, list) else []
+
+    async def get_automation_schema(self, automation_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_AUTOMATION_SCHEMA.format(id=automation_id))
+        return result if isinstance(result, dict) else {}
+
+    async def get_automation_logs(self, automation_id: int) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_AUTOMATION_LOGS.format(id=automation_id))
+        return result if isinstance(result, list) else []
 
     # ------------------------------------------------------------ variables
 
@@ -307,6 +374,14 @@ class SinumClient:
     async def get_schedules(self) -> list[dict[str, Any]]:
         result = await self._request("GET", API_SCHEDULES)
         return result if isinstance(result, list) else []
+
+    async def get_schedule(self, schedule_id: int) -> dict[str, Any]:
+        result = await self._request("GET", API_SCHEDULE.format(id=schedule_id))
+        return result if isinstance(result, dict) else {}
+
+    async def patch_schedule(self, schedule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        result = await self._request("PATCH", API_SCHEDULE.format(id=schedule_id), json=payload)
+        return result if isinstance(result, dict) else {}
 
     # --------------------------------------------------------------- alarms
 
@@ -345,7 +420,7 @@ class SinumClient:
 
     async def send_notification(self, title: str, message: str) -> None:
         payload = {"title": title, "message": message}
-        await self._request("POST", "/api/v1/notifications", json=payload)
+        await self._request("POST", API_NOTIFICATIONS, json=payload)
 
     # -------------------------------------------------------------- weather
 
@@ -356,6 +431,60 @@ class SinumClient:
 
     async def get_energy(self) -> dict[str, Any]:
         return await self._request("GET", API_ENERGY)
+
+    async def get_energy_center_associations(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_ASSOCIATIONS)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_flow_monitor(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_FLOW_MONITOR)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_prices(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_prices_settings(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SETTINGS)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_prices_sources(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SOURCES)
+        return result if isinstance(result, list) else []
+
+    async def get_energy_center_storage(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_STORAGE)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_consumption(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_CONSUMPTION)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_production(self) -> dict[str, Any]:
+        result = await self._request("GET", API_ENERGY_CENTER_PRODUCTION)
+        return result if isinstance(result, dict) else {}
+
+    async def get_energy_center_summary(self) -> dict[str, Any]:
+        endpoints = {
+            "associations": self.get_energy_center_associations,
+            "flow_monitor": self.get_energy_center_flow_monitor,
+            "prices": self.get_energy_center_prices,
+            "prices_settings": self.get_energy_center_prices_settings,
+            "prices_sources": self.get_energy_center_prices_sources,
+            "storage": self.get_energy_center_storage,
+            "consumption": self.get_energy_center_consumption,
+            "production": self.get_energy_center_production,
+        }
+        summary: dict[str, Any] = {"available_endpoints": [], "missing_endpoints": []}
+        for key, getter in endpoints.items():
+            try:
+                summary[key] = await getter()
+                summary["available_endpoints"].append(key)
+            except SinumConnectionError:
+                summary["missing_endpoints"].append(key)
+        if not summary["available_endpoints"]:
+            raise SinumConnectionError("Energy Center endpoints unavailable")
+        return summary
 
     # ----------------------------------------- Lua HTTP server (optional)
     # Only available when sinapse_api.lua is installed on the hub.

@@ -11,16 +11,16 @@ Bus types covered:
   - Alarm (arm/disarm commands with PIN)
   - MQTT bridge (state topic routing, event firing)
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 
 from custom_components.sinum.api import SinumClient, SinumConnectionError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,6 +50,7 @@ def _make_client(session) -> SinumClient:
 # ---------------------------------------------------------------------------
 # Virtual bus — exact URL / payload contracts
 # ---------------------------------------------------------------------------
+
 
 class TestVirtualBusContracts:
     """PATCH /api/v1/devices/virtual/{id} — verify method, URL, and JSON body."""
@@ -276,6 +277,7 @@ class TestVirtualBusContracts:
 # WTP bus — exact URL / payload contracts
 # ---------------------------------------------------------------------------
 
+
 class TestWtpBusContracts:
     """PATCH /api/v1/devices/wtp/{id} — verify method, URL, and JSON body."""
 
@@ -421,6 +423,7 @@ class TestWtpBusContracts:
 # ---------------------------------------------------------------------------
 # SBUS bus — exact URL / payload contracts
 # ---------------------------------------------------------------------------
+
 
 class TestSbusBusContracts:
     """PATCH /api/v1/devices/sbus/{id} — verify method, URL, and JSON body."""
@@ -644,6 +647,7 @@ class TestSbusBusContracts:
 # LoRa bus — exact URL / payload contracts
 # ---------------------------------------------------------------------------
 
+
 class TestLoraBusContracts:
     """PATCH /api/v1/devices/lora/{id} — verify method, URL, and JSON body."""
 
@@ -738,6 +742,7 @@ class TestLoraBusContracts:
 # Alarm system — exact URL / payload contracts
 # ---------------------------------------------------------------------------
 
+
 class TestAlarmBusContracts:
     """POST /api/v1/devices/alarm-system/{id}/command/{cmd} — verify all arm/disarm flows."""
 
@@ -784,13 +789,18 @@ class TestAlarmBusContracts:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             await client.command_alarm_device(42, "arm", {"arm": "0000"})
 
-        assert session.request.await_args.args[1] == f"{BASE}/api/v1/devices/alarm-system/42/command/arm"
+        assert (
+            session.request.await_args.args[1]
+            == f"{BASE}/api/v1/devices/alarm-system/42/command/arm"
+        )
 
     @pytest.mark.asyncio
     async def test_alarm_get_devices_endpoint(self):
         """GET /api/v1/devices/alarm-system returns list."""
         session = MagicMock(spec=aiohttp.ClientSession)
-        resp = _make_response(200, {"data": [{"id": 1, "type": "alarm_zone", "zone_status": "disarmed"}]})
+        resp = _make_response(
+            200, {"data": [{"id": 1, "type": "alarm_zone", "zone_status": "disarmed"}]}
+        )
         session.request = AsyncMock(return_value=resp)
         client = _make_client(session)
 
@@ -826,14 +836,17 @@ class TestAlarmBusContracts:
         session.request = AsyncMock(return_value=resp)
         client = _make_client(session)
 
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
-            with pytest.raises(SinumConnectionError, match="Validation error"):
-                await client.command_alarm_device(1, "arm", {"arm": "wrong"})
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Validation error"),
+        ):
+            await client.command_alarm_device(1, "arm", {"arm": "wrong"})
 
 
 # ---------------------------------------------------------------------------
 # Variable (automation) API contracts
 # ---------------------------------------------------------------------------
+
 
 class TestVariableContracts:
     """PATCH /api/v1/variables/{id} — verify value payload."""
@@ -882,6 +895,7 @@ class TestVariableContracts:
 # Scene activation contracts
 # ---------------------------------------------------------------------------
 
+
 class TestSceneContracts:
     @pytest.mark.asyncio
     async def test_run_scene_posts_to_activate_endpoint(self):
@@ -914,10 +928,11 @@ class TestSceneContracts:
 # Notification API contracts
 # ---------------------------------------------------------------------------
 
+
 class TestNotificationContracts:
     @pytest.mark.asyncio
     async def test_send_notification_payload(self):
-        """Notification: POST /api/v1/notifications with title+message."""
+        """Notification: POST /api/v1/notify with title+message."""
         session = MagicMock(spec=aiohttp.ClientSession)
         resp = _make_response(204, {}, content_length=0)
         session.request = AsyncMock(return_value=resp)
@@ -928,7 +943,7 @@ class TestNotificationContracts:
 
         call_args = session.request.await_args
         assert call_args.args[0] == "POST"
-        assert call_args.args[1] == f"{BASE}/api/v1/notifications"
+        assert call_args.args[1] == f"{BASE}/api/v1/notify"
         payload = call_args.kwargs["json"]
         assert payload["title"] == "Alert"
         assert payload["message"] == "Motion detected in kitchen"
@@ -937,6 +952,7 @@ class TestNotificationContracts:
 # ---------------------------------------------------------------------------
 # Temperature encode/decode (protocol-critical for climate entities)
 # ---------------------------------------------------------------------------
+
 
 class TestTemperatureEncoding:
     """Sinum uses raw int = Celsius × 10. These are critical for climate correctness."""
@@ -971,6 +987,7 @@ class TestTemperatureEncoding:
 # ---------------------------------------------------------------------------
 # MQTT bridge — state routing and event handling
 # ---------------------------------------------------------------------------
+
 
 class TestMqttBridgeContracts:
     """Verify MQTT message routing: sinum/state/{id} updates coordinator stores."""
@@ -1022,10 +1039,7 @@ class TestMqttBridgeContracts:
         coord.sbus_devices[200] = {"id": 200, "current_opening": 0}
         bridge = SinumMqttBridge(MagicMock(), coord)
 
-        msg = self._make_msg(
-            "sinum/state/200",
-            '{"id":200,"current_opening":75,"source":"sbus"}'
-        )
+        msg = self._make_msg("sinum/state/200", '{"id":200,"current_opening":75,"source":"sbus"}')
         bridge._handle_state(msg)
 
         assert coord.sbus_devices[200]["current_opening"] == 75
@@ -1112,12 +1126,7 @@ class TestMqttBridgeContracts:
 
     def test_mqtt_publish_command_sends_to_correct_topic(self):
         """async_publish_command → sinum/cmd/{device_id} with JSON payload."""
-        from custom_components.sinum.mqtt import SinumMqttBridge, TOPIC_CMD
-        import json
-
-        hass = MagicMock()
-        coord = self._make_coordinator()
-        bridge = SinumMqttBridge(hass, coord)
+        from custom_components.sinum.mqtt import TOPIC_CMD
 
         # Verify the topic template is correct
         assert TOPIC_CMD == "sinum/cmd/{device_id}"
@@ -1136,10 +1145,7 @@ class TestMqttBridgeContracts:
         }
         bridge = SinumMqttBridge(MagicMock(), coord)
 
-        msg = self._make_msg(
-            "sinum/state/50",
-            '{"room_temperature":215,"source":"wtp"}'
-        )
+        msg = self._make_msg("sinum/state/50", '{"room_temperature":215,"source":"wtp"}')
         bridge._handle_state(msg)
 
         # Existing fields are preserved, only updated field changes
@@ -1152,16 +1158,20 @@ class TestMqttBridgeContracts:
 # Coordinator data flow — device parsing per bus
 # ---------------------------------------------------------------------------
 
+
 class TestCoordinatorDataFlow:
     """Verify coordinator correctly routes and stores per-bus API responses."""
 
     def _make_coordinator(self, client):
         from custom_components.sinum.coordinator import SinumCoordinator
+
         hass = MagicMock()
         hass.loop = MagicMock()
         # Required async method not in all test fixtures
         if not isinstance(client.get_lua_hub_info, AsyncMock):
             client.get_lua_hub_info = AsyncMock(return_value={})
+        if not isinstance(client.get_automations, AsyncMock):
+            client.get_automations = AsyncMock(return_value=[])
         with patch("homeassistant.helpers.frame.report_usage", return_value=None):
             coord = SinumCoordinator(hass, client, scan_interval=30)
         return coord
@@ -1174,10 +1184,12 @@ class TestCoordinatorDataFlow:
         client.get_rooms = AsyncMock(return_value=[])
         client.get_floors = AsyncMock(return_value=[])
         client.get_parent_devices = AsyncMock(return_value=[])
-        client.get_virtual_devices = AsyncMock(return_value=[
-            {"id": 1, "type": "relay", "state": True, "name": "Kitchen light"},
-            {"id": 2, "type": "blind_controller_integrator", "last_set_target_opening": 50},
-        ])
+        client.get_virtual_devices = AsyncMock(
+            return_value=[
+                {"id": 1, "type": "relay", "state": True, "name": "Kitchen light"},
+                {"id": 2, "type": "blind_controller_integrator", "last_set_target_opening": 50},
+            ]
+        )
         client.get_wtp_devices = AsyncMock(return_value=[])
         client.get_sbus_devices = AsyncMock(return_value=[])
         client.get_alarm_devices = AsyncMock(return_value=[])
@@ -1203,10 +1215,12 @@ class TestCoordinatorDataFlow:
         client.get_floors = AsyncMock(return_value=[])
         client.get_parent_devices = AsyncMock(return_value=[])
         client.get_virtual_devices = AsyncMock(return_value=[])
-        client.get_wtp_devices = AsyncMock(return_value=[
-            {"id": 100, "type": "relay", "state": False, "name": "WTP relay 1"},
-            {"id": 101, "type": "fan_coil", "room_temperature": 210, "work_mode": "heating"},
-        ])
+        client.get_wtp_devices = AsyncMock(
+            return_value=[
+                {"id": 100, "type": "relay", "state": False, "name": "WTP relay 1"},
+                {"id": 101, "type": "fan_coil", "room_temperature": 210, "work_mode": "heating"},
+            ]
+        )
         client.get_sbus_devices = AsyncMock(return_value=[])
         client.get_alarm_devices = AsyncMock(return_value=[])
         client.get_lora_devices = AsyncMock(return_value=[])
@@ -1231,11 +1245,13 @@ class TestCoordinatorDataFlow:
         client.get_parent_devices = AsyncMock(return_value=[])
         client.get_virtual_devices = AsyncMock(return_value=[])
         client.get_wtp_devices = AsyncMock(return_value=[])
-        client.get_sbus_devices = AsyncMock(return_value=[
-            {"id": 200, "type": "blind_controller", "current_opening": 0},
-            {"id": 201, "type": "fan_coil", "work_mode": "off"},
-            {"id": 202, "type": "impulse_meter", "total_count": 1234},
-        ])
+        client.get_sbus_devices = AsyncMock(
+            return_value=[
+                {"id": 200, "type": "blind_controller", "current_opening": 0},
+                {"id": 201, "type": "fan_coil", "work_mode": "off"},
+                {"id": 202, "type": "impulse_meter", "total_count": 1234},
+            ]
+        )
         client.get_alarm_devices = AsyncMock(return_value=[])
         client.get_lora_devices = AsyncMock(return_value=[])
         client.get_variables = AsyncMock(return_value=[])
@@ -1262,11 +1278,13 @@ class TestCoordinatorDataFlow:
         client.get_wtp_devices = AsyncMock(return_value=[])
         client.get_sbus_devices = AsyncMock(return_value=[])
         client.get_alarm_devices = AsyncMock(return_value=[])
-        client.get_lora_devices = AsyncMock(return_value=[
-            {"id": 300, "type": "temperature_sensor", "temperature": 215},
-            {"id": 301, "type": "flood_sensor", "state": False},
-            {"id": 302, "type": "humidity_sensor", "humidity": 650},
-        ])
+        client.get_lora_devices = AsyncMock(
+            return_value=[
+                {"id": 300, "type": "temperature_sensor", "temperature": 215},
+                {"id": 301, "type": "flood_sensor", "state": False},
+                {"id": 302, "type": "humidity_sensor", "humidity": 650},
+            ]
+        )
         client.get_variables = AsyncMock(return_value=[])
         client.get_schedules = AsyncMock(return_value=[])
 
@@ -1290,9 +1308,11 @@ class TestCoordinatorDataFlow:
         client.get_virtual_devices = AsyncMock(return_value=[])
         client.get_wtp_devices = AsyncMock(return_value=[])
         client.get_sbus_devices = AsyncMock(return_value=[])
-        client.get_alarm_devices = AsyncMock(return_value=[
-            {"id": 1, "type": "alarm_zone", "zone_status": "disarmed"},
-        ])
+        client.get_alarm_devices = AsyncMock(
+            return_value=[
+                {"id": 1, "type": "alarm_zone", "zone_status": "disarmed"},
+            ]
+        )
         client.get_lora_devices = AsyncMock(return_value=[])
         client.get_variables = AsyncMock(return_value=[])
         client.get_schedules = AsyncMock(return_value=[])
@@ -1308,6 +1328,7 @@ class TestCoordinatorDataFlow:
 # ---------------------------------------------------------------------------
 # 304 / empty-response handling (important for PATCH idempotency)
 # ---------------------------------------------------------------------------
+
 
 class TestHttpEdgeCasesPerBus:
     """304 Not Modified means no state change — each bus PATCH must handle it."""
@@ -1368,6 +1389,8 @@ class TestHttpEdgeCasesPerBus:
         session.request = AsyncMock(return_value=resp)
         client = _make_client(session)
 
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
-            with pytest.raises(SinumConnectionError, match="Hub internal timeout"):
-                await client.patch_sbus_device(200, {"state": True})
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Hub internal timeout"),
+        ):
+            await client.patch_sbus_device(200, {"state": True})
