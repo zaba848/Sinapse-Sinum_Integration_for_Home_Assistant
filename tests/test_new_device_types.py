@@ -220,7 +220,7 @@ class TestBusRgbLight:
         call_args = coordinator.client.patch_sbus_device.call_args
         assert call_args[0][0] == 45
         payload = call_args[0][1]
-        assert payload == {"state": True, "led_color": "#00FF00"}
+        assert payload == {"state": True, "color": "#00FF00"}
 
 
 # ── Binary sensor (SBUS motion) ────────────────────────────────────────────────

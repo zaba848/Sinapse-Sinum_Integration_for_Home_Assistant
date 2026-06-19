@@ -18,6 +18,7 @@ from custom_components.sinum.const import (
 from custom_components.sinum.light import (
     SinumBusDimmerLight,
     SinumBusRgbLight,
+    SinumButtonLight,
     SinumDimmerLight,
     _hex_to_hs,
     _hs_to_hex,
@@ -393,7 +394,7 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_HS_COLOR: (240.0, 100.0)})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True, "led_color": "#0000FF"}
+        assert payload == {"state": True, "color": "#0000FF"}
 
     @pytest.mark.asyncio
     async def test_turn_on_with_color_temp_converts_to_led_color(self):
@@ -402,7 +403,8 @@ class TestSinumBusRgbLight:
         await entity.async_turn_on(**{ATTR_COLOR_TEMP_KELVIN: 3000})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
         assert payload["state"] is True
-        assert "led_color" in payload
+        assert "color" in payload
+        assert "led_color" not in payload
         assert "white_temperature" not in payload
 
     @pytest.mark.asyncio
@@ -461,7 +463,7 @@ class TestSinumBusRgbLight:
         assert payload == {
             "state": True,
             "brightness": round(200 / 255 * 100),
-            "led_color": "#00FF00",
+            "color": "#00FF00",
         }
 
     @pytest.mark.asyncio
@@ -471,3 +473,66 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_off()
         coordinator.client.patch_wtp_device.assert_awaited_once_with(4, {"state": False})
+
+
+class TestSinumButtonLight:
+    def _make(self, bus: str = "sbus", color: str = "#0072c3"):
+        device = {"id": 70, "name": "Button", "type": "button", "color": color}
+        if bus == "wtp":
+            coordinator = _make_coordinator(wtp={70: device})
+        else:
+            coordinator = _make_coordinator(sbus={70: device})
+        entity = _wire(SinumButtonLight(coordinator, 70, "test_entry", bus))
+        return entity, coordinator
+
+    def test_is_on_nonblack_color(self):
+        entity, _ = self._make(color="#0072c3")
+        assert entity.is_on is True
+
+    def test_is_off_black_color(self):
+        entity, _ = self._make(color="#000000")
+        assert entity.is_on is False
+
+    def test_hs_color_roundtrip(self):
+        entity, _ = self._make(color="#FF0000")
+        hs = entity.hs_color
+        assert hs is not None
+        assert hs[0] == pytest.approx(0.0, abs=1)
+        assert hs[1] == pytest.approx(100.0, abs=1)
+
+    def test_unique_id_contains_backlight(self):
+        entity, _ = self._make()
+        assert "backlight" in entity.unique_id
+
+    @pytest.mark.asyncio
+    async def test_turn_on_with_color_patches_sbus(self):
+        entity, coordinator = self._make(bus="sbus")
+        coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_HS_COLOR: (0.0, 100.0)})
+        call_args = coordinator.client.patch_sbus_device.call_args
+        assert call_args[0][0] == 70
+        assert call_args[0][1] == {"color": "#FF0000"}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_no_color_keeps_existing(self):
+        entity, coordinator = self._make(bus="sbus", color="#00FF00")
+        coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_turn_on()
+        call_args = coordinator.client.patch_sbus_device.call_args
+        assert call_args[0][1] == {"color": "#00FF00"}
+
+    @pytest.mark.asyncio
+    async def test_turn_off_sends_black(self):
+        entity, coordinator = self._make(bus="sbus")
+        coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_turn_off()
+        call_args = coordinator.client.patch_sbus_device.call_args
+        assert call_args[0][1] == {"color": "#000000"}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_wtp_patches_wtp(self):
+        entity, coordinator = self._make(bus="wtp")
+        coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_HS_COLOR: (240.0, 100.0)})
+        call_args = coordinator.client.patch_wtp_device.call_args
+        assert call_args[0][1] == {"color": "#0000FF"}

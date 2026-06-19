@@ -18,10 +18,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    STYPE_BUTTON,
     STYPE_DIMMER,
     STYPE_RGB_CONTROLLER,
     VTYPE_DIMMER_RGB,
     VTYPE_DIMMER_RGB_INTEGRATOR,
+    WTYPE_BUTTON,
     WTYPE_DIMMER,
     WTYPE_RGB_CONTROLLER,
 )
@@ -46,6 +48,8 @@ async def async_setup_entry(
             entities.append(SinumBusDimmerLight(coordinator, device_id, entry.entry_id, "wtp"))
         elif dev_type == WTYPE_RGB_CONTROLLER:
             entities.append(SinumBusRgbLight(coordinator, device_id, entry.entry_id, "wtp"))
+        elif dev_type == WTYPE_BUTTON and "color" in device:
+            entities.append(SinumButtonLight(coordinator, device_id, entry.entry_id, "wtp"))
 
     for device_id, device in coordinator.sbus_devices.items():
         dev_type = device.get("type")
@@ -53,6 +57,8 @@ async def async_setup_entry(
             entities.append(SinumBusDimmerLight(coordinator, device_id, entry.entry_id, "sbus"))
         elif dev_type == STYPE_RGB_CONTROLLER:
             entities.append(SinumBusRgbLight(coordinator, device_id, entry.entry_id, "sbus"))
+        elif dev_type == STYPE_BUTTON and "color" in device:
+            entities.append(SinumButtonLight(coordinator, device_id, entry.entry_id, "sbus"))
 
     async_add_entities(entities)
 
@@ -385,7 +391,8 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
-        hex_color = self._device.get("led_color")
+        # "color" is the writable target; "led_color" is the read-only hardware state
+        hex_color = self._device.get("color") or self._device.get("led_color")
         if not hex_color:
             return None
         return _hex_to_hs(hex_color)
@@ -402,11 +409,11 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
         if ATTR_HS_COLOR in kwargs:
             h, s = kwargs[ATTR_HS_COLOR]
-            payload["led_color"] = _hs_to_hex(h, s)
+            payload["color"] = _hs_to_hex(h, s)
 
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            # white_temperature is read-only on rgb_controller (hub computes it from led_color)
-            payload["led_color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
+            # color is writable; white_temperature and led_color are read-only on rgb_controller
+            payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
 
         if self._bus == "wtp":
             updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
@@ -427,4 +434,84 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
                 self._device_id, {"state": False}
             )
             self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumButtonLight(CoordinatorEntity[SinumCoordinator], LightEntity):
+    """Button panel backlight — controls the physical LED color via the 'color' field."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "button_backlight"
+    _attr_icon = "mdi:led-on"
+    _attr_color_mode = ColorMode.HS
+    _attr_supported_color_modes = {ColorMode.HS}
+
+    def __init__(
+        self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._bus = bus
+        self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_backlight"
+        store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+        device = store.get(device_id, {})
+        label = _label(device)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
+            name=label,
+            manufacturer="TECH Sterowniki",
+            model=device.get("_parent_model") or "Sinum Button",
+            suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
+        return store.get(self._device_id, {})
+
+    @property
+    def is_on(self) -> bool:
+        color = self._device.get("color", "#000000")
+        return color.lstrip("#").lower() not in ("000000", "")
+
+    @property
+    def hs_color(self) -> tuple[float, float] | None:
+        color = self._device.get("color")
+        if not color:
+            return None
+        return _hex_to_hs(color)
+
+    def _store(self) -> dict[int, dict[str, Any]]:
+        return self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        if ATTR_HS_COLOR in kwargs:
+            h, s = kwargs[ATTR_HS_COLOR]
+            color = _hs_to_hex(h, s)
+        else:
+            color = self._device.get("color") or "#0072c3"
+        if self._bus == "wtp":
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"color": color}
+            )
+        else:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"color": color}
+            )
+        self._store()[self._device_id].update({**{"color": color}, **(updated or {})})
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        if self._bus == "wtp":
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"color": "#000000"}
+            )
+        else:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"color": "#000000"}
+            )
+        self._store()[self._device_id].update({**{"color": "#000000"}, **(updated or {})})
         self.async_write_ha_state()

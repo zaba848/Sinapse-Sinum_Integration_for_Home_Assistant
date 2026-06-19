@@ -443,6 +443,7 @@
     "type": "button",
     "action": "single_press",
     "buttons_count": 2,
+    "color": "#0072c3",
     "room_id": 1,
     "class": "sbus"
   },
@@ -452,6 +453,7 @@
     "type": "button",
     "action": "double_press",
     "buttons_count": 1,
+    "color": "#0072c3",
     "room_id": 1,
     "class": "wtp"
   },
