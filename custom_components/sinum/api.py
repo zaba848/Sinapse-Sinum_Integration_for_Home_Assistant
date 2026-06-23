@@ -247,64 +247,65 @@ class SinumClient:
         async with self._sem:
             return await self._request_inner(method, path, **kwargs)
 
-    async def _request_inner(self, method: str, path: str, **kwargs: Any) -> Any:
-        if not self._api_token and not self._jwt:
-            await self.login()
-
+    async def _do_request(self, method: str, path: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Execute a single HTTP request; raises SinumConnectionError on transport failure."""
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
-                resp = await self._session.request(
+                return await self._session.request(
                     method, self._url(path), headers=self._headers(), ssl=False, **kwargs
                 )
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise SinumConnectionError(f"Request failed: {err}") from err
 
-        if resp.status == 401:
-            if self._api_token:
-                raise SinumAuthError("API token rejected by hub")
-            _LOGGER.debug("Auth expired, refreshing")
-            refreshed = await self._refresh_jwt()
-            if not refreshed:
-                self._jwt = None
-                await self.login()
-            try:
-                async with asyncio.timeout(REQUEST_TIMEOUT):
-                    resp = await self._session.request(
-                        method, self._url(path), headers=self._headers(), ssl=False, **kwargs
-                    )
-            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-                raise SinumConnectionError(f"Request failed on retry: {err}") from err
+    async def _handle_401(self, method: str, path: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Re-authenticate and retry after a 401 response."""
+        if self._api_token:
+            raise SinumAuthError("API token rejected by hub")
+        _LOGGER.debug("Auth expired, refreshing")
+        if not await self._refresh_jwt():
+            self._jwt = None
+            await self.login()
+        return await self._do_request(method, path, **kwargs)
 
-        # 304 means no change (PATCH returned same data) — treat as success
+    async def _handle_408(self, method: str, path: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Retry once after a 408 bus-busy response."""
+        _LOGGER.debug("Bus busy (408) on %s %s, retrying in 1 s", method, path)
+        await asyncio.sleep(1)
+        return await self._do_request(method, path, **kwargs)
+
+    async def _raise_for_422(self, resp: aiohttp.ClientResponse, path: str) -> None:
+        """Parse validation error details and raise SinumConnectionError."""
+        try:
+            body = await _read_json(resp, path)
+            errors = body.get("error", {}).get("errors", {})
+            details = "; ".join(
+                f"{k}: {v.get('text', v)}" if isinstance(v, dict) else f"{k}: {v}"
+                for k, v in errors.items()
+            )
+        except Exception:
+            details = f"status {resp.status}"
+        raise SinumConnectionError(f"Validation error for {path}: {details}")
+
+    async def _request_inner(self, method: str, path: str, **kwargs: Any) -> Any:
+        if not self._api_token and not self._jwt:
+            await self.login()
+
+        resp = await self._do_request(method, path, **kwargs)
+
+        if resp.status == 401:
+            resp = await self._handle_401(method, path, **kwargs)
+
         if resp.status == 304:
             return {}
 
-        # Retry once on 408 — the bus is often free a moment later (applies to reads and writes)
         if resp.status == 408:
-            _LOGGER.debug("Bus busy (408) on %s %s, retrying in 1 s", method, path)
-            await asyncio.sleep(1)
-            try:
-                async with asyncio.timeout(REQUEST_TIMEOUT):
-                    resp = await self._session.request(
-                        method, self._url(path), headers=self._headers(), ssl=False, **kwargs
-                    )
-            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-                raise SinumConnectionError(f"Request failed on retry: {err}") from err
+            resp = await self._handle_408(method, path, **kwargs)
 
         if resp.status == 408:
             raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
 
         if resp.status == 422:
-            try:
-                body = await _read_json(resp, path)
-                errors = body.get("error", {}).get("errors", {})
-                details = "; ".join(
-                    f"{k}: {v.get('text', v)}" if isinstance(v, dict) else f"{k}: {v}"
-                    for k, v in errors.items()
-                )
-            except Exception:
-                details = f"status {resp.status}"
-            raise SinumConnectionError(f"Validation error for {path}: {details}")
+            await self._raise_for_422(resp, path)
 
         if resp.status not in (200, 201, 204):
             raise SinumConnectionError(f"API error {resp.status} for {path}")

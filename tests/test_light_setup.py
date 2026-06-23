@@ -657,3 +657,106 @@ class TestSinumButtonLight:
         await entity.async_turn_on(**{ATTR_HS_COLOR: (240.0, 100.0)})
         call_args = coordinator.client.patch_wtp_device.call_args
         assert call_args[0][1] == {"color": "#0000FF"}
+
+
+class TestSinumBusRgbLightHelpers:
+    """Unit tests for _sbus_lua_commands and _wtp_color_payload extracted helpers."""
+
+    def _make_sbus(self, device: dict | None = None):
+        d = device or {
+            "id": 7,
+            "type": STYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "brightness": 60,
+            "led_color": "#00FF00",
+        }
+        from unittest.mock import patch as _patch
+        coordinator = _make_coordinator(sbus={7: d})
+        from custom_components.sinum.light import SinumBusRgbLight
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def _make_wtp(self, device: dict | None = None):
+        d = device or {
+            "id": 8,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "brightness": 80,
+            "led_color": "#FF0000",
+        }
+        from unittest.mock import patch as _patch
+        coordinator = _make_coordinator(wtp={8: d})
+        from custom_components.sinum.light import SinumBusRgbLight
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 8, "e", "wtp")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def test_sbus_lua_kelvin_produces_set_temperature(self):
+        entity = self._make_sbus()
+        lines, optimistic = entity._sbus_lua_commands(**{ATTR_COLOR_TEMP_KELVIN: 4000})
+        assert any("set_temperature" in l for l in lines)
+        assert 4000 in lines[0].__class__.__mro__ or "4000" in lines[0]
+        assert optimistic["color_mode"] == "temperature"
+        assert optimistic["white_temperature"] == 4000
+
+    def test_sbus_lua_hs_produces_set_color(self):
+        entity = self._make_sbus()
+        lines, optimistic = entity._sbus_lua_commands(**{ATTR_HS_COLOR: (0.0, 100.0)})
+        assert any("set_color" in l for l in lines)
+        assert optimistic["color_mode"] == "rgb"
+
+    def test_sbus_lua_brightness_produces_set_brightness(self):
+        entity = self._make_sbus()
+        lines, optimistic = entity._sbus_lua_commands(**{ATTR_BRIGHTNESS: 128})
+        assert any("set_brightness" in l for l in lines)
+        assert optimistic["brightness"] == round(128 / 255 * 100)
+
+    def test_sbus_lua_hs_and_brightness_produces_two_commands(self):
+        entity = self._make_sbus()
+        lines, _ = entity._sbus_lua_commands(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 200})
+        assert len(lines) == 2
+        assert any("set_color" in l for l in lines)
+        assert any("set_brightness" in l for l in lines)
+
+    def test_sbus_lua_kelvin_takes_precedence_over_hs(self):
+        entity = self._make_sbus()
+        lines, optimistic = entity._sbus_lua_commands(
+            **{ATTR_COLOR_TEMP_KELVIN: 3000, ATTR_HS_COLOR: (0.0, 100.0)}
+        )
+        assert all("set_temperature" in l or l == "" for l in lines)
+        assert "white_temperature" in optimistic
+
+    def test_wtp_color_payload_kelvin(self):
+        entity = self._make_wtp()
+        payload = entity._wtp_color_payload(**{ATTR_COLOR_TEMP_KELVIN: 2700})
+        assert "color" in payload
+        assert payload["color"].startswith("#")
+
+    def test_wtp_color_payload_hs_and_brightness(self):
+        entity = self._make_wtp()
+        payload = entity._wtp_color_payload(**{ATTR_HS_COLOR: (240.0, 100.0), ATTR_BRIGHTNESS: 200})
+        assert payload["color"] != "#0000FF"  # brightness encoded in V, so not full blue
+
+    def test_wtp_color_payload_hs_only_full_brightness(self):
+        entity = self._make_wtp()
+        payload = entity._wtp_color_payload(**{ATTR_HS_COLOR: (240.0, 100.0)})
+        assert payload["color"] == "#0000FF"  # full brightness blue
+
+    def test_wtp_color_payload_brightness_only_preserves_hue(self):
+        entity = self._make_wtp()  # led_color=#FF0000 (red)
+        payload = entity._wtp_color_payload(**{ATTR_BRIGHTNESS: 128})
+        assert "color" in payload
+        # Red hue preserved, brightness halved → #800000
+        assert payload["color"] == "#800000"
+
+    def test_wtp_color_payload_no_color_args_returns_empty(self):
+        entity = self._make_wtp()
+        payload = entity._wtp_color_payload()
+        assert payload == {}

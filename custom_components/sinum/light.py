@@ -458,76 +458,83 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     # ------------------------------------------------------------------ commands
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        has_brightness = ATTR_BRIGHTNESS in kwargs
-        has_hs = ATTR_HS_COLOR in kwargs
-        has_kelvin = ATTR_COLOR_TEMP_KELVIN in kwargs
+    def _sbus_lua_commands(self, **kwargs: Any) -> tuple[list[str], dict[str, Any]]:
+        """Build Lua command lines and optimistic state for SBUS RGB control."""
+        lua_lines: list[str] = []
+        optimistic: dict[str, Any] = {}
+        prefix = f"sbus[{self._device_id}]"
 
+        if ATTR_COLOR_TEMP_KELVIN in kwargs:
+            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            current_pct = self._device.get("brightness") or 80
+            lua_lines.append(f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})')
+            optimistic["color_mode"] = "temperature"
+            optimistic["white_temperature"] = kelvin
+        else:
+            if ATTR_HS_COLOR in kwargs:
+                h, s = kwargs[ATTR_HS_COLOR]
+                lua_lines.append(f'{prefix}:call("set_color",{{"{_hs_to_hex(h, s, 1.0)}",200}})')
+                optimistic["color_mode"] = "rgb"
+            if ATTR_BRIGHTNESS in kwargs:
+                pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+                lua_lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')
+                optimistic["brightness"] = pct
+
+        return lua_lines, optimistic
+
+    def _wtp_color_payload(self, **kwargs: Any) -> dict[str, Any]:
+        """Build REST color payload for WTP RGB control."""
+        payload: dict[str, Any] = {}
+        has_hs = ATTR_HS_COLOR in kwargs
+        has_brightness = ATTR_BRIGHTNESS in kwargs
+
+        if ATTR_COLOR_TEMP_KELVIN in kwargs:
+            payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
+        elif has_hs and has_brightness:
+            h, s = kwargs[ATTR_HS_COLOR]
+            payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+        elif has_hs:
+            h, s = kwargs[ATTR_HS_COLOR]
+            payload["color"] = _hs_to_hex(h, s, 1.0)
+        elif has_brightness:
+            current = self._device.get("led_color") or self._device.get("color") or "#ffffff"
+            h, s, _ = _hex_to_hsv(current)
+            payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+
+        return payload
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
         store = (
             self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
         )
         optimistic: dict[str, Any] = {"state": True}
-
+        has_color_kwargs = ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
         mode = str(self._device.get("color_mode", "")).lower()
         # WTP REST PATCH cannot override the schedule in temperature/animation mode.
-        # SBUS uses Lua which works regardless of the current mode.
         wtp_managed = self._bus == "wtp" and mode in ("temperature", "animation")
 
-        if self._bus == "sbus" and (has_hs or has_brightness or has_kelvin):
-            # SBUS: control LEDs via Lua scene (REST PATCH ignores color/brightness fields)
-            lua_lines: list[str] = []
-            prefix = f"sbus[{self._device_id}]"
-
-            if has_kelvin:
-                kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-                current_pct = self._device.get("brightness") or 80
-                lua_lines.append(f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})')
-                optimistic["color_mode"] = "temperature"
-                optimistic["white_temperature"] = kelvin
-            else:
-                if has_hs:
-                    h, s = kwargs[ATTR_HS_COLOR]
-                    hex_color = _hs_to_hex(h, s, 1.0)
-                    lua_lines.append(f'{prefix}:call("set_color",{{"{hex_color}",200}})')
-                    optimistic["color_mode"] = "rgb"
-                if has_brightness:
-                    pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-                    lua_lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')
-                    optimistic["brightness"] = pct
-
+        if self._bus == "sbus" and has_color_kwargs:
+            lua_lines, sbus_optimistic = self._sbus_lua_commands(**kwargs)
+            optimistic.update(sbus_optimistic)
             try:
                 await self._run_lua("\n".join(lua_lines))
             except Exception as err:
                 raise HomeAssistantError(f"Cannot control RGB: {err}") from err
 
-        # Build the REST payload — always sends state=True; WTP also includes color
-        # because WTP firmware does not support the Lua scene approach.
         rest_payload: dict[str, Any] = {"state": True}
         if self._bus == "wtp" and not wtp_managed:
-            if has_kelvin:
-                rest_payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
-            elif has_hs and has_brightness:
-                h, s = kwargs[ATTR_HS_COLOR]
-                rest_payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
-            elif has_hs:
-                h, s = kwargs[ATTR_HS_COLOR]
-                rest_payload["color"] = _hs_to_hex(h, s, 1.0)
-            elif has_brightness:
-                current = self._device.get("led_color") or self._device.get("color") or "#ffffff"
-                h, s, _ = _hex_to_hsv(current)
-                rest_payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+            rest_payload.update(self._wtp_color_payload(**kwargs))
 
         try:
             if self._bus == "wtp":
                 updated = await self.coordinator.client.patch_wtp_device(
                     self._device_id, rest_payload
                 )
-                store[self._device_id].update(updated or {})
             else:
                 updated = await self.coordinator.client.patch_sbus_device(
                     self._device_id, {"state": True}
                 )
-                store[self._device_id].update(updated or {})
+            store[self._device_id].update(updated or {})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err
 
