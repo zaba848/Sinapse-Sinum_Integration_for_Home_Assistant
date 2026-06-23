@@ -2,6 +2,31 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.1] — 2026-06-23
+
+### Fixed
+- **API: robust JSON parsing** — new `_read_json()` helper replaces direct `resp.json()` calls;
+  handles empty response body, non-JSON / HTML error pages, and body-read failures
+  (`ClientPayloadError`) by raising `SinumConnectionError` with a clear message instead of crashing
+- **Token refresh**: `_refresh_jwt()` returns `False` instead of raising when the refresh
+  endpoint returns non-JSON, preventing an unhandled exception in the auth retry path
+- **`content_length` guard** was unreliable when hub omits the `Content-Length` header;
+  replaced with raw-byte read + empty check
+- **`light.py` ruff E402**: `_LOGGER` moved after all imports
+
+### Changed
+- **Button backlights** (`button` RGB backlight channel) moved to `EntityCategory.CONFIG` —
+  visible only in the device configuration page, not on the main dashboard
+- **Temperature sensors returning 0.0 °C**: virtual thermostats and SBUS sensors without a
+  physical probe now report `unknown` instead of `0.0` via `zero_is_unavailable` flag
+- **RGB Controller — SBUS**: full color control via persistent Lua scenes (`_ha_rgb_sbus_{id}`);
+  REST PATCH replaced for color and brightness to avoid hub read-only field errors
+- **Tests expanded**: 880 → 987 tests; 5 new `TestReadJsonErrorHandling` tests added
+- **README** rewritten with architecture diagram, entity reference, dev guide,
+  Lua integration examples, and "Adding New Device Types" walkthrough
+
+---
+
 ## [0.2.0] — 2026-06-17
 
 ### Added
