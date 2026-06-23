@@ -14,6 +14,7 @@ Bus types covered:
 
 from __future__ import annotations
 
+import json as _json
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -37,8 +38,8 @@ async def _fake_timeout(*args, **kwargs):
 def _make_response(status: int = 200, data: object = None, content_length: int = 100):
     resp = MagicMock()
     resp.status = status
-    resp.content_length = content_length
-    resp.json = AsyncMock(return_value=data or {})
+    _data = data if data is not None else {}
+    resp.read = AsyncMock(return_value=_json.dumps(_data).encode())
     return resp
 
 

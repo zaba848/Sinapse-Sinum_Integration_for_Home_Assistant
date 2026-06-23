@@ -19,8 +19,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-
-_LOGGER = logging.getLogger(__name__)
 from .const import (
     DOMAIN,
     STYPE_BUTTON,
@@ -33,6 +31,8 @@ from .const import (
     WTYPE_RGB_CONTROLLER,
 )
 from .coordinator import SinumCoordinator, via_device_for
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -481,9 +481,7 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             if has_kelvin:
                 kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
                 current_pct = self._device.get("brightness") or 80
-                lua_lines.append(
-                    f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})'
-                )
+                lua_lines.append(f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})')
                 optimistic["color_mode"] = "temperature"
                 optimistic["white_temperature"] = kelvin
             else:

@@ -8,6 +8,7 @@ Testing errors is not a substitute for testing that the fix works.
 """
 from __future__ import annotations
 
+import json as _json
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,16 +19,15 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.api import SinumClient
 
-
 # ---------------------------------------------------------------------------
 # HTTP-level helpers (mirror test_api.py pattern)
 # ---------------------------------------------------------------------------
 
-def _resp(status: int, data: object) -> MagicMock:
+def _resp(status: int, data: object = None) -> MagicMock:
     r = MagicMock()
     r.status = status
-    r.content_length = 100
-    r.json = AsyncMock(return_value=data)
+    _data = data if data is not None else {}
+    r.read = AsyncMock(return_value=_json.dumps(_data).encode())
     return r
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -111,6 +112,22 @@ class SinumConnectionError(Exception):
     pass
 
 
+async def _read_json(resp: aiohttp.ClientResponse, path: str) -> dict[str, Any]:
+    """Read response body and parse JSON; handle empty/non-JSON responses gracefully."""
+    try:
+        raw = await resp.read()
+    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        raise SinumConnectionError(f"Failed to read response body for {path}: {err}") from err
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError) as err:
+        raise SinumConnectionError(
+            f"Non-JSON response from {path} (status {resp.status}): {raw[:80]!r}"
+        ) from err
+
+
 class SinumClient:
     """Async HTTP client for the Sinum EH-01 hub REST API.
 
@@ -187,7 +204,7 @@ class SinumClient:
         if resp.status != 200:
             raise SinumConnectionError(f"Login failed with status {resp.status}")
 
-        body = await resp.json()
+        body = await _read_json(resp, "login")
         data = body.get("data", body)
         self._jwt = data[ATTR_SESSION]
         self._refresh_token = data.get(ATTR_REFRESH_TOKEN)
@@ -210,7 +227,10 @@ class SinumClient:
         if resp.status != 200:
             return False
 
-        body = await resp.json()
+        try:
+            body = await _read_json(resp, "token-refresh")
+        except SinumConnectionError:
+            return False
         data = body.get("data", body)
         if ATTR_SESSION in data:
             self._jwt = data[ATTR_SESSION]
@@ -276,7 +296,7 @@ class SinumClient:
 
         if resp.status == 422:
             try:
-                body = await resp.json()
+                body = await _read_json(resp, path)
                 errors = body.get("error", {}).get("errors", {})
                 details = "; ".join(
                     f"{k}: {v.get('text', v)}" if isinstance(v, dict) else f"{k}: {v}"
@@ -289,12 +309,9 @@ class SinumClient:
         if resp.status not in (200, 201, 204):
             raise SinumConnectionError(f"API error {resp.status} for {path}")
 
-        if resp.status == 204 or resp.content_length == 0:
-            return {}
-
-        body = await resp.json()
+        body = await _read_json(resp, path)
         # Unwrap {"data": ...} envelope present on all Sinum API responses
-        return body.get("data", body)
+        return body.get("data", body) if isinstance(body, dict) else body
 
     # ------------------------------------------------------------------ hub info
 

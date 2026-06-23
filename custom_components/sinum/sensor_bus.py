@@ -566,8 +566,7 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         if raw == _SENTINEL_INT16:
             return None
         if raw == 0 and (
-            self.entity_description.zero_is_unavailable
-            or self._device.get("status") == "offline"
+            self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
         ):
             return None
         return raw * self.entity_description.scale

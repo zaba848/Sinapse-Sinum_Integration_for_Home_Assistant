@@ -1,6 +1,7 @@
 """Tests for SinumClient."""
 from __future__ import annotations
 
+import json as _json
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,11 +20,11 @@ def session() -> MagicMock:
     return MagicMock(spec=aiohttp.ClientSession)
 
 
-def make_response(status: int, data: object) -> MagicMock:
+def make_response(status: int, data: object = None) -> MagicMock:
     resp = MagicMock()
     resp.status = status
-    resp.content_length = 100
-    resp.json = AsyncMock(return_value=data)
+    _data = data if data is not None else {}
+    resp.read = AsyncMock(return_value=_json.dumps(_data).encode())
     return resp
 
 
@@ -65,17 +66,15 @@ class TestLogin:
         resp = make_response(401, {})
         session.post = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, username="user", password="wrong")
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
-            with pytest.raises(SinumAuthError):
-                await client.login()
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumAuthError):
+            await client.login()
 
     @pytest.mark.asyncio
     async def test_login_connection_error(self, session):
         session.post = AsyncMock(side_effect=aiohttp.ClientError("unreachable"))
         client = SinumClient("192.168.1.1", session, username="user", password="pass")
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
-            with pytest.raises(SinumConnectionError):
-                await client.login()
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumConnectionError):
+            await client.login()
 
 
 class TestTokenAuth:
@@ -106,9 +105,8 @@ class TestApiRequests:
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
 
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
-            with pytest.raises(SinumConnectionError, match="API error 404"):
-                await client.get_energy()
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumConnectionError, match="API error 404"):
+            await client.get_energy()
 
     @pytest.mark.asyncio
     async def test_run_scene_sends_trigger_payload(self, session):
@@ -170,9 +168,9 @@ class TestApiRequests:
         with (
             patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
             patch("custom_components.sinum.api.asyncio.sleep", AsyncMock()),
+            pytest.raises(SinumConnectionError, match="Hub internal timeout"),
         ):
-            with pytest.raises(SinumConnectionError, match="Hub internal timeout"):
-                await client.get_wtp_devices()
+            await client.get_wtp_devices()
 
         assert session.request.call_count == 2
 

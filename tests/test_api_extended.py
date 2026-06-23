@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -20,11 +21,11 @@ async def _fake_timeout(*args, **kwargs):
     yield
 
 
-def make_response(status: int, data: object, content_length: int = 100) -> MagicMock:
+def make_response(status: int, data: object = None, content_length: int = 100) -> MagicMock:
     resp = MagicMock()
     resp.status = status
-    resp.content_length = content_length
-    resp.json = AsyncMock(return_value=data)
+    _data = data if data is not None else {}
+    resp.read = AsyncMock(return_value=_json.dumps(_data).encode())
     return resp
 
 
@@ -536,10 +537,10 @@ class TestApiGaps:
 
     @pytest.mark.asyncio
     async def test_request_422_json_parse_error_uses_status_fallback(self, session):
-        """422 response where json() raises → details falls back to 'status 422'."""
+        """422 response where body is not JSON → details falls back to 'status 422'."""
         resp = MagicMock()
         resp.status = 422
-        resp.json = AsyncMock(side_effect=Exception("bad json"))
+        resp.read = AsyncMock(return_value=b"not valid json{{{{")
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
         with (
@@ -609,3 +610,72 @@ class TestApiGaps:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client.patch_lora_device(5, {"state": True})
         assert result["id"] == 5
+
+
+class TestReadJsonErrorHandling:
+    """Tests for _read_json helper: empty body, non-JSON, and body-read failure."""
+
+    @pytest.mark.asyncio
+    async def test_empty_body_returns_empty_dict(self, session):
+        """204 or empty body → returns {} without raising."""
+        resp = MagicMock()
+        resp.status = 200
+        resp.read = AsyncMock(return_value=b"")
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_hub_info()
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_non_json_body_raises_connection_error(self, session):
+        """HTML or non-JSON response → SinumConnectionError with body excerpt."""
+        resp = MagicMock()
+        resp.status = 200
+        resp.read = AsyncMock(return_value=b"<html>Service Unavailable</html>")
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Non-JSON response"),
+        ):
+            await client.get_hub_info()
+
+    @pytest.mark.asyncio
+    async def test_body_read_failure_raises_connection_error(self, session):
+        """If body read itself raises ClientError → SinumConnectionError."""
+        resp = MagicMock()
+        resp.status = 200
+        resp.read = AsyncMock(side_effect=aiohttp.ClientPayloadError("truncated"))
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Failed to read response"),
+        ):
+            await client.get_hub_info()
+
+    @pytest.mark.asyncio
+    async def test_valid_json_without_data_envelope_returned_as_is(self, session):
+        """JSON without 'data' envelope → returned directly (not wrapped)."""
+        resp = MagicMock()
+        resp.status = 200
+        resp.read = AsyncMock(return_value=_json.dumps({"name": "hub"}).encode())
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_hub_info()
+        assert result == {"name": "hub"}
+
+    @pytest.mark.asyncio
+    async def test_refresh_jwt_returns_false_on_bad_json(self, session):
+        """If token-refresh endpoint returns non-JSON, _refresh_jwt returns False instead of raising."""
+        resp_refresh = MagicMock()
+        resp_refresh.status = 200
+        resp_refresh.read = AsyncMock(return_value=b"not-json")
+        session.post = AsyncMock(return_value=resp_refresh)
+        client = SinumClient("192.168.1.1", session, username="u", password="p")
+        client._refresh_token = "old-token"
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client._refresh_jwt()
+        assert result is False

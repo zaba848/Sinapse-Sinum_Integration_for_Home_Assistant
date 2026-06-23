@@ -1,14 +1,15 @@
 """Tests for climate temperature fix: dynamic min/max, HomeAssistantError, 422 handling."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import json as _json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.api import SinumConnectionError
-from custom_components.sinum.climate import SinumThermostat, SinumTemperatureRegulatorClimate
-from custom_components.sinum.const import TEMP_MAX, TEMP_MIN, VTYPE_THERMOSTAT
+from custom_components.sinum.climate import SinumTemperatureRegulatorClimate, SinumThermostat
+from custom_components.sinum.const import TEMP_MAX, TEMP_MIN
 
 
 def _make_coordinator(virtual=None, wtp=None, sbus=None):
@@ -128,18 +129,19 @@ class TestApiValidationError:
 
     @pytest.mark.asyncio
     async def test_422_extracts_field_error(self):
+
         from custom_components.sinum.api import SinumClient
-        import aiohttp
 
         session = MagicMock()
         resp = MagicMock()
         resp.status = 422
-        resp.json = AsyncMock(return_value={
+        _body = {
             "error": {
                 "errors": {"target_temperature": {"id": 7250, "text": "Parameter exceeds maximum range"}},
                 "message": {"text": "Validation failed"},
             }
-        })
+        }
+        resp.read = AsyncMock(return_value=_json.dumps(_body).encode())
 
         async def fake_request(*args, **kwargs):
             return resp
@@ -184,7 +186,7 @@ class TestNotifyEntity:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_entity(self):
-        from custom_components.sinum.notify import async_setup_entry, SinumNotifyEntity
+        from custom_components.sinum.notify import SinumNotifyEntity, async_setup_entry
 
         coordinator = MagicMock()
         coordinator.hub_info = {}

@@ -235,9 +235,7 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         try:
-            await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "stop"}
-            )
+            await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "stop"})
         except Exception as err:
             raise HomeAssistantError(f"Cannot stop gate: {err}") from err
         # Re-fetch actual state: gate may have stopped at unknown position
