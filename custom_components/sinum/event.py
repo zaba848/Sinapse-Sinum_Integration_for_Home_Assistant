@@ -80,15 +80,18 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
 
         action_valid = action is not None and action != ""
         action_changed = action_valid and action != self._prev_action
-        # buttons_count increments on every press, even when action type stays the same.
-        # This handles consecutive presses of the same type when hub doesn't reset action field.
+        # buttons_count increments on every press regardless of action type.
         count_changed = count is not None and count != self._prev_count
 
         if action_changed or (count_changed and action_valid):
+            # WTP: action field persists → detected by action change or count (same-type repeat)
             self._prev_action = action
             self._prev_count = count
             self._trigger_event("pressed", {"action": action, "buttons_count": count})
         elif count_changed:
+            # SBUS: hub resets action to '' before the next poll — count is the only signal.
+            # Fire with action=None; use MQTT bridge for real-time action type detection.
             self._prev_count = count
+            self._trigger_event("pressed", {"action": None, "buttons_count": count})
 
         self.async_write_ha_state()

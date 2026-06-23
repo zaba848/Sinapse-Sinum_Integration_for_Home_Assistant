@@ -158,8 +158,8 @@ class TestSinumButtonEvent:
         assert fired[0][1]["action"] == "single_press"
         assert fired[0][1]["buttons_count"] == 2
 
-    def test_no_event_when_count_increments_but_action_empty(self):
-        """buttons_count change alone doesn't fire if action is empty (spurious hub message)."""
+    def test_sbus_event_fires_with_none_action_when_count_increments_and_action_empty(self):
+        """SBUS buttons reset action to '' before poll — count change alone fires event with action=None."""
         entity, coordinator = self._make_entity(bus="wtp", action="single_press")
         fired = []
         entity._trigger_event = lambda t, a: fired.append((t, a))
@@ -168,7 +168,9 @@ class TestSinumButtonEvent:
         coordinator.wtp_devices[51]["buttons_count"] = 2
         entity._handle_coordinator_update()
 
-        assert fired == []
+        assert len(fired) == 1
+        assert fired[0][1]["action"] is None
+        assert fired[0][1]["buttons_count"] == 2
 
     def test_count_updated_even_without_event(self):
         """_prev_count is updated when count changes even if no event fires (action empty)."""

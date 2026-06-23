@@ -2,6 +2,21 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.3] — 2026-06-22
+
+### Fixed
+- **SBUS button polling**: SBUS hub resets `action` field to `""` immediately after press —
+  by the time the coordinator polls, the action type is gone. Press is now always detected via
+  `buttons_count` increment. Event fires with `action=None` when action has already been reset;
+  for real-time action type use the MQTT bridge.
+- **hacs.json**: removed `"homeassistant"` key that caused HACS validation failure
+
+### Added
+- Brand assets (`custom_components/sinum/brand/icon.png`, `icon@2x.png`) for HACS v2 listing
+- HACS GitHub Actions validation workflow (`.github/workflows/validate.yml`)
+
+---
+
 ## [0.2.2] — 2026-06-23
 
 ### Fixed

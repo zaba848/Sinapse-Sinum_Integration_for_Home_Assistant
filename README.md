@@ -706,7 +706,7 @@ Integration is tested against two live hubs in production:
 
 | Limitation | Notes |
 |---|---|
-| **Button events without MQTT** | Detected on next poll (up to 30 s). `buttons_count` field ensures consecutive same-type presses are not missed. For < 1 s latency enable the MQTT bridge — see [Event — Physical Buttons](#event--physical-buttons). |
+| **SBUS button action type without MQTT** | SBUS hub resets `action` to `""` immediately after a press — by polling time it is gone. The press IS detected via `buttons_count`, but the event fires with `action=None`. WTP buttons keep `action` set until next press, so type is always available. For real-time action type on both buses, enable the MQTT bridge. |
 | **`custom_device` virtual type** | Lua contracts vary per installation; not mapped to HA entities. Use scenes/automations to control them. |
 | **`thermostat_output_group`** | Exposed as a disabled-by-default diagnostic sensor (output count), not as direct control entities. |
 | **WTP RGB in temperature mode** | Hub firmware ignores color values when color-temperature mode is active; only `color_temp_kelvin` works. |

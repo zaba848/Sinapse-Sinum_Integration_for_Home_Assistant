@@ -1,7 +1,7 @@
 {
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "documentation": "https://github.com/zaba848/Sinum_HomeAsistant_connector",
   "issue_tracker": "https://github.com/zaba848/Sinum_HomeAsistant_connector/issues",
   "homeassistant": "2024.1.0",
