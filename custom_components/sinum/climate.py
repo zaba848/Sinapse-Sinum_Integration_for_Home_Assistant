@@ -289,9 +289,12 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"mode": sinum_mode}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"mode": sinum_mode}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set HVAC mode: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
@@ -375,7 +378,10 @@ class _BusClimateMixin:
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
-        updated = await self._patch({self._patch_mode_key: sinum_mode})
+        try:
+            updated = await self._patch({self._patch_mode_key: sinum_mode})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set HVAC mode: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
@@ -485,7 +491,10 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
         if not gear:
             _LOGGER.warning("Unknown fan mode: %s", fan_mode)
             return
-        updated = await self._patch({"fan.manual_fan_gear": gear})
+        try:
+            updated = await self._patch({"fan.manual_fan_gear": gear})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set fan mode: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
@@ -566,19 +575,28 @@ class SinumTemperatureRegulatorClimate(
             )
             return
         system_mode = _HVAC_TO_MODE.get(hvac_mode, "off")
-        updated = await self._patch({"system_mode": system_mode})
+        try:
+            updated = await self._patch({"system_mode": system_mode})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set HVAC mode: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
-        updated = await self._patch({"system_mode": "heating"})
+        try:
+            updated = await self._patch({"system_mode": "heating"})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
-        updated = await self._patch({"system_mode": "off"})
+        try:
+            updated = await self._patch({"system_mode": "off"})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         if updated:
             self._device.update(updated)
         self.async_write_ha_state()
@@ -697,31 +715,40 @@ class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEn
         self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        if hvac_mode == HVACMode.OFF:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"enabled": False}
-            )
-        else:
-            sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "heating")
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"enabled": True, "work_mode": sinum_mode}
-            )
+        try:
+            if hvac_mode == HVACMode.OFF:
+                updated = await self.coordinator.client.patch_virtual_device(
+                    self._device_id, {"enabled": False}
+                )
+            else:
+                sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "heating")
+                updated = await self.coordinator.client.patch_virtual_device(
+                    self._device_id, {"enabled": True, "work_mode": sinum_mode}
+                )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set HVAC mode: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"enabled": True}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"enabled": True}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"enabled": False}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"enabled": False}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()

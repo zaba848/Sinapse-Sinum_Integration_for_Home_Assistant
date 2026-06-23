@@ -161,12 +161,84 @@ class TestApiRequests:
         assert devices == [{"id": 1, "class": "wtp_parent_device", "devices": []}]
 
     @pytest.mark.asyncio
-    async def test_408_raises_connection_error(self, session):
-        """Hub-side bus timeout (HTTP 408) raises SinumConnectionError for retry."""
+    async def test_408_on_get_retries_once_and_raises_if_both_fail(self, session):
+        """GET 408 retries once; if both attempts return 408, SinumConnectionError is raised."""
         resp = make_response(408, {"error": {"message": {"text": "Request timeout exceeded", "id": 7334}}})
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
 
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            patch("custom_components.sinum.api.asyncio.sleep", AsyncMock()),
+        ):
             with pytest.raises(SinumConnectionError, match="Hub internal timeout"):
                 await client.get_wtp_devices()
+
+        assert session.request.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_408_on_patch_retries_once_and_succeeds(self, session):
+        """PATCH 408 triggers one retry; if retry returns 200 the call succeeds."""
+        first = make_response(408, {})
+        second = make_response(200, {"data": {"id": 9, "mode": "heating"}})
+        session.request = AsyncMock(side_effect=[first, second])
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            patch("custom_components.sinum.api.asyncio.sleep", AsyncMock()),
+        ):
+            result = await client.patch_virtual_device(9, {"mode": "heating"})
+
+        assert result == {"id": 9, "mode": "heating"}
+        assert session.request.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_408_on_patch_retry_also_408_raises_connection_error(self, session):
+        """PATCH 408 is retried once; if retry is also 408, SinumConnectionError is raised."""
+        resp = make_response(408, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            patch("custom_components.sinum.api.asyncio.sleep", AsyncMock()),
+            pytest.raises(SinumConnectionError, match="Hub internal timeout"),
+        ):
+            await client.patch_virtual_device(9, {"mode": "heating"})
+
+        assert session.request.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_408_on_patch_sleeps_before_retry(self, session):
+        """PATCH 408 triggers asyncio.sleep(1) before retrying."""
+        resp_408 = make_response(408, {})
+        resp_ok = make_response(200, {"data": {"id": 9}})
+        session.request = AsyncMock(side_effect=[resp_408, resp_ok])
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        mock_sleep = AsyncMock()
+
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            patch("custom_components.sinum.api.asyncio.sleep", mock_sleep),
+        ):
+            await client.patch_virtual_device(9, {"mode": "off"})
+
+        mock_sleep.assert_awaited_once_with(1)
+
+    @pytest.mark.asyncio
+    async def test_408_on_patch_sbus_also_retries(self, session):
+        """SBUS PATCH also retries on 408."""
+        first = make_response(408, {})
+        second = make_response(200, {"data": {"id": 5, "state": True}})
+        session.request = AsyncMock(side_effect=[first, second])
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            patch("custom_components.sinum.api.asyncio.sleep", AsyncMock()),
+        ):
+            result = await client.patch_sbus_device(5, {"state": True})
+
+        assert result == {"id": 5, "state": True}
+        assert session.request.call_count == 2

@@ -209,12 +209,13 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 devices[device_id] = device
             return devices
 
-        # Bulk succeeded but returned empty → try per-device (old firmware).
-        # Bulk failed with cache → keep entities available and avoid 400+ requests.
-        # Bulk failed on cold start → try per-device IDs so entities are still provided.
-        if not bulk_ok and cached:
-            return cached
+        # Bulk failed (exception) → return cache to keep entities alive; never fall through
+        # to per-device loop when bulk raised (the hub would 408/timeout on every device too).
+        if not bulk_ok:
+            return cached  # empty dict on cold start → entities unavailable (correct)
 
+        # Bulk succeeded but returned empty list → old firmware without bulk endpoint.
+        # Try per-device using IDs collected from rooms/parent-device trees.
         for device_id in fallback_ids:
             try:
                 device = await item_getter(device_id)

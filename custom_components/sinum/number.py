@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -90,7 +91,10 @@ class SinumVariableNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
         return float(value) if value is not None else None
 
     async def async_set_native_value(self, value: float) -> None:
-        updated = await self.coordinator.client.set_variable(self._variable_id, value)
+        try:
+            updated = await self.coordinator.client.set_variable(self._variable_id, value)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set variable: {err}") from err
         variable = self._variable
         if variable:
             variable.update(updated)
@@ -148,9 +152,12 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
         return float(raw) if raw is not None else None
 
     async def async_set_native_value(self, value: float) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(
-            self._device_id, {"value": int(value)}
-        )
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"value": int(value)}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set analog output: {err}") from err
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -192,8 +199,11 @@ class SinumPwmNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
         return float(raw) if raw is not None else None
 
     async def async_set_native_value(self, value: float) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(
-            self._device_id, {"duty_cycle": int(value)}
-        )
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"duty_cycle": int(value)}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set PWM duty cycle: {err}") from err
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()

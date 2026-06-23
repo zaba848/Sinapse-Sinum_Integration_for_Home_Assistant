@@ -4,6 +4,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -95,16 +96,22 @@ class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return bool(self._device.get("state"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"state": True}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"state": True}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"state": False}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"state": False}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -131,16 +138,22 @@ class SinumWicketSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return self._device.get("state") in ("unlocked", "open")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"command": "unlock"}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"command": "unlock"}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot unlock wicket: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"command": "lock"}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"command": "lock"}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot lock wicket: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -188,39 +201,45 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return bool(self._device.get("state"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": True}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        elif self._bus == "sbus":
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": True}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_lora_device(
-                self._device_id, {"state": True}
-            )
-            self.coordinator.lora_devices[self._device_id].update(updated)
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"state": True}
+                )
+                self.coordinator.wtp_devices[self._device_id].update(updated)
+            elif self._bus == "sbus":
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": True}
+                )
+                self.coordinator.sbus_devices[self._device_id].update(updated)
+            else:
+                updated = await self.coordinator.client.patch_lora_device(
+                    self._device_id, {"state": True}
+                )
+                self.coordinator.lora_devices[self._device_id].update(updated)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        elif self._bus == "sbus":
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_lora_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.lora_devices[self._device_id].update(updated)
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"state": False}
+                )
+                self.coordinator.wtp_devices[self._device_id].update(updated)
+            elif self._bus == "sbus":
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": False}
+                )
+                self.coordinator.sbus_devices[self._device_id].update(updated)
+            else:
+                updated = await self.coordinator.client.patch_lora_device(
+                    self._device_id, {"state": False}
+                )
+                self.coordinator.lora_devices[self._device_id].update(updated)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.async_write_ha_state()
 
 
@@ -267,16 +286,22 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return attrs
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(
-            self._device_id, {"enabled": True}
-        )
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"enabled": True}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot open valve: {err}") from err
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_sbus_device(
-            self._device_id, {"enabled": False}
-        )
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"enabled": False}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot close valve: {err}") from err
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -325,17 +350,23 @@ class SinumDhwSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         return attrs
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"dhw_control": {"enabled": True}}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"dhw_control": {"enabled": True}}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot enable DHW: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"dhw_control": {"enabled": False}}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"dhw_control": {"enabled": False}}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot disable DHW: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()

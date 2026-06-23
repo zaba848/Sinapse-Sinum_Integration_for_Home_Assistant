@@ -214,13 +214,20 @@ class TestBusRgbLight:
     async def test_sbus_rgb_turn_on_sends_color(self):
         device = dict(FIXTURES["sbus_rgb"])
         coordinator = _make_coordinator(sbus={45: device})
+        coordinator.client.get_or_create_scene = AsyncMock(return_value=99)
+        coordinator.client.patch_scene_lua = AsyncMock(return_value=None)
+        coordinator.client.run_scene = AsyncMock(return_value=None)
         entity = _wire(SinumBusRgbLight(coordinator, 45, "test_entry", "sbus"))
         from homeassistant.components.light import ATTR_HS_COLOR
         await entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0)})
+        # SBUS uses Lua — verify set_color was sent with green #00FF00
+        lua_code = coordinator.client.patch_scene_lua.await_args.args[1]
+        assert 'set_color' in lua_code
+        assert '#00FF00' in lua_code.upper()
+        # REST PATCH carries only state=True (no color — hub ignores color field for rgb_controllers)
         call_args = coordinator.client.patch_sbus_device.call_args
         assert call_args[0][0] == 45
-        payload = call_args[0][1]
-        assert payload == {"state": True, "color": "#00FF00"}
+        assert call_args[0][1] == {"state": True}
 
 
 # ── Binary sensor (SBUS motion) ────────────────────────────────────────────────

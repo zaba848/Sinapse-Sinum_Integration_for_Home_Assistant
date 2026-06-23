@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any
 
@@ -10,12 +11,16 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+
+_LOGGER = logging.getLogger(__name__)
 from .const import (
     DOMAIN,
     STYPE_BUTTON,
@@ -67,15 +72,15 @@ def _label(device: dict[str, Any]) -> str:
     return (device.get("_device_name") or device.get("name", "")).strip()
 
 
-def _hex_to_hs(hex_color: str) -> tuple[float, float]:
-    """Convert #RRGGBB to (hue 0-360, saturation 0-100)."""
+def _hex_to_hsv(hex_color: str) -> tuple[float, float, float]:
+    """Convert #RRGGBB to (hue 0-360, saturation 0-100, value 0-1)."""
     hex_color = hex_color.lstrip("#")
     if len(hex_color) < 6:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 1.0)
     try:
         r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
     except ValueError:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 1.0)
     max_c = max(r, g, b)
     min_c = min(r, g, b)
     delta = max_c - min_c
@@ -88,6 +93,12 @@ def _hex_to_hs(hex_color: str) -> tuple[float, float]:
     else:
         h = 60 * ((r - g) / delta + 4)
     s = 0.0 if max_c == 0 else (delta / max_c) * 100
+    return h, s, max_c
+
+
+def _hex_to_hs(hex_color: str) -> tuple[float, float]:
+    """Convert #RRGGBB to (hue 0-360, saturation 0-100)."""
+    h, s, _ = _hex_to_hsv(hex_color)
     return h, s
 
 
@@ -109,16 +120,17 @@ def _kelvin_to_hex(kelvin: int) -> str:
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
-def _hs_to_hex(hue: float, saturation: float) -> str:
-    """Convert (hue 0-360, saturation 0-100) to #RRGGBB."""
+def _hs_to_hex(hue: float, saturation: float, value: float = 1.0) -> str:
+    """Convert (hue 0-360, saturation 0-100, value 0-1) to #RRGGBB."""
     h = hue / 60
     s = saturation / 100
+    v = max(0.0, min(1.0, value))
     i = math.floor(h)
     f = h - i
-    p = 1 - s
-    q = 1 - f * s
-    t = 1 - (1 - f) * s
-    mapping = [(1, t, p), (q, 1, p), (p, 1, t), (p, q, 1), (t, p, 1), (1, p, q)]
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+    mapping = [(v, t, p), (q, v, p), (p, v, t), (p, q, v), (t, p, v), (v, p, q)]
     r, g, b = mapping[int(i) % 6]
     return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
@@ -249,14 +261,20 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             else:
                 payload["white_temperature"] = kelvin
 
-        updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, {"state": False}
-        )
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(
+                self._device_id, {"state": False}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
@@ -312,30 +330,42 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         payload: dict[str, Any] = {"state": True}
         if ATTR_BRIGHTNESS in kwargs:
             payload["target_level"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
-            self.coordinator.sbus_devices[self._device_id].update(updated)
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+                self.coordinator.wtp_devices[self._device_id].update(updated)
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
+                self.coordinator.sbus_devices[self._device_id].update(updated)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"state": False}
+                )
+                self.coordinator.wtp_devices[self._device_id].update(updated)
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": False}
+                )
+                self.coordinator.sbus_devices[self._device_id].update(updated)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.async_write_ha_state()
 
 
 class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
-    """SBUS or WTP rgb_controller."""
+    """SBUS or WTP rgb_controller.
+
+    SBUS devices are controlled via Lua scenes (set_color / set_brightness /
+    set_temperature).  State on/off is sent as a separate REST PATCH because
+    the Lua set_state call is unreliable.  WTP rgb_controllers fall back to
+    REST-only control (no confirmed Lua support on that firmware).
+    """
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -350,6 +380,7 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
+        self._lua_scene_id: int | None = None
         device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
             device_id, {}
         )
@@ -391,8 +422,9 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
-        # "color" is the writable target; "led_color" is the read-only hardware state
-        hex_color = self._device.get("color") or self._device.get("led_color")
+        # led_color is the actual hardware output; HS extraction ignores V so dimming
+        # doesn't affect the reported hue/saturation shown in the HA colour picker.
+        hex_color = self._device.get("led_color") or self._device.get("color")
         if not hex_color:
             return None
         return _hex_to_hs(hex_color)
@@ -401,39 +433,125 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     def color_temp_kelvin(self) -> int | None:
         return self._device.get("white_temperature")
 
+    # ------------------------------------------------------------------ Lua helpers
+
+    async def _ensure_lua_scene(self) -> int:
+        """Return the ID of the persistent Lua scene for this device, creating it if needed."""
+        if self._lua_scene_id is None:
+            name = f"_ha_rgb_{self._bus}_{self._device_id}"
+            self._lua_scene_id = await self.coordinator.client.get_or_create_scene(name)
+        return self._lua_scene_id
+
+    async def _run_lua(self, lua_code: str) -> None:
+        """Update the scene's Lua code and activate it."""
+        scene_id = await self._ensure_lua_scene()
+        await self.coordinator.client.patch_scene_lua(scene_id, lua_code)
+        await self.coordinator.client.run_scene(scene_id)
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._lua_scene_id is not None:
+            try:
+                await self.coordinator.client.delete_scene(self._lua_scene_id)
+            except Exception:
+                _LOGGER.debug("Could not delete RGB scene %s on removal", self._lua_scene_id)
+            self._lua_scene_id = None
+
+    # ------------------------------------------------------------------ commands
+
     async def async_turn_on(self, **kwargs: Any) -> None:
-        payload: dict[str, Any] = {"state": True}
+        has_brightness = ATTR_BRIGHTNESS in kwargs
+        has_hs = ATTR_HS_COLOR in kwargs
+        has_kelvin = ATTR_COLOR_TEMP_KELVIN in kwargs
 
-        if ATTR_BRIGHTNESS in kwargs:
-            payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
+        optimistic: dict[str, Any] = {"state": True}
 
-        if ATTR_HS_COLOR in kwargs:
-            h, s = kwargs[ATTR_HS_COLOR]
-            payload["color"] = _hs_to_hex(h, s)
+        mode = str(self._device.get("color_mode", "")).lower()
+        # WTP REST PATCH cannot override the schedule in temperature/animation mode.
+        # SBUS uses Lua which works regardless of the current mode.
+        wtp_managed = self._bus == "wtp" and mode in ("temperature", "animation")
 
-        if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            # color is writable; white_temperature and led_color are read-only on rgb_controller
-            payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
+        if self._bus == "sbus" and (has_hs or has_brightness or has_kelvin):
+            # SBUS: control LEDs via Lua scene (REST PATCH ignores color/brightness fields)
+            lua_lines: list[str] = []
+            prefix = f"sbus[{self._device_id}]"
 
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
-            self.coordinator.wtp_devices[self._device_id].update({**payload, **(updated or {})})
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
-            self.coordinator.sbus_devices[self._device_id].update({**payload, **(updated or {})})
+            if has_kelvin:
+                kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+                current_pct = self._device.get("brightness") or 80
+                lua_lines.append(
+                    f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})'
+                )
+                optimistic["color_mode"] = "temperature"
+                optimistic["white_temperature"] = kelvin
+            else:
+                if has_hs:
+                    h, s = kwargs[ATTR_HS_COLOR]
+                    hex_color = _hs_to_hex(h, s, 1.0)
+                    lua_lines.append(f'{prefix}:call("set_color",{{"{hex_color}",200}})')
+                    optimistic["color_mode"] = "rgb"
+                if has_brightness:
+                    pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+                    lua_lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')
+                    optimistic["brightness"] = pct
+
+            try:
+                await self._run_lua("\n".join(lua_lines))
+            except Exception as err:
+                raise HomeAssistantError(f"Cannot control RGB: {err}") from err
+
+        # Build the REST payload — always sends state=True; WTP also includes color
+        # because WTP firmware does not support the Lua scene approach.
+        rest_payload: dict[str, Any] = {"state": True}
+        if self._bus == "wtp" and not wtp_managed:
+            if has_kelvin:
+                rest_payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
+            elif has_hs and has_brightness:
+                h, s = kwargs[ATTR_HS_COLOR]
+                rest_payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+            elif has_hs:
+                h, s = kwargs[ATTR_HS_COLOR]
+                rest_payload["color"] = _hs_to_hex(h, s, 1.0)
+            elif has_brightness:
+                current = self._device.get("led_color") or self._device.get("color") or "#ffffff"
+                h, s, _ = _hex_to_hsv(current)
+                rest_payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, rest_payload
+                )
+                store[self._device_id].update(updated or {})
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": True}
+                )
+                store[self._device_id].update(updated or {})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
+
+        store[self._device_id].update(optimistic)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": False}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
+        store = (
+            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        )
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"state": False}
+                )
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": False}
+                )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
+        store[self._device_id].update({**{"state": False}, **(updated or {})})
         self.async_write_ha_state()
 
 
@@ -445,6 +563,7 @@ class SinumButtonLight(CoordinatorEntity[SinumCoordinator], LightEntity):
     _attr_icon = "mdi:led-on"
     _attr_color_mode = ColorMode.HS
     _attr_supported_color_modes = {ColorMode.HS}
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
         self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
@@ -493,25 +612,31 @@ class SinumButtonLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             color = _hs_to_hex(h, s)
         else:
             color = self._device.get("color") or "#0072c3"
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"color": color}
-            )
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"color": color}
-            )
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"color": color}
+                )
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"color": color}
+                )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot set backlight color: {err}") from err
         self._store()[self._device_id].update({**{"color": color}, **(updated or {})})
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"color": "#000000"}
-            )
-        else:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"color": "#000000"}
-            )
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"color": "#000000"}
+                )
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"color": "#000000"}
+                )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off backlight: {err}") from err
         self._store()[self._device_id].update({**{"color": "#000000"}, **(updated or {})})
         self.async_write_ha_state()

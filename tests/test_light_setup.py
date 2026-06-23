@@ -440,14 +440,16 @@ class TestSinumBusRgbLight:
 
     @pytest.mark.asyncio
     async def test_turn_on_with_brightness_sends_brightness(self):
+        # brightness is read-only on rgb_controller — encoded as V in color hex
         entity, coordinator = self._make_wtp()
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_BRIGHTNESS: 128})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {"state": True, "brightness": round(128 / 255 * 100)}
+        # HS preserved from led_color "#00FF00" (120°, 100%), V = 128/255
+        assert payload == {"state": True, "color": "#008000"}
 
     @pytest.mark.asyncio
-    async def test_turn_on_rgbww_device_sends_color_and_brightness(self):
+    async def test_turn_on_rgbww_device_sends_color_with_brightness_encoded(self):
         d = {
             "id": 4,
             "type": WTYPE_RGB_CONTROLLER,
@@ -460,11 +462,8 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 200})
         payload = coordinator.client.patch_wtp_device.await_args.args[1]
-        assert payload == {
-            "state": True,
-            "brightness": round(200 / 255 * 100),
-            "color": "#00FF00",
-        }
+        # brightness (200/255) encoded into color V — no separate brightness field
+        assert payload == {"state": True, "color": "#00C800"}
 
     @pytest.mark.asyncio
     async def test_turn_off_wtp(self):
@@ -473,6 +472,128 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_turn_off()
         coordinator.client.patch_wtp_device.assert_awaited_once_with(4, {"state": False})
+
+    # ---- tests that verify real hardware behavior ----
+
+    def test_hs_color_reads_led_color_not_command_target(self):
+        """led_color is the actual hardware output; color diverges when in temperature mode."""
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "color": "#0000FF",  # last command we sent (blue)
+            "led_color": "#FF0000",  # what the LED is actually showing (red)
+        }
+        coordinator = _make_coordinator(wtp={4: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
+        hs = entity.hs_color
+        assert hs is not None
+        # Must report red (led_color), not blue (color)
+        assert hs[0] == pytest.approx(0.0, abs=1)
+
+    @pytest.mark.asyncio
+    async def test_turn_on_temperature_mode_sends_only_state(self):
+        """In temperature mode the hub ignores color/brightness — only state (on/off) works."""
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": False,
+            "color_mode": "temperature",
+            "brightness": 80,
+            "led_color": "#cc1000",
+        }
+        coordinator = _make_coordinator(wtp={4: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
+        coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_BRIGHTNESS: 200, ATTR_HS_COLOR: (0.0, 100.0)})
+        payload = coordinator.client.patch_wtp_device.await_args.args[1]
+        # brightness and color must NOT be in payload — firmware owns them in temperature mode
+        assert payload == {"state": True}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_temperature_mode_ignores_kelvin(self):
+        """Kelvin change is also ignored in temperature mode — schedule system controls it."""
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": False,
+            "color_mode": "temperature",
+            "white_temperature": 3000,
+        }
+        coordinator = _make_coordinator(wtp={4: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
+        coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_COLOR_TEMP_KELVIN: 6500})
+        payload = coordinator.client.patch_wtp_device.await_args.args[1]
+        assert payload == {"state": True}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_animation_mode_sends_only_state(self):
+        """In animation mode the firmware runs its own color sequence — only on/off works."""
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": False,
+            "color_mode": "animation",
+        }
+        coordinator = _make_coordinator(wtp={4: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
+        coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_BRIGHTNESS: 200})
+        payload = coordinator.client.patch_wtp_device.await_args.args[1]
+        assert payload == {"state": True}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_color_mode_sends_color_with_brightness(self):
+        """In color mode brightness IS encoded in the color hex (V component in HSV)."""
+        d = {
+            "id": 4,
+            "type": WTYPE_RGB_CONTROLLER,
+            "name": "RGB",
+            "state": True,
+            "color_mode": "color",
+            "led_color": "#00FF00",  # current green at full brightness
+        }
+        coordinator = _make_coordinator(wtp={4: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 4, "test_entry", "wtp"))
+        coordinator.client.patch_wtp_device = AsyncMock(return_value={})
+        await entity.async_turn_on(**{ATTR_BRIGHTNESS: 128})
+        payload = coordinator.client.patch_wtp_device.await_args.args[1]
+        # Green (120°, 100%) at 50% brightness → #008000
+        assert payload == {"state": True, "color": "#008000"}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_sbus_temperature_mode_uses_lua(self):
+        """SBUS Lua works regardless of color_mode — brightness change sent via Lua even in temperature mode."""
+        from unittest.mock import AsyncMock as AM
+        d = {
+            "id": 119,
+            "type": STYPE_RGB_CONTROLLER,
+            "name": "RGB Controller 1",
+            "state": True,
+            "color_mode": "temperature",
+            "brightness": 80,
+            "led_color": "#cc1000",
+            "white_temperature": 3000,
+        }
+        coordinator = _make_coordinator(sbus={119: d})
+        coordinator.client.get_or_create_scene = AM(return_value=10)
+        coordinator.client.patch_scene_lua = AM(return_value=None)
+        coordinator.client.run_scene = AM(return_value=None)
+        coordinator.client.patch_sbus_device = AM(return_value={})
+        entity = _wire(SinumBusRgbLight(coordinator, 119, "test_entry", "sbus"))
+        await entity.async_turn_on(**{ATTR_BRIGHTNESS: 255})
+        # Lua was called with set_brightness
+        lua_code = coordinator.client.patch_scene_lua.await_args.args[1]
+        assert "set_brightness" in lua_code
+        assert "100" in lua_code  # 255/255*100 = 100
+        # REST carries only state=True (no color fields for SBUS)
+        payload = coordinator.client.patch_sbus_device.await_args.args[1]
+        assert payload == {"state": True}
 
 
 class TestSinumButtonLight:

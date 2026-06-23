@@ -60,7 +60,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 25
 
 
 def _dict_list(items: Any) -> list[dict[str, Any]]:
@@ -140,6 +140,8 @@ class SinumClient:
         self._password = password
         self._jwt: str | None = None
         self._refresh_token: str | None = None
+        # Limit concurrent requests — hub embedded firmware can't handle parallel load
+        self._sem = asyncio.Semaphore(2)
 
     @property
     def base_url(self) -> str:
@@ -222,6 +224,10 @@ class SinumClient:
         await self.get_hub_info()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        async with self._sem:
+            return await self._request_inner(method, path, **kwargs)
+
+    async def _request_inner(self, method: str, path: str, **kwargs: Any) -> Any:
         if not self._api_token and not self._jwt:
             await self.login()
 
@@ -253,8 +259,18 @@ class SinumClient:
         if resp.status == 304:
             return {}
 
-        # 408 is hub-side bus timeout (firmware alpha behaviour) — raise as connection error
-        # so coordinator logs a warning and retries on next poll instead of crashing
+        # Retry once on 408 — the bus is often free a moment later (applies to reads and writes)
+        if resp.status == 408:
+            _LOGGER.debug("Bus busy (408) on %s %s, retrying in 1 s", method, path)
+            await asyncio.sleep(1)
+            try:
+                async with asyncio.timeout(REQUEST_TIMEOUT):
+                    resp = await self._session.request(
+                        method, self._url(path), headers=self._headers(), ssl=False, **kwargs
+                    )
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                raise SinumConnectionError(f"Request failed on retry: {err}") from err
+
         if resp.status == 408:
             raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
 
@@ -368,6 +384,38 @@ class SinumClient:
 
     async def run_scene(self, scene_id: int) -> None:
         await self._request("POST", API_SCENE_ACTIVATE.format(id=scene_id))
+
+    async def create_scene(self, name: str, lua: str) -> int:
+        """Create a code-type scene and return its ID."""
+        result = await self._request(
+            "POST", API_SCENES, json={"name": name, "type": "code", "lua": lua}
+        )
+        if isinstance(result, dict) and result.get("id"):
+            return int(result["id"])
+        raise SinumConnectionError(f"Scene creation failed: {result}")
+
+    async def patch_scene_lua(self, scene_id: int, lua: str) -> None:
+        """Replace the Lua code of an existing scene."""
+        await self._request("PATCH", API_SCENE.format(id=scene_id), json={"lua": lua})
+
+    async def delete_scene(self, scene_id: int) -> None:
+        """Delete a scene by ID."""
+        await self._request("DELETE", API_SCENE.format(id=scene_id))
+
+    async def find_scene_by_name(self, name: str) -> int | None:
+        """Return the ID of the first scene matching *name*, or None."""
+        scenes = await self.get_scenes()
+        for s in scenes:
+            if s.get("name") == name:
+                return int(s["id"])
+        return None
+
+    async def get_or_create_scene(self, name: str) -> int:
+        """Return ID of a named scene, creating it if it doesn't exist."""
+        existing = await self.find_scene_by_name(name)
+        if existing is not None:
+            return existing
+        return await self.create_scene(name, "-- HA RGB placeholder")
 
     # ------------------------------------------------------------ automations
 

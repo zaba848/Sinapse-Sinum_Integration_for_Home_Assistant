@@ -345,8 +345,8 @@ class TestCoordinatorMissingCoverage:
         mock_client.get_virtual_device.assert_awaited_once_with(10)
 
     @pytest.mark.asyncio
-    async def test_cold_start_bulk_failure_uses_per_device_fallback(self, mock_client):
-        """If a bulk endpoint fails before cache exists, fallback IDs still create entities."""
+    async def test_cold_start_bulk_failure_returns_empty_no_per_device(self, mock_client):
+        """When bulk fails on cold start, return empty dict — don't flood hub with per-device requests."""
         mock_client.get_rooms = AsyncMock(return_value=[])
         mock_client.get_sbus_devices = AsyncMock(side_effect=SinumConnectionError("bus timeout"))
         mock_client.get_sbus_device = AsyncMock(
@@ -364,8 +364,9 @@ class TestCoordinatorMissingCoverage:
         coordinator = self._make_coordinator(mock_client)
         with patch.object(coordinator, "async_set_updated_data"):
             await coordinator._async_update_data()
-        assert 300 in coordinator.sbus_devices
-        mock_client.get_sbus_device.assert_awaited_once_with(300)
+        # Bulk failed → return empty, do NOT call per-device (which would also fail/flood hub)
+        assert 300 not in coordinator.sbus_devices
+        mock_client.get_sbus_device.assert_not_awaited()
 
 
 class TestParentModelHelpers:
