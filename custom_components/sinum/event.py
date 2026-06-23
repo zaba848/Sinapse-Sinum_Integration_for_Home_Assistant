@@ -63,6 +63,7 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
             suggested_area=device.get("_area") or None,
         )
         self._prev_action: str | None = device.get("action")
+        self._prev_count: int | None = device.get("buttons_count")
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -73,8 +74,21 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        action = self._device.get("action")
-        if action is not None and action != "" and action != self._prev_action:
+        device = self._device
+        action = device.get("action")
+        count = device.get("buttons_count")
+
+        action_valid = action is not None and action != ""
+        action_changed = action_valid and action != self._prev_action
+        # buttons_count increments on every press, even when action type stays the same.
+        # This handles consecutive presses of the same type when hub doesn't reset action field.
+        count_changed = count is not None and count != self._prev_count
+
+        if action_changed or (count_changed and action_valid):
             self._prev_action = action
-            self._trigger_event("pressed", {"action": action})
+            self._prev_count = count
+            self._trigger_event("pressed", {"action": action, "buttons_count": count})
+        elif count_changed:
+            self._prev_count = count
+
         self.async_write_ha_state()

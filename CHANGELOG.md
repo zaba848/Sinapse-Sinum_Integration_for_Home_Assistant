@@ -2,6 +2,24 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.2] — 2026-06-23
+
+### Fixed
+- **Button event: consecutive same-type presses no longer missed** — `SinumButtonEvent` now also
+  tracks `buttons_count` (hub-side cumulative counter). If `action` stays at e.g. `"single"` but
+  the count increments, the event fires again. Previously a second single-press would be silently
+  dropped if the hub didn't reset the `action` field between presses.
+
+### Changed
+- **Event entity payload** now includes `buttons_count` alongside `action`
+- **README**: new "Event — Physical Buttons" section with action values, automation YAML examples,
+  step-by-step MQTT setup guide for instant button response (< 1 s), comparison table
+
+### Added
+- 3 new tests for `buttons_count`-based event detection (990 total)
+
+---
+
 ## [0.2.1] — 2026-06-23
 
 ### Fixed

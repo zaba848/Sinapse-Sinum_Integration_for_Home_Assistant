@@ -17,6 +17,7 @@
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Entity Reference](#entity-reference)
+  - [Event — Physical Buttons](#event--physical-buttons)
 - [HA Services](#ha-services)
 - [Sinum Scenes, Automations and Variables](#sinum-scenes-automations-and-variables)
 - [MQTT Real-Time Bridge](#mqtt-real-time-bridge)
@@ -201,9 +202,96 @@ Virtual blind integrators with no associated physical controllers report `state 
 
 Physical relays filtered by the `managed_by_thermostat` label: relays tagged with this label are excluded from switch entities because they are controlled by the climate platform instead.
 
-### Event
+### Event — Physical Buttons
 
-`sinum_button_event` fires on each button press. Attribute `action` contains the press type (`single`, `double`, `hold`, etc.). Pair with MQTT for instant delivery; without MQTT the event relies on the next poll cycle.
+Physical Sinum buttons (WTP and SBUS bus) are exposed as **Event entities** (`event.sinum_*`).
+
+#### How it works
+
+When a button is pressed, the hub sets the `action` field on the device (`"single"`, `"double"`, `"hold"`, etc.) and increments `buttons_count`. On the next coordinator update the integration compares both values to the previous ones and fires a `pressed` event if either changed. This means:
+
+| Scenario | Without MQTT | With MQTT |
+|---|---|---|
+| First press detected | Next poll, up to 30 s | < 1 s (hub push) |
+| Two presses, different type | Both detected | Both detected |
+| Two presses, same type (e.g. single + single) | Detected via `buttons_count` increment | Both detected |
+
+The `buttons_count` field (increments on every press regardless of type) eliminates the "missed second press" problem even without MQTT.
+
+#### Event attributes
+
+| Attribute | Example | Description |
+|---|---|---|
+| `action` | `"single"`, `"double"`, `"hold"` | Press type reported by hub |
+| `buttons_count` | `42` | Cumulative press counter (hub-side) |
+
+#### Setting up button automations
+
+**Option A — HA automation triggered by event entity (recommended):**
+
+```yaml
+automation:
+  - alias: "Living room button single press → toggle lights"
+    trigger:
+      - platform: event
+        event_type: state_changed
+        # OR use the Event trigger:
+      - platform: state
+        entity_id: event.sinum_living_room_button
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.event_type == 'pressed' }}"
+    action:
+      - service: light.toggle
+        target:
+          area_id: living_room
+```
+
+Better: use the **Event** trigger in the HA UI — navigate to **Settings → Automations → + New** and select "Sinum Button" as trigger entity. HA will offer you to select the press type.
+
+```yaml
+automation:
+  - alias: "Button long press → scene Night"
+    trigger:
+      - platform: device
+        domain: sinum
+        device_id: !secret button_device_id
+        type: pressed
+        subtype: hold
+```
+
+**Option B — MQTT event (fastest, zero polling delay):**
+
+The hub fires a `sinum_button_event` HA event (via `mqtt.py`'s `_handle_event`) for each button press, independently of coordinator polls. Use it in automations when latency matters:
+
+```yaml
+automation:
+  - alias: "Button press via MQTT"
+    trigger:
+      - platform: event
+        event_type: sinum_button_event
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.data.action == 'single' }}"
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.evening
+```
+
+> This requires MQTT bridge enabled. See [MQTT Real-Time Bridge](#mqtt-real-time-bridge).
+
+#### Eliminating the polling delay (setup guide)
+
+The only way to get instant button response (< 1 s) is the MQTT bridge. Follow these steps:
+
+1. **Install Mosquitto broker** — in HA go to **Settings → Add-ons → Mosquitto broker → Install → Start**
+2. **Set up HA MQTT integration** — **Settings → Devices & Services → Add Integration → MQTT** — use `localhost` as broker, leave port `1883`, no auth needed with the Mosquitto add-on
+3. **Add MQTT client on the hub** — Sinum web UI → **Settings → System → Integrations → MQTT → Add** → enter HA IP, port 1883, username/password from Mosquitto add-on
+4. **Upload `mqtt_bridge.lua`** to the hub as an automation (see [MQTT Real-Time Bridge](#mqtt-real-time-bridge) for full instructions)
+5. **Enable MQTT in the Sinum integration** — **Settings → Devices & Services → Sinum → Configure** → enable MQTT, set prefix to match the Lua script
+
+After setup: press a button and watch the HA event fire instantly in **Developer Tools → Events → Listen → sinum_button_event**.
 
 ### Number
 
@@ -618,7 +706,7 @@ Integration is tested against two live hubs in production:
 
 | Limitation | Notes |
 |---|---|
-| **Button events without MQTT** | Detected only on next poll (up to 30 s delay). With MQTT the hub sends button events instantly. |
+| **Button events without MQTT** | Detected on next poll (up to 30 s). `buttons_count` field ensures consecutive same-type presses are not missed. For < 1 s latency enable the MQTT bridge — see [Event — Physical Buttons](#event--physical-buttons). |
 | **`custom_device` virtual type** | Lua contracts vary per installation; not mapped to HA entities. Use scenes/automations to control them. |
 | **`thermostat_output_group`** | Exposed as a disabled-by-default diagnostic sensor (output count), not as direct control entities. |
 | **WTP RGB in temperature mode** | Hub firmware ignores color values when color-temperature mode is active; only `color_temp_kelvin` works. |

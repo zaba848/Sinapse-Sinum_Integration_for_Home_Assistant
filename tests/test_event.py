@@ -93,7 +93,7 @@ class TestSinumButtonEvent:
 
         assert len(fired) == 1
         assert fired[0][0] == "pressed"
-        assert fired[0][1] == {"action": "double_press"}
+        assert fired[0][1]["action"] == "double_press"
 
     def test_prev_action_updated_after_event(self):
         entity, coordinator = self._make_entity(bus="wtp", action="single_press")
@@ -141,7 +141,45 @@ class TestSinumButtonEvent:
         entity._handle_coordinator_update()
 
         assert len(fired) == 1
-        assert fired[0][1] == {"action": "long_press"}
+        assert fired[0][1]["action"] == "long_press"
+
+    def test_event_fired_when_count_increments_same_action(self):
+        """Two presses of the same type in a row: action unchanged but buttons_count increments."""
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        # Same action, count goes from 1 → 2
+        coordinator.wtp_devices[51]["action"] = "single_press"
+        coordinator.wtp_devices[51]["buttons_count"] = 2
+        entity._handle_coordinator_update()
+
+        assert len(fired) == 1
+        assert fired[0][1]["action"] == "single_press"
+        assert fired[0][1]["buttons_count"] == 2
+
+    def test_no_event_when_count_increments_but_action_empty(self):
+        """buttons_count change alone doesn't fire if action is empty (spurious hub message)."""
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.wtp_devices[51]["action"] = ""
+        coordinator.wtp_devices[51]["buttons_count"] = 2
+        entity._handle_coordinator_update()
+
+        assert fired == []
+
+    def test_count_updated_even_without_event(self):
+        """_prev_count is updated when count changes even if no event fires (action empty)."""
+        entity, coordinator = self._make_entity(bus="wtp", action="single_press")
+        entity._trigger_event = MagicMock()
+
+        coordinator.wtp_devices[51]["action"] = ""
+        coordinator.wtp_devices[51]["buttons_count"] = 5
+        entity._handle_coordinator_update()
+
+        assert entity._prev_count == 5
 
     @pytest.mark.asyncio
     async def test_setup_creates_wtp_and_sbus_entities(self):
