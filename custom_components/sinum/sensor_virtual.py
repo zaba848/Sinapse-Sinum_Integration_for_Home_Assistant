@@ -38,6 +38,7 @@ VIRTUAL_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         scale=0.1,
         suggested_display_precision=1,
+        zero_is_unavailable=True,
     ),
     SinumSensorDescription(
         key="humidity",
@@ -48,6 +49,7 @@ VIRTUAL_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         scale=0.1,
         suggested_display_precision=0,
+        zero_is_unavailable=True,
     ),
     SinumSensorDescription(
         key="room_temperature",

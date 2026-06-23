@@ -38,6 +38,7 @@ class SinumSensorDescription(SensorEntityDescription):
     scale: float = 1.0
     source: str = "virtual"
     is_text: bool = False
+    zero_is_unavailable: bool = False
 
 
 # ── WTP device sensors ─────────────────────────────────────────────────────────
@@ -563,6 +564,11 @@ class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         if not isinstance(raw, (int, float)):
             return None
         if raw == _SENTINEL_INT16:
+            return None
+        if raw == 0 and (
+            self.entity_description.zero_is_unavailable
+            or self._device.get("status") == "offline"
+        ):
             return None
         return raw * self.entity_description.scale
 

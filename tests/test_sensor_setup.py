@@ -319,6 +319,34 @@ class TestSinumSensorNativeValue:
         entity = SinumSensor(coordinator, 1, desc, "test_entry")
         assert entity.native_value is None
 
+    def test_zero_is_unavailable_returns_none(self):
+        """Virtual thermostat temperature=0 (no sensor) should map to None."""
+        from custom_components.sinum.sensor_virtual import VIRTUAL_SENSORS
+        desc = next(d for d in VIRTUAL_SENSORS if d.api_key == "temperature")
+        assert desc.zero_is_unavailable is True
+        coordinator = MagicMock()
+        coordinator.virtual_devices = {1: {"id": 1, "type": "thermostat", "name": "T", "temperature": 0}}
+        coordinator.wtp_devices = {}
+        entity = SinumSensor(coordinator, 1, desc, "test_entry")
+        assert entity.native_value is None
+
+    def test_zero_is_unavailable_false_allows_zero_when_online(self):
+        """Online sensor with raw=0 and zero_is_unavailable=False should return 0.0."""
+        desc = next(d for d in WTP_SENSORS if d.source == "wtp" and not d.is_text)
+        assert desc.zero_is_unavailable is False
+        coordinator = MagicMock()
+        coordinator.wtp_devices = {1: {"id": 1, "name": "T", "status": "online", desc.api_key: 0}}
+        entity = SinumSensor(coordinator, 1, desc, "test_entry")
+        assert entity.native_value == 0.0
+
+    def test_offline_sensor_with_zero_returns_none(self):
+        """Offline sensor with raw=0 should return None (disconnected probe)."""
+        desc = next(d for d in WTP_SENSORS if d.source == "wtp" and not d.is_text)
+        coordinator = MagicMock()
+        coordinator.wtp_devices = {1: {"id": 1, "name": "T", "status": "offline", desc.api_key: 0}}
+        entity = SinumSensor(coordinator, 1, desc, "test_entry")
+        assert entity.native_value is None
+
     def test_sbus_source_reads_sbus_store(self):
         desc = next(d for d in SBUS_SENSORS if d.source == "sbus")
         coordinator = MagicMock()
