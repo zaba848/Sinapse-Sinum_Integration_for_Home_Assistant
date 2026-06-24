@@ -118,12 +118,14 @@ def main() -> int:
         + f" | {endpoint_code(sbus_results, '/api/v1/devices/virtual')} |"
     )
 
-    lines.extend([
-        "",
-        "## Result",
-        "",
-        "PASS" if (wtp_ok and sbus_ok) else "FAIL",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Result",
+            "",
+            "PASS" if (wtp_ok and sbus_ok) else "FAIL",
+        ]
+    )
 
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
     OUT_MD.write_text("\n".join(lines), encoding="utf-8")

@@ -370,10 +370,13 @@ class TestSinumSensorNativeValue:
     def test_zero_is_unavailable_returns_none(self):
         """Virtual thermostat temperature=0 (no sensor) should map to None."""
         from custom_components.sinum.sensor_virtual import VIRTUAL_SENSORS
+
         desc = next(d for d in VIRTUAL_SENSORS if d.api_key == "temperature")
         assert desc.zero_is_unavailable is True
         coordinator = MagicMock()
-        coordinator.virtual_devices = {1: {"id": 1, "type": "thermostat", "name": "T", "temperature": 0}}
+        coordinator.virtual_devices = {
+            1: {"id": 1, "type": "thermostat", "name": "T", "temperature": 0}
+        }
         coordinator.wtp_devices = {}
         entity = SinumSensor(coordinator, 1, desc, "test_entry")
         assert entity.native_value is None

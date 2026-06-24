@@ -40,11 +40,15 @@ def main() -> int:
     pass_rate = (len(ci_success) / len(ci_completed) * 100) if ci_completed else 0.0
     durations = [
         d
-        for d in (minutes_between(r.get("run_started_at"), r.get("updated_at")) for r in ci_completed)
+        for d in (
+            minutes_between(r.get("run_started_at"), r.get("updated_at")) for r in ci_completed
+        )
         if d is not None
     ]
     avg_duration = statistics.mean(durations) if durations else 0.0
-    p95_duration = statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else avg_duration
+    p95_duration = (
+        statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else avg_duration
+    )
 
     flaky_proxy = len([r for r in ci_completed if int(r.get("run_attempt", 1)) > 1])
 

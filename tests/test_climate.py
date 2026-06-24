@@ -1,4 +1,5 @@
 """Tests for SinumThermostat climate entity."""
+
 from __future__ import annotations
 
 import json
@@ -8,9 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_thermostat(device_data: dict[str, Any]):
@@ -77,9 +76,7 @@ class TestSinumThermostat:
 
         await entity.async_set_hvac_mode(HVACMode.OFF)
 
-        coordinator.client.patch_virtual_device.assert_called_once_with(
-            10, {"mode": "off"}
-        )
+        coordinator.client.patch_virtual_device.assert_called_once_with(10, {"mode": "off"})
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_heat_sends_mode(self):
@@ -92,9 +89,7 @@ class TestSinumThermostat:
 
         await entity.async_set_hvac_mode(HVACMode.HEAT)
 
-        coordinator.client.patch_virtual_device.assert_called_once_with(
-            10, {"mode": "heating"}
-        )
+        coordinator.client.patch_virtual_device.assert_called_once_with(10, {"mode": "heating"})
 
     def test_unique_id_contains_device_and_entry(self):
         device = dict(FIXTURES["virtual_thermostat"])
@@ -114,9 +109,8 @@ class TestSinumThermostat:
         entity, coordinator = _make_thermostat(device)
         # calling without temperature kwarg should not call API
         import asyncio
-        asyncio.get_event_loop().run_until_complete(
-            entity.async_set_temperature()
-        )
+
+        asyncio.get_event_loop().run_until_complete(entity.async_set_temperature())
         coordinator.client.patch_virtual_device.assert_not_called()
 
 

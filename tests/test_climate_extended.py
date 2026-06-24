@@ -16,6 +16,7 @@ Covers:
   set_temperature branches, set_hvac_mode, turn_on, turn_off
   (lines 664, 671, 674, 691, 718, 726, 729-730, 732, 746, 754, 762)
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -48,6 +49,7 @@ from custom_components.sinum.const import (
 # Shared helpers (same pattern as test_climate_fixes.py)
 # ---------------------------------------------------------------------------
 
+
 def _make_coordinator(virtual=None, wtp=None, sbus=None):
     c = MagicMock()
     c.virtual_devices = virtual or {}
@@ -71,6 +73,7 @@ def _wire(entity):
 # ---------------------------------------------------------------------------
 # 1. async_setup_entry
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncSetupEntry:
     """Test that async_setup_entry creates the right entity types."""
@@ -239,6 +242,7 @@ class TestAsyncSetupEntry:
 # 2. Helper function coverage
 # ---------------------------------------------------------------------------
 
+
 class TestIsThermostat:
     def test_type_thermostat(self):
         assert _is_thermostat({"type": "thermostat"}) is True
@@ -249,7 +253,10 @@ class TestIsThermostat:
 
     def test_duck_type_with_work_mode_not_thermostat(self):
         """Has work_mode → not a thermostat (fan coil)."""
-        assert _is_thermostat({"target_temperature": 220, "temperature": 215, "work_mode": "heating"}) is False
+        assert (
+            _is_thermostat({"target_temperature": 220, "temperature": 215, "work_mode": "heating"})
+            is False
+        )
 
     def test_unrelated_device(self):
         assert _is_thermostat({"type": "relay_integrator"}) is False
@@ -293,12 +300,18 @@ class TestAvailableHvacModes:
         assert modes == [HVACMode.OFF]
 
     def test_inferred_from_heating_range(self):
-        device = {"target_temperature_heating_minimum": 100, "target_temperature_heating_maximum": 300}
+        device = {
+            "target_temperature_heating_minimum": 100,
+            "target_temperature_heating_maximum": 300,
+        }
         modes = _available_hvac_modes(device)
         assert HVACMode.HEAT in modes
 
     def test_inferred_from_cooling_range(self):
-        device = {"target_temperature_cooling_minimum": 100, "target_temperature_cooling_maximum": 300}
+        device = {
+            "target_temperature_cooling_minimum": 100,
+            "target_temperature_cooling_maximum": 300,
+        }
         modes = _available_hvac_modes(device)
         assert HVACMode.COOL in modes
 
@@ -325,6 +338,7 @@ class TestAvailableHvacModes:
 # ---------------------------------------------------------------------------
 # 3. SinumThermostat — uncovered branches
 # ---------------------------------------------------------------------------
+
 
 class TestSinumThermostatExtended:
     def _make(self, device: dict):
@@ -461,6 +475,7 @@ class TestSinumThermostatExtended:
 # 4. SinumFanCoilClimate — uncovered branches
 # ---------------------------------------------------------------------------
 
+
 class TestSinumFanCoilClimateExtended:
     def _make_sbus(self, device: dict):
         c = _make_coordinator(sbus={5: device})
@@ -486,7 +501,12 @@ class TestSinumFanCoilClimateExtended:
     # line 388 — min_temp returns raw_min / 10 (when set)
     def test_min_temp_from_device(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "off", "target_temperature": 220, "target_temperature_minimum": 100}
+            {
+                "id": 5,
+                "work_mode": "off",
+                "target_temperature": 220,
+                "target_temperature_minimum": 100,
+            }
         )
         assert entity.min_temp == 10.0
 
@@ -497,7 +517,12 @@ class TestSinumFanCoilClimateExtended:
 
     def test_max_temp_from_device(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "off", "target_temperature": 220, "target_temperature_maximum": 300}
+            {
+                "id": 5,
+                "work_mode": "off",
+                "target_temperature": 220,
+                "target_temperature_maximum": 300,
+            }
         )
         assert entity.max_temp == 30.0
 
@@ -516,14 +541,17 @@ class TestSinumFanCoilClimateExtended:
         assert entity.hvac_action == HVACAction.IDLE
 
     def test_hvac_action_off_when_mode_off(self):
-        entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "off", "target_temperature": 220}
-        )
+        entity, _ = self._make_sbus({"id": 5, "work_mode": "off", "target_temperature": 220})
         assert entity.hvac_action == HVACAction.OFF
 
     def test_hvac_action_heating_via_working_state(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "heating", "target_temperature": 220, "working_state": "heating_active"}
+            {
+                "id": 5,
+                "work_mode": "heating",
+                "target_temperature": 220,
+                "working_state": "heating_active",
+            }
         )
         assert entity.hvac_action == HVACAction.HEATING
 
@@ -535,8 +563,12 @@ class TestSinumFanCoilClimateExtended:
 
     def test_hvac_modes(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "heating", "target_temperature": 220,
-             "available_work_modes": ["heating", "cooling", "off"]}
+            {
+                "id": 5,
+                "work_mode": "heating",
+                "target_temperature": 220,
+                "available_work_modes": ["heating", "cooling", "off"],
+            }
         )
         modes = entity.hvac_modes
         assert HVACMode.HEAT in modes
@@ -575,14 +607,24 @@ class TestSinumFanCoilClimateExtended:
 
     def test_extra_attrs_fan_operation_mode(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "heating", "target_temperature": 220, "fan_operation_mode": "automatic"}
+            {
+                "id": 5,
+                "work_mode": "heating",
+                "target_temperature": 220,
+                "fan_operation_mode": "automatic",
+            }
         )
         attrs = entity.extra_state_attributes
         assert attrs["fan_operation_mode"] == "automatic"
 
     def test_extra_attrs_working_state(self):
         entity, _ = self._make_sbus(
-            {"id": 5, "work_mode": "heating", "target_temperature": 220, "working_state": "heating_active"}
+            {
+                "id": 5,
+                "work_mode": "heating",
+                "target_temperature": 220,
+                "working_state": "heating_active",
+            }
         )
         attrs = entity.extra_state_attributes
         assert attrs["working_state"] == "heating_active"
@@ -602,9 +644,7 @@ class TestSinumFanCoilClimateExtended:
     # lines 453-454 — set_temperature exception → HomeAssistantError
     @pytest.mark.asyncio
     async def test_set_temperature_raises_ha_error(self):
-        entity, c = self._make_sbus(
-            {"id": 5, "work_mode": "heating", "target_temperature": 220}
-        )
+        entity, c = self._make_sbus({"id": 5, "work_mode": "heating", "target_temperature": 220})
         c.client.patch_sbus_device = AsyncMock(side_effect=SinumConnectionError("err"))
         with pytest.raises(HomeAssistantError, match="Cannot set temperature"):
             await entity.async_set_temperature(temperature=22.0)
@@ -644,6 +684,7 @@ class TestSinumFanCoilClimateExtended:
     @pytest.mark.asyncio
     async def test_set_fan_mode_unknown_logs_warning(self, caplog):
         import logging
+
         entity, c = self._make_sbus({"id": 5, "work_mode": "heating", "target_temperature": 220})
         with caplog.at_level(logging.WARNING):
             await entity.async_set_fan_mode("9")
@@ -666,6 +707,7 @@ class TestSinumFanCoilClimateExtended:
 # ---------------------------------------------------------------------------
 # 5. SinumTemperatureRegulatorClimate (SBUS bus)
 # ---------------------------------------------------------------------------
+
 
 class TestSinumTemperatureRegulatorSbus:
     def _make_sbus(self, device: dict):
@@ -701,15 +743,11 @@ class TestSinumTemperatureRegulatorSbus:
 
     # lines 567-574 — hvac_action branches
     def test_hvac_action_heating_via_state_string(self):
-        entity, _ = self._make_sbus(
-            {"id": 6, "system_mode": "heating", "state": "heating_demand"}
-        )
+        entity, _ = self._make_sbus({"id": 6, "system_mode": "heating", "state": "heating_demand"})
         assert entity.hvac_action == HVACAction.HEATING
 
     def test_hvac_action_cooling_via_state_string(self):
-        entity, _ = self._make_sbus(
-            {"id": 6, "system_mode": "cooling", "state": "cooling_demand"}
-        )
+        entity, _ = self._make_sbus({"id": 6, "system_mode": "cooling", "state": "cooling_demand"})
         assert entity.hvac_action == HVACAction.COOLING
 
     def test_hvac_action_off_when_system_mode_off(self):
@@ -839,6 +877,7 @@ class TestSinumTemperatureRegulatorSbus:
 # 6. SinumHeatPumpManagerClimate
 # ---------------------------------------------------------------------------
 
+
 class TestSinumHeatPumpManagerClimate:
     def _make(self, device: dict):
         c = _make_coordinator(virtual={1: device})
@@ -913,9 +952,7 @@ class TestSinumHeatPumpManagerClimate:
 
     # hvac_action: mode=OFF → OFF
     def test_hvac_action_off_when_disabled(self):
-        entity, _ = self._make(
-            {"id": 1, "type": VTYPE_HEAT_PUMP_MANAGER, "enabled": False}
-        )
+        entity, _ = self._make({"id": 1, "type": VTYPE_HEAT_PUMP_MANAGER, "enabled": False})
         assert entity.hvac_action == HVACAction.OFF
 
     # line 691 — hvac_action cooling branch (state=True, work_mode=cooling)

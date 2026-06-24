@@ -1,4 +1,5 @@
 """Tests for SinumCoordinator."""
+
 from __future__ import annotations
 
 import json
@@ -23,9 +24,7 @@ from custom_components.sinum.coordinator import (
     via_device_for,
 )
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 class TestCollectDeviceIds:
@@ -72,7 +71,10 @@ class TestRoomHelpers:
     def test_find_room_containing_device_skips_non_dict_values(self):
         rooms = [
             "bad-room",
-            {"name": "Kitchen", "devices": ["bad-device", {"id": 12, "class": "virtual", "name": "Relay"}]},
+            {
+                "name": "Kitchen",
+                "devices": ["bad-device", {"id": 12, "class": "virtual", "name": "Relay"}],
+            },
         ]
         room, dev_name = _find_room_containing_device(rooms, 12, "virtual")
         assert room["name"] == "Kitchen"
@@ -216,9 +218,8 @@ class TestSinumCoordinator:
     async def test_update_raises_on_hub_info_failure_with_no_cache(self, mock_client):
         """Hub unreachable (hub info fails, no cache) raises UpdateFailed."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
-        mock_client.get_hub_info = AsyncMock(
-            side_effect=SinumConnectionError("hub unreachable")
-        )
+
+        mock_client.get_hub_info = AsyncMock(side_effect=SinumConnectionError("hub unreachable"))
         coordinator = self._make_coordinator(mock_client)
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
@@ -245,9 +246,7 @@ class TestSinumCoordinator:
     @pytest.mark.asyncio
     async def test_single_device_failure_does_not_abort(self, mock_client):
         mock_client.get_virtual_devices = AsyncMock(return_value=[])
-        mock_client.get_virtual_device = AsyncMock(
-            side_effect=SinumConnectionError("bad device")
-        )
+        mock_client.get_virtual_device = AsyncMock(side_effect=SinumConnectionError("bad device"))
         coordinator = self._make_coordinator(mock_client)
         with patch.object(coordinator, "async_set_updated_data"):
             data = await coordinator._async_update_data()
@@ -261,8 +260,13 @@ class TestSinumCoordinator:
         coordinator._apply_metadata_results(
             hub_info=None,  # no fresh hub_info (use cache)
             lua_info={"wifi": {"signal": -60, "ssid": "MyNet"}},
-            rooms=None, floors_list=None, parent_devices=None,
-            scenes=None, schedules=None, automations=None, variables=None,
+            rooms=None,
+            floors_list=None,
+            parent_devices=None,
+            scenes=None,
+            schedules=None,
+            automations=None,
+            variables=None,
         )
         assert coordinator.hub_info["wifi"]["ssid"] == "MyNet"
         assert coordinator.hub_info["version"] == "1.0"
@@ -273,9 +277,15 @@ class TestSinumCoordinator:
         coordinator.hub_info = {}
         with pytest.raises(UpdateFailed):
             coordinator._apply_metadata_results(
-                hub_info=None, lua_info=None,
-                rooms=None, floors_list=None, parent_devices=None,
-                scenes=None, schedules=None, automations=None, variables=None,
+                hub_info=None,
+                lua_info=None,
+                rooms=None,
+                floors_list=None,
+                parent_devices=None,
+                scenes=None,
+                schedules=None,
+                automations=None,
+                variables=None,
             )
 
     def test_apply_metadata_none_values_do_not_overwrite_cache(self, mock_client):
@@ -285,9 +295,15 @@ class TestSinumCoordinator:
         coordinator.scenes = [{"id": 1}]
         coordinator.schedules = [{"id": 2}]
         coordinator._apply_metadata_results(
-            hub_info=None, lua_info=None,
-            rooms=None, floors_list=None, parent_devices=None,
-            scenes=None, schedules=None, automations=None, variables=None,
+            hub_info=None,
+            lua_info=None,
+            rooms=None,
+            floors_list=None,
+            parent_devices=None,
+            scenes=None,
+            schedules=None,
+            automations=None,
+            variables=None,
         )
         assert coordinator.hub_info["name"] == "cached-hub"
         assert coordinator.scenes == [{"id": 1}]
@@ -298,10 +314,15 @@ class TestSinumCoordinator:
         coordinator = self._make_coordinator(mock_client)
         coordinator.hub_info = {"name": "Hub"}
         coordinator._apply_metadata_results(
-            hub_info={"name": "Hub"}, lua_info=None,
-            rooms=[], floors_list=[{"id": "3", "name": "Ground", "level": 0}],
-            parent_devices=None, scenes=None, schedules=None,
-            automations=None, variables=None,
+            hub_info={"name": "Hub"},
+            lua_info=None,
+            rooms=[],
+            floors_list=[{"id": "3", "name": "Ground", "level": 0}],
+            parent_devices=None,
+            scenes=None,
+            schedules=None,
+            automations=None,
+            variables=None,
         )
         assert 3 in coordinator.floors
         assert coordinator.floors[3]["name"] == "Ground"
@@ -337,7 +358,9 @@ class TestSinumCoordinator:
         coordinator.floors = {}
         rooms = []
 
-        devices = coordinator._process_bulk_devices(["bad", {"id": "x"}, {"id": 2, "name": "Relay"}], "virtual", rooms)
+        devices = coordinator._process_bulk_devices(
+            ["bad", {"id": "x"}, {"id": 2, "name": "Relay"}], "virtual", rooms
+        )
 
         assert list(devices) == [2]
         assert devices[2]["class"] == "virtual"

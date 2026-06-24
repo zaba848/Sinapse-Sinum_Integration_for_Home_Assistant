@@ -1,4 +1,5 @@
 """Tests for binary_sensor async_setup_entry and parent device sensors."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -101,7 +102,11 @@ class TestAsyncSetupEntry:
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         # Only target_reached sensor (temperature_regulator not in _WTP_TYPE_TO_DESCRIPTION directly)
-        target_reached = [e for e in added if hasattr(e, "entity_description") and e.entity_description.key == "target_reached"]
+        target_reached = [
+            e
+            for e in added
+            if hasattr(e, "entity_description") and e.entity_description.key == "target_reached"
+        ]
         assert len(target_reached) == 1
 
     @pytest.mark.asyncio
@@ -115,7 +120,9 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_sbus_motion_sensor_creates_entity(self):
-        sbus = {7: {"id": 7, "type": STYPE_MOTION_SENSOR, "name": "SBUS Motion", "state": "detected"}}
+        sbus = {
+            7: {"id": 7, "type": STYPE_MOTION_SENSOR, "name": "SBUS Motion", "state": "detected"}
+        }
         coordinator = _make_coordinator(sbus=sbus)
         entry = _make_entry(coordinator)
         added = []
@@ -136,7 +143,11 @@ class TestAsyncSetupEntry:
         entry = _make_entry(coordinator)
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
-        target_reached = [e for e in added if hasattr(e, "entity_description") and e.entity_description.key == "target_reached"]
+        target_reached = [
+            e
+            for e in added
+            if hasattr(e, "entity_description") and e.entity_description.key == "target_reached"
+        ]
         assert len(target_reached) == 1
 
     @pytest.mark.asyncio
@@ -151,7 +162,9 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_parent_error_sensor_created_when_has_messages_present(self):
-        parents = [{"id": 1, "class": "wtp", "name": "Hub WTP", "status": "online", "has_messages": False}]
+        parents = [
+            {"id": 1, "class": "wtp", "name": "Hub WTP", "status": "online", "has_messages": False}
+        ]
         coordinator = _make_coordinator(parent_devices=parents)
         entry = _make_entry(coordinator)
         added = []
@@ -207,9 +220,13 @@ class TestSinumParentOnlineSensor:
 
     def test_extra_state_attributes(self):
         parent = {
-            "id": 1, "class": "wtp", "name": "Hub",
-            "status": "online", "software_status": "ok",
-            "has_messages": False, "version": "1.24.0",
+            "id": 1,
+            "class": "wtp",
+            "name": "Hub",
+            "status": "online",
+            "software_status": "ok",
+            "has_messages": False,
+            "version": "1.24.0",
             "type": "wtp_hub",
         }
         entity = self._make_sensor(parent)

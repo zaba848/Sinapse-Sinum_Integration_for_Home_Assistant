@@ -4,6 +4,7 @@ Each write operation (set_hvac_mode, turn_on, turn_off, set_cover_position, etc.
 must raise HomeAssistantError when the API raises SinumConnectionError (e.g. 408 bus busy).
 This prevents raw exceptions from surfacing in the HA UI as internal errors.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -17,6 +18,7 @@ from custom_components.sinum.api import SinumConnectionError
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
 
 def _coordinator(virtual=None, wtp=None, sbus=None, lora=None):
     c = MagicMock()
@@ -41,18 +43,27 @@ def _wire(entity):
     return entity
 
 
-_BUS_ERR = SinumConnectionError("Hub internal timeout for /api/v1/devices/virtual/9 (bus may be busy)")
+_BUS_ERR = SinumConnectionError(
+    "Hub internal timeout for /api/v1/devices/virtual/9 (bus may be busy)"
+)
 
 
 # ===========================================================================
 # Climate — SinumThermostat
 # ===========================================================================
 
+
 class TestThermostatErrors:
     def _make(self, device=None):
         from custom_components.sinum.climate import SinumThermostat
-        dev = device or {"id": 1, "type": "thermostat", "mode": "heating",
-                         "target_temperature": 220, "temperature": 215}
+
+        dev = device or {
+            "id": 1,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+        }
         c = _coordinator(virtual={1: dev})
         return _wire(SinumThermostat(c, 1, "e")), c
 
@@ -89,11 +100,17 @@ class TestThermostatErrors:
 # Climate — SinumFanCoilClimate (SBUS)
 # ===========================================================================
 
+
 class TestFanCoilErrors:
     def _make(self, device=None):
         from custom_components.sinum.climate import SinumFanCoilClimate
-        dev = device or {"id": 5, "type": "fan_coil", "work_mode": "heating",
-                         "target_temperature": 220}
+
+        dev = device or {
+            "id": 5,
+            "type": "fan_coil",
+            "work_mode": "heating",
+            "target_temperature": 220,
+        }
         c = _coordinator(sbus={5: dev})
         return _wire(SinumFanCoilClimate(c, 5, "e", "sbus")), c
 
@@ -123,12 +140,19 @@ class TestFanCoilErrors:
 # Climate — SinumFanCoilClimate (WTP)
 # ===========================================================================
 
+
 class TestFanCoilWtpErrors:
     def _make(self):
         from custom_components.sinum.climate import SinumFanCoilClimate
         from custom_components.sinum.const import WTYPE_FAN_COIL
-        dev = {"id": 7, "type": WTYPE_FAN_COIL, "work_mode": "heating",
-               "target_temperature": 220, "room_temperature": 215}
+
+        dev = {
+            "id": 7,
+            "type": WTYPE_FAN_COIL,
+            "work_mode": "heating",
+            "target_temperature": 220,
+            "room_temperature": 215,
+        }
         c = _coordinator(wtp={7: dev})
         return _wire(SinumFanCoilClimate(c, 7, "e", "wtp")), c
 
@@ -144,11 +168,18 @@ class TestFanCoilWtpErrors:
 # Climate — SinumTemperatureRegulatorClimate
 # ===========================================================================
 
+
 class TestTemperatureRegulatorErrors:
     def _make(self, bus="sbus"):
         from custom_components.sinum.climate import SinumTemperatureRegulatorClimate
-        dev = {"id": 6, "type": "temperature_regulator", "system_mode": "heating",
-               "target_temperature": 220, "mode_mutable": True}
+
+        dev = {
+            "id": 6,
+            "type": "temperature_regulator",
+            "system_mode": "heating",
+            "target_temperature": 220,
+            "mode_mutable": True,
+        }
         store = {6: dev}
         c = _coordinator(sbus=store if bus == "sbus" else {}, wtp=store if bus == "wtp" else {})
         return _wire(SinumTemperatureRegulatorClimate(c, 6, "e", bus)), c
@@ -186,10 +217,12 @@ class TestTemperatureRegulatorErrors:
 # Climate — SinumHeatPumpManagerClimate
 # ===========================================================================
 
+
 class TestHeatPumpManagerErrors:
     def _make(self):
         from custom_components.sinum.climate import SinumHeatPumpManagerClimate
         from custom_components.sinum.const import VTYPE_HEAT_PUMP_MANAGER
+
         dev = {"id": 3, "type": VTYPE_HEAT_PUMP_MANAGER, "enabled": True, "work_mode": "heating"}
         c = _coordinator(virtual={3: dev})
         return _wire(SinumHeatPumpManagerClimate(c, 3, "e")), c
@@ -227,21 +260,25 @@ class TestHeatPumpManagerErrors:
 # Switch
 # ===========================================================================
 
+
 class TestSwitchErrors:
     def _make_relay(self):
         from custom_components.sinum.switch import SinumRelaySwitch
+
         dev = {"id": 2, "type": "relay_integrator", "state": False}
         c = _coordinator(virtual={2: dev})
         return _wire(SinumRelaySwitch(c, 2, "e")), c
 
     def _make_wicket(self):
         from custom_components.sinum.switch import SinumWicketSwitch
+
         dev = {"id": 4, "type": "wicket", "state": "locked"}
         c = _coordinator(virtual={4: dev})
         return _wire(SinumWicketSwitch(c, 4, "e")), c
 
     def _make_bus_relay(self, bus="wtp"):
         from custom_components.sinum.switch import SinumBusRelaySwitch
+
         dev = {"id": 8, "type": "relay", "state": False}
         store = {8: dev}
         c = _coordinator(
@@ -253,6 +290,7 @@ class TestSwitchErrors:
 
     def _make_common_valve(self):
         from custom_components.sinum.switch import SinumCommonValveSwitch
+
         dev = {"id": 10, "type": "common_valve", "enabled": False}
         c = _coordinator(sbus={10: dev})
         return _wire(SinumCommonValveSwitch(c, 10, "e")), c
@@ -332,16 +370,23 @@ class TestSwitchErrors:
 # Light
 # ===========================================================================
 
+
 class TestLightErrors:
     def _make_virtual_dimmer(self):
         from custom_components.sinum.light import SinumDimmerLight
-        dev = {"id": 11, "type": "dimmer_rgb_controller_integrator", "state": False,
-               "brightness": 50}
+
+        dev = {
+            "id": 11,
+            "type": "dimmer_rgb_controller_integrator",
+            "state": False,
+            "brightness": 50,
+        }
         c = _coordinator(virtual={11: dev})
         return _wire(SinumDimmerLight(c, 11, "e")), c
 
     def _make_bus_dimmer(self, bus="wtp"):
         from custom_components.sinum.light import SinumBusDimmerLight
+
         dev = {"id": 12, "type": "dimmer", "state": False, "target_level": 50}
         store = {12: dev}
         c = _coordinator(
@@ -352,8 +397,14 @@ class TestLightErrors:
 
     def _make_bus_rgb(self, bus="wtp"):
         from custom_components.sinum.light import SinumBusRgbLight
-        dev = {"id": 13, "type": "rgb_controller", "state": False,
-               "brightness": 50, "color": "#ff0000"}
+
+        dev = {
+            "id": 13,
+            "type": "rgb_controller",
+            "state": False,
+            "brightness": 50,
+            "color": "#ff0000",
+        }
         store = {13: dev}
         c = _coordinator(
             wtp=store if bus == "wtp" else {},
@@ -408,28 +459,37 @@ class TestLightErrors:
 # Cover
 # ===========================================================================
 
+
 class TestCoverErrors:
     def _make_blind(self):
         from custom_components.sinum.cover import SinumBlindCover
-        dev = {"id": 14, "type": "blind_controller_integrator", "state": "open",
-               "last_set_target_opening": 100}
+
+        dev = {
+            "id": 14,
+            "type": "blind_controller_integrator",
+            "state": "open",
+            "last_set_target_opening": 100,
+        }
         c = _coordinator(virtual={14: dev})
         return _wire(SinumBlindCover(c, 14, "e")), c
 
     def _make_gate(self):
         from custom_components.sinum.cover import SinumGateCover
+
         dev = {"id": 15, "type": "gate", "state": "closed"}
         c = _coordinator(virtual={15: dev})
         return _wire(SinumGateCover(c, 15, "e")), c
 
     def _make_wtp_blind(self):
         from custom_components.sinum.cover import SinumWtpBlindCover
+
         dev = {"id": 16, "type": "blind_controller", "current_opening": 100}
         c = _coordinator(wtp={16: dev})
         return _wire(SinumWtpBlindCover(c, 16, "e")), c
 
     def _make_sbus_blind(self):
         from custom_components.sinum.cover import SinumSbusBlindCover
+
         dev = {"id": 17, "type": "blind_controller", "current_opening": 100}
         c = _coordinator(sbus={17: dev})
         return _wire(SinumSbusBlindCover(c, 17, "e")), c
@@ -523,11 +583,12 @@ class TestCoverErrors:
 # Number
 # ===========================================================================
 
+
 class TestNumberErrors:
     def _make_variable(self):
         from custom_components.sinum.number import SinumVariableNumber
-        var = {"id": 20, "name": "setpoint", "value": 21.0,
-               "min": 5.0, "max": 30.0}
+
+        var = {"id": 20, "name": "setpoint", "value": 21.0, "min": 5.0, "max": 30.0}
         c = _coordinator()
         c.hub_info = {}
         c.variables = [var]
@@ -535,13 +596,20 @@ class TestNumberErrors:
 
     def _make_analog_output(self):
         from custom_components.sinum.number import SinumAnalogOutputNumber
-        dev = {"id": 21, "type": "analog_output", "value": 0,
-               "value_minimum": 0, "value_maximum": 10000}
+
+        dev = {
+            "id": 21,
+            "type": "analog_output",
+            "value": 0,
+            "value_minimum": 0,
+            "value_maximum": 10000,
+        }
         c = _coordinator(sbus={21: dev})
         return _wire(SinumAnalogOutputNumber(c, 21, "e")), c
 
     def _make_pwm(self):
         from custom_components.sinum.number import SinumPwmNumber
+
         dev = {"id": 22, "type": "pulse_width_modulation", "duty_cycle": 50}
         c = _coordinator(sbus={22: dev})
         return _wire(SinumPwmNumber(c, 22, "e")), c

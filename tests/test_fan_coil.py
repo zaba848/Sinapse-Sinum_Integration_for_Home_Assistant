@@ -1,4 +1,5 @@
 """Tests for SinumFanCoilClimate entity."""
+
 from __future__ import annotations
 
 import json
@@ -9,9 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.components.climate import HVACMode
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_fan_coil(
@@ -48,29 +47,33 @@ class TestSinumFanCoilClimate:
     def test_temperature_range_from_device(self):
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, _ = _make_fan_coil(device)
-        assert entity.min_temp == 5.0   # 50 / 10
+        assert entity.min_temp == 5.0  # 50 / 10
         assert entity.max_temp == 30.0  # 300 / 10
 
     def test_hvac_mode_heating(self):
         from homeassistant.components.climate import HVACMode
+
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_mode == HVACMode.HEAT
 
     def test_hvac_mode_off(self):
         from homeassistant.components.climate import HVACMode
+
         device = {**FIXTURES["sbus_fan_coil"], "work_mode": "off"}
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_mode == HVACMode.OFF
 
     def test_hvac_action_heating_active(self):
         from homeassistant.components.climate import HVACAction
+
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_action == HVACAction.HEATING
 
     def test_hvac_action_idle(self):
         from homeassistant.components.climate import HVACAction
+
         device = {**FIXTURES["sbus_fan_coil"], "working_state": "idle"}
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_action == HVACAction.IDLE
@@ -78,13 +81,20 @@ class TestSinumFanCoilClimate:
     def test_hvac_action_none_working_state_when_off_returns_off(self):
         """working_state='none' (live hub) with work_mode='off' must return OFF not IDLE."""
         from homeassistant.components.climate import HVACAction
-        device = {**FIXTURES["sbus_fan_coil"], "working_state": "none", "work_mode": "off", "state": ""}
+
+        device = {
+            **FIXTURES["sbus_fan_coil"],
+            "working_state": "none",
+            "work_mode": "off",
+            "state": "",
+        }
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_action == HVACAction.OFF
 
     def test_hvac_action_none_working_state_state_fallback(self):
         """working_state='none' falls through to state-field fallback."""
         from homeassistant.components.climate import HVACAction
+
         device = {**FIXTURES["sbus_fan_coil"], "working_state": "none", "state": "heating_demand"}
         entity, _ = _make_fan_coil(device)
         assert entity.hvac_action == HVACAction.HEATING
@@ -101,6 +111,7 @@ class TestSinumFanCoilClimate:
 
     def test_available_hvac_modes(self):
         from homeassistant.components.climate import HVACMode
+
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, _ = _make_fan_coil(device)
         assert HVACMode.HEAT in entity.hvac_modes
@@ -131,6 +142,7 @@ class TestSinumFanCoilClimate:
     @pytest.mark.asyncio
     async def test_set_hvac_mode_sends_work_mode(self):
         from homeassistant.components.climate import HVACMode
+
         device = dict(FIXTURES["sbus_fan_coil"])
         entity, coordinator = _make_fan_coil(device)
         updated = {**device, "work_mode": "cooling"}
@@ -138,9 +150,7 @@ class TestSinumFanCoilClimate:
 
         await entity.async_set_hvac_mode(HVACMode.COOL)
 
-        coordinator.client.patch_sbus_device.assert_called_once_with(
-            13, {"work_mode": "cooling"}
-        )
+        coordinator.client.patch_sbus_device.assert_called_once_with(13, {"work_mode": "cooling"})
 
     @pytest.mark.asyncio
     async def test_set_fan_mode_sends_gear(self):
@@ -189,9 +199,7 @@ class TestSinumFanCoilClimate:
 
         await entity.async_set_temperature(temperature=22.5)
 
-        coordinator.client.patch_wtp_device.assert_called_once_with(
-            22, {"target_temperature": 225}
-        )
+        coordinator.client.patch_wtp_device.assert_called_once_with(22, {"target_temperature": 225})
         coordinator.client.patch_sbus_device.assert_not_called()
 
     @pytest.mark.asyncio
@@ -205,9 +213,7 @@ class TestSinumFanCoilClimate:
 
         await entity.async_set_hvac_mode(HVACMode.COOL)
 
-        coordinator.client.patch_wtp_device.assert_called_once_with(
-            22, {"work_mode": "cooling"}
-        )
+        coordinator.client.patch_wtp_device.assert_called_once_with(22, {"work_mode": "cooling"})
         coordinator.client.patch_sbus_device.assert_not_called()
 
     @pytest.mark.asyncio
@@ -258,7 +264,7 @@ class TestSinumFanCoilClimate:
             "class": "wtp",
             "room_id": 1,
             "room_temperature": 195,
-            "status": "online"
+            "status": "online",
         }
 
         coordinator = MagicMock()
@@ -276,12 +282,7 @@ class TestSinumFanCoilClimate:
 
     def test_partial_wtp_fan_coil_graceful_degradation(self):
         """Partial WTP fan coil handles missing optional fields if instantiated directly."""
-        device = {
-            "id": 24,
-            "name": "WTP Partial",
-            "type": "fan_coil",
-            "room_temperature": 200
-        }
+        device = {"id": 24, "name": "WTP Partial", "type": "fan_coil", "room_temperature": 200}
         entity, _ = _make_fan_coil(device, source="wtp", device_id=24)
 
         assert entity.current_temperature == 20.0
@@ -293,26 +294,27 @@ class TestSinumFanCoilClimate:
         """Partial WTP fan coil without target_temperature has no setpoint feature."""
         from homeassistant.components.climate import ClimateEntityFeature
 
-        device = {
-            "id": 24,
-            "name": "WTP Partial",
-            "type": "fan_coil",
-            "room_temperature": 200
-        }
+        device = {"id": 24, "name": "WTP Partial", "type": "fan_coil", "room_temperature": 200}
         entity, _ = _make_fan_coil(device, source="wtp", device_id=24)
 
         assert entity._attr_supported_features == ClimateEntityFeature(0)
 
     def test_target_temperature_mode_mode_key(self):
         """SBUS fan_coil uses 'mode' key in target_temperature_mode dict (live hub)."""
-        device = {**FIXTURES["sbus_fan_coil"], "target_temperature_mode": {"mode": "constant", "remaining_time": 0}}
+        device = {
+            **FIXTURES["sbus_fan_coil"],
+            "target_temperature_mode": {"mode": "constant", "remaining_time": 0},
+        }
         entity, _ = _make_fan_coil(device)
         attrs = entity.extra_state_attributes
         assert attrs.get("target_temperature_mode") == "constant"
 
     def test_target_temperature_mode_current_key(self):
         """Thermostats use 'current' key in target_temperature_mode dict."""
-        device = {**FIXTURES["sbus_fan_coil"], "target_temperature_mode": {"current": "schedule", "remaining_time": 300}}
+        device = {
+            **FIXTURES["sbus_fan_coil"],
+            "target_temperature_mode": {"current": "schedule", "remaining_time": 300},
+        }
         entity, _ = _make_fan_coil(device)
         attrs = entity.extra_state_attributes
         assert attrs.get("target_temperature_mode") == "schedule"
@@ -326,9 +328,7 @@ class TestSinumFanCoilClimate:
             "name": "WTP With Fan",
             "type": "fan_coil",
             "room_temperature": 200,
-            "fan": {
-                "relay_fan": {"current_gear": "second"}
-            }
+            "fan": {"relay_fan": {"current_gear": "second"}},
         }
         entity, _ = _make_fan_coil(device, source="wtp", device_id=25)
 

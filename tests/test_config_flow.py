@@ -1,4 +1,5 @@
 """Tests for Sinum config flow."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -30,9 +31,7 @@ def mock_aiohttp_session():
 class TestConfigFlowToken:
     @pytest.mark.asyncio
     async def test_token_flow_success(self, hass, mock_aiohttp_session):
-        with patch(
-            "custom_components.sinum.config_flow.SinumClient"
-        ) as MockClient:
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
             client = MagicMock()
             client.get_hub_info = AsyncMock(return_value={"name": "tablica-wtp"})
             MockClient.return_value = client
@@ -49,9 +48,7 @@ class TestConfigFlowToken:
             assert result["type"] == "form"
             assert result["step_id"] == "token"
 
-            result2 = await flow.async_step_token(
-                {CONF_API_TOKEN: "mytoken", "scan_interval": 30}
-            )
+            result2 = await flow.async_step_token({CONF_API_TOKEN: "mytoken", "scan_interval": 30})
             assert result2["type"] == "create_entry"
             assert result2["data"][CONF_API_TOKEN] == "mytoken"
             assert result2["data"][CONF_AUTH_MODE] == AUTH_MODE_TOKEN
@@ -71,9 +68,7 @@ class TestConfigFlowToken:
             flow._host = "192.168.1.100"
             flow._auth_mode = AUTH_MODE_TOKEN
 
-            result = await flow.async_step_token(
-                {CONF_API_TOKEN: "bad-token", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({CONF_API_TOKEN: "bad-token", "scan_interval": 30})
             assert result["type"] == "form"
             assert result["errors"]["base"] == "invalid_auth"
 
@@ -81,9 +76,7 @@ class TestConfigFlowToken:
     async def test_token_flow_cannot_connect(self, hass, mock_aiohttp_session):
         with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
             client = MagicMock()
-            client.get_hub_info = AsyncMock(
-                side_effect=SinumConnectionError("timeout")
-            )
+            client.get_hub_info = AsyncMock(side_effect=SinumConnectionError("timeout"))
             MockClient.return_value = client
 
             from custom_components.sinum.config_flow import SinumConfigFlow
@@ -93,9 +86,7 @@ class TestConfigFlowToken:
             flow._host = "192.168.1.100"
             flow._auth_mode = AUTH_MODE_TOKEN
 
-            result = await flow.async_step_token(
-                {CONF_API_TOKEN: "tok", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({CONF_API_TOKEN: "tok", "scan_interval": 30})
             assert result["errors"]["base"] == "cannot_connect"
 
 
@@ -357,9 +348,7 @@ class TestReconfigureFlow:
                 {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
             )
             # Step 3: submit token credentials
-            result = await flow.async_step_token(
-                {CONF_API_TOKEN: "new_token", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({CONF_API_TOKEN: "new_token", "scan_interval": 30})
 
         assert result["type"] == "abort"
         flow.async_update_reload_and_abort.assert_called_once()
@@ -424,9 +413,7 @@ class TestReconfigureFlow:
             await flow.async_step_reconfigure(
                 {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
             )
-            result = await flow.async_step_token(
-                {CONF_API_TOKEN: "tok", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({CONF_API_TOKEN: "tok", "scan_interval": 30})
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect"
@@ -514,14 +501,14 @@ class TestConfigFlowUserStep:
         flow = SinumConfigFlow()
         flow.hass = hass
         flow.context = {}
+
         # stub password step to avoid making real connections
         async def _fake_password():
             return {"type": "form", "step_id": "password", "errors": {}}
+
         flow.async_step_password = lambda **_kw: _fake_password()
 
-        result = await flow.async_step_user(
-            {"host": "192.168.1.1", "auth_mode": "password"}
-        )
+        result = await flow.async_step_user({"host": "192.168.1.1", "auth_mode": "password"})
 
         assert result["step_id"] == "password"
 
@@ -542,9 +529,7 @@ class TestConfigFlowTokenUnknownError:
             flow.hass = hass
             flow._host = "192.168.1.100"
 
-            result = await flow.async_step_token(
-                {"api_token": "tok", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({"api_token": "tok", "scan_interval": 30})
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "unknown"
@@ -665,9 +650,7 @@ class TestReauthPasswordMode:
         """Line 198: SinumConnectionError in reauth → cannot_connect."""
         with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
             client = MagicMock()
-            client.test_connection = AsyncMock(
-                side_effect=SinumConnectionError("unreachable")
-            )
+            client.test_connection = AsyncMock(side_effect=SinumConnectionError("unreachable"))
             MockClient.return_value = client
 
             from custom_components.sinum.config_flow import SinumConfigFlow
@@ -684,8 +667,6 @@ class TestReauthPasswordMode:
             }
             flow._get_reauth_entry = MagicMock(return_value=mock_entry)
 
-            result = await flow.async_step_reauth_confirm(
-                {"api_token": "tok", "scan_interval": 30}
-            )
+            result = await flow.async_step_reauth_confirm({"api_token": "tok", "scan_interval": 30})
 
         assert result["errors"]["base"] == "cannot_connect"

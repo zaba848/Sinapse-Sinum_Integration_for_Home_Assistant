@@ -247,8 +247,7 @@ class TestSinumVariableNumberSetup:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
 
         assert any(
-            isinstance(entity, SinumVariableNumber) and entity._variable_id == 6
-            for entity in added
+            isinstance(entity, SinumVariableNumber) and entity._variable_id == 6 for entity in added
         )
         assert coordinator.variables == [variable]
 
@@ -326,7 +325,9 @@ class TestRemainingNumberCoverage:
 
     @pytest.mark.asyncio
     async def test_variable_set_native_value_appends_when_variable_missing(self):
-        entity, coordinator = TestSinumVariableNumber()._make_entity(_make_variable(var_id=77, value=10))
+        entity, coordinator = TestSinumVariableNumber()._make_entity(
+            _make_variable(var_id=77, value=10)
+        )
         coordinator.variables = []
         coordinator.client.set_variable = AsyncMock(return_value={"id": 77, "value": 22})
 
@@ -358,7 +359,9 @@ class TestRemainingNumberCoverage:
         from custom_components.sinum.number import async_setup_entry
 
         coordinator = _make_coordinator(sbus_devices={})
-        coordinator.variables = [{"id": 5, "name": "Cached", "type": "integer", "value": 10, "min": 0, "max": 100}]
+        coordinator.variables = [
+            {"id": 5, "name": "Cached", "type": "integer", "value": 10, "min": 0, "max": 100}
+        ]
         coordinator.client = MagicMock()
         coordinator.client.get_variables = AsyncMock(side_effect=SinumConnectionError("missing"))
         entry = MagicMock()

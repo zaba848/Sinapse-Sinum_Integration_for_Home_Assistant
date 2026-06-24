@@ -1,4 +1,5 @@
 """Tests for update entity (firmware tracker)."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -109,9 +110,11 @@ class TestUpdateAsyncSetupEntry:
         """async_setup_entry: parents without software_status or version → empty list."""
         from custom_components.sinum.update import async_setup_entry
 
-        coord = _make_coordinator(parent_devices=[
-            {"id": 1, "name": "NoVersion", "class": "wtp_parent_device"},
-        ])
+        coord = _make_coordinator(
+            parent_devices=[
+                {"id": 1, "name": "NoVersion", "class": "wtp_parent_device"},
+            ]
+        )
         entry = MagicMock()
         entry.runtime_data = coord
         entry.entry_id = "test_entry"
@@ -127,9 +130,16 @@ class TestUpdateAsyncSetupEntry:
         """Parents with software_status field → entity created."""
         from custom_components.sinum.update import async_setup_entry
 
-        coord = _make_coordinator(parent_devices=[
-            {"id": 2, "name": "Gateway", "class": "wtp_parent_device", "software_status": "up_to_date"},
-        ])
+        coord = _make_coordinator(
+            parent_devices=[
+                {
+                    "id": 2,
+                    "name": "Gateway",
+                    "class": "wtp_parent_device",
+                    "software_status": "up_to_date",
+                },
+            ]
+        )
         entry = MagicMock()
         entry.runtime_data = coord
         entry.entry_id = "test_entry"

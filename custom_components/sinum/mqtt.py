@@ -80,9 +80,7 @@ class SinumMqttBridge:
     def _state_device_id(self, topic: str) -> int | None:
         state_prefix = f"{self._topic_prefix}/state/"
         if not topic.startswith(state_prefix):
-            _LOGGER.debug(
-                "Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, topic
-            )
+            _LOGGER.debug("Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, topic)
             return None
         try:
             return int(topic.removeprefix(state_prefix).split("/")[-1])
@@ -106,7 +104,9 @@ class SinumMqttBridge:
         }
         return stores.get(source)
 
-    def _apply_state_update(self, store: dict[int, dict[str, Any]], device_id: int, payload: dict[str, Any]) -> None:
+    def _apply_state_update(
+        self, store: dict[int, dict[str, Any]], device_id: int, payload: dict[str, Any]
+    ) -> None:
         if device_id in store:
             store[device_id].update(payload)
             return

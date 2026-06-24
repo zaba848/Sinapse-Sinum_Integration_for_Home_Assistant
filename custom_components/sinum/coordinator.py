@@ -199,9 +199,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             devices[device_id] = device
         return devices
 
-    async def _bulk_collection(
-        self, list_getter: Any, label: str
-    ) -> tuple[list[Any], bool]:
+    async def _bulk_collection(self, list_getter: Any, label: str) -> tuple[list[Any], bool]:
         try:
             return await list_getter(), True
         except Exception as err:

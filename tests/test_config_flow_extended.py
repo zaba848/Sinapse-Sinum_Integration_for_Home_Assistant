@@ -1,4 +1,5 @@
 """Extended config flow tests covering password errors, reauth, and edge cases."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -44,9 +45,7 @@ class TestConfigFlowUserStep:
         flow.hass = hass
         flow.context = {}
 
-        result = await flow.async_step_user(
-            {"host": "10.0.0.1", "auth_mode": AUTH_MODE_PASSWORD}
-        )
+        result = await flow.async_step_user({"host": "10.0.0.1", "auth_mode": AUTH_MODE_PASSWORD})
         # Should show the password form
         assert result["type"] == "form"
         assert result["step_id"] == "password"
@@ -66,9 +65,7 @@ class TestConfigFlowTokenErrors:
             flow.hass = hass
             flow._host = "192.168.1.100"
 
-            result = await flow.async_step_token(
-                {CONF_API_TOKEN: "tok", "scan_interval": 30}
-            )
+            result = await flow.async_step_token({CONF_API_TOKEN: "tok", "scan_interval": 30})
             assert result["errors"]["base"] == "unknown"
 
 

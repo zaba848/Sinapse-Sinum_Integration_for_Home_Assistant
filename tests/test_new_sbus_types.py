@@ -1,4 +1,5 @@
 """Tests for new SBUS/WTP device types: button, valve_pump, common_valve, analog_output, PWM, heat_pump_manager."""
+
 from __future__ import annotations
 
 import json
@@ -7,9 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_coordinator(*, wtp=None, sbus=None, virtual=None):
@@ -33,6 +32,7 @@ def _wire(entity):
 
 
 # ── Button sensor ──────────────────────────────────────────────────────────────
+
 
 class TestButtonSensor:
     def test_sbus_button_action(self):
@@ -89,6 +89,7 @@ class TestButtonSensor:
 
 # ── Valve pump binary sensor ───────────────────────────────────────────────────
 
+
 class TestValvePumpBinarySensor:
     def test_is_on_when_state_true(self):
         from custom_components.sinum.binary_sensor import (
@@ -144,6 +145,7 @@ class TestValvePumpBinarySensor:
 
 # ── Common valve switch ────────────────────────────────────────────────────────
 
+
 class TestCommonValveSwitch:
     def test_is_off_when_enabled_false(self):
         from custom_components.sinum.switch import SinumCommonValveSwitch
@@ -195,6 +197,7 @@ class TestCommonValveSwitch:
 
 # ── Analog output number ───────────────────────────────────────────────────────
 
+
 class TestAnalogOutputNumber:
     def test_native_value(self):
         from custom_components.sinum.number import SinumAnalogOutputNumber
@@ -242,6 +245,7 @@ class TestAnalogOutputNumber:
 
 # ── PWM sensors ────────────────────────────────────────────────────────────────
 
+
 class TestPwmSensors:
     def _pwm_desc(self, key: str):
         from custom_components.sinum.sensor import SBUS_SENSORS
@@ -278,6 +282,7 @@ class TestPwmSensors:
 
 
 # ── Heat pump manager climate ──────────────────────────────────────────────────
+
 
 class TestHeatPumpManagerClimate:
     def _make_hpm(self, device_data):
@@ -359,9 +364,7 @@ class TestHeatPumpManagerClimate:
         device = dict(FIXTURES["virtual_heat_pump_manager"])
         entity, coordinator = self._make_hpm(device)
         await entity.async_set_hvac_mode(HVACMode.OFF)
-        coordinator.client.patch_virtual_device.assert_called_once_with(
-            15, {"enabled": False}
-        )
+        coordinator.client.patch_virtual_device.assert_called_once_with(15, {"enabled": False})
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_cool_enables_and_sets_mode(self):
@@ -379,18 +382,14 @@ class TestHeatPumpManagerClimate:
         device = {**FIXTURES["virtual_heat_pump_manager"], "enabled": False}
         entity, coordinator = self._make_hpm(device)
         await entity.async_turn_on()
-        coordinator.client.patch_virtual_device.assert_called_once_with(
-            15, {"enabled": True}
-        )
+        coordinator.client.patch_virtual_device.assert_called_once_with(15, {"enabled": True})
 
     @pytest.mark.asyncio
     async def test_turn_off_patches_enabled_false(self):
         device = dict(FIXTURES["virtual_heat_pump_manager"])
         entity, coordinator = self._make_hpm(device)
         await entity.async_turn_off()
-        coordinator.client.patch_virtual_device.assert_called_once_with(
-            15, {"enabled": False}
-        )
+        coordinator.client.patch_virtual_device.assert_called_once_with(15, {"enabled": False})
 
     def test_unique_id(self):
         device = dict(FIXTURES["virtual_heat_pump_manager"])

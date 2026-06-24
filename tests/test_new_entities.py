@@ -1,4 +1,5 @@
 """Tests for new entities: target_reached binary sensor, DHW switch, valve sensors."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -33,6 +34,7 @@ def _wire(entity):
 
 
 # ── target_temperature_reached binary sensor ───────────────────────────────────
+
 
 class TestTargetReachedBinarySensor:
     def test_wtp_target_reached_is_on(self):
@@ -83,6 +85,7 @@ class TestTargetReachedBinarySensor:
 
 
 # ── SinumDhwSwitch ─────────────────────────────────────────────────────────────
+
 
 class TestDhwSwitch:
     def _make_heat_pump(self, dhw_enabled: bool, dhw_state: bool = False):
@@ -172,6 +175,7 @@ class TestDhwSwitch:
 
 
 # ── common_valve sensors ────────────────────────────────────────────────────────
+
 
 class TestCommonValveSensors:
     def _valve_desc(self, key: str):

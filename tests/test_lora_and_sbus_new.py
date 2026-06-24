@@ -1,4 +1,5 @@
 """Tests for LoRa bus entities, SBUS blind controller, alarm arm/disarm, and new sensors."""
+
 from __future__ import annotations
 
 import json
@@ -9,9 +10,7 @@ import pytest
 
 from custom_components.sinum.api import SinumConnectionError
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_coordinator(lora=None, sbus=None, wtp=None, virtual=None):
@@ -30,9 +29,11 @@ def _make_coordinator(lora=None, sbus=None, wtp=None, virtual=None):
 
 # ─────────────────────── LoRa Switch ────────────────────────────
 
+
 class TestLoraRelaySwitch:
     def _make(self):
         from custom_components.sinum.switch import SinumBusRelaySwitch
+
         device = dict(FIXTURES["lora_relay"])
         device["_device_name"] = "LoRa Relay"
         coordinator = _make_coordinator(lora={73: device})
@@ -51,6 +52,7 @@ class TestLoraRelaySwitch:
 
     def test_is_off_when_state_false(self):
         from custom_components.sinum.switch import SinumBusRelaySwitch
+
         device = dict(FIXTURES["lora_relay"])
         device["state"] = False
         coordinator = _make_coordinator(lora={73: device})
@@ -75,6 +77,7 @@ class TestLoraRelaySwitch:
 
     def test_lora_bus_setup_creates_switch(self):
         from custom_components.sinum.switch import async_setup_entry
+
         device = {"type": "relay", "_device_name": "LoRa Relay"}
         coordinator = _make_coordinator(lora={73: device})
         entry = MagicMock()
@@ -82,6 +85,7 @@ class TestLoraRelaySwitch:
         entry.entry_id = "test"
         added = []
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(
             async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         )
@@ -90,9 +94,11 @@ class TestLoraRelaySwitch:
 
 # ─────────────────────── LoRa Sensors ───────────────────────────
 
+
 class TestLoraSensors:
     def test_temperature_sensor_native_value(self):
         from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
+
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -102,6 +108,7 @@ class TestLoraSensors:
 
     def test_battery_sensor_native_value(self):
         from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
+
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -111,6 +118,7 @@ class TestLoraSensors:
 
     def test_signal_sensor_native_value(self):
         from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
+
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -120,6 +128,7 @@ class TestLoraSensors:
 
     def test_humidity_sensor_native_value(self):
         from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
+
         device = dict(FIXTURES["lora_humidity_sensor"])
         device["_device_name"] = "LoRa Humidity"
         coordinator = _make_coordinator(lora={71: device})
@@ -130,6 +139,7 @@ class TestLoraSensors:
 
     def test_lora_sensor_unique_id(self):
         from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
+
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -140,12 +150,14 @@ class TestLoraSensors:
 
 # ─────────────────────── LoRa Binary Sensors ────────────────────
 
+
 class TestLoraBinarySensors:
     def test_opening_sensor_is_on_when_open(self):
         from custom_components.sinum.binary_sensor import (
             LORA_BINARY_SENSOR_TYPES,
             SinumBinarySensor,
         )
+
         device = dict(FIXTURES["lora_opening_sensor"])
         device["_device_name"] = "LoRa Door"
         coordinator = _make_coordinator(lora={72: device})
@@ -158,7 +170,13 @@ class TestLoraBinarySensors:
             LORA_BINARY_SENSOR_TYPES,
             SinumBinarySensor,
         )
-        device = {"id": 72, "type": "opening_sensor", "state": "closed", "_device_name": "LoRa Door"}
+
+        device = {
+            "id": 72,
+            "type": "opening_sensor",
+            "state": "closed",
+            "_device_name": "LoRa Door",
+        }
         coordinator = _make_coordinator(lora={72: device})
         desc = next(d for d in LORA_BINARY_SENSOR_TYPES if d.key == "opening")
         entity = SinumBinarySensor(coordinator, 72, desc, "test_entry")
@@ -166,6 +184,7 @@ class TestLoraBinarySensors:
 
     def test_lora_setup_creates_binary_sensor(self):
         from custom_components.sinum.binary_sensor import async_setup_entry
+
         device = {"type": "opening_sensor", "state": "open", "_device_name": "LoRa Door"}
         coordinator = _make_coordinator(lora={72: device})
         coordinator.wtp_devices = {}
@@ -176,6 +195,7 @@ class TestLoraBinarySensors:
         entry.entry_id = "test"
         added = []
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(
             async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         )
@@ -187,6 +207,7 @@ class TestLoraBinarySensors:
             LORA_BINARY_SENSOR_TYPES,
             SinumBinarySensor,
         )
+
         device = dict(FIXTURES["lora_opening_sensor"])
         device["_device_name"] = "LoRa Door"
         coordinator = _make_coordinator(lora={72: device})
@@ -197,9 +218,11 @@ class TestLoraBinarySensors:
 
 # ─────────────────────── SBUS Blind Controller ──────────────────
 
+
 class TestSbusBlindCover:
     def _make(self, device_override=None):
         from custom_components.sinum.cover import SinumSbusBlindCover
+
         device = dict(FIXTURES["sbus_blind_controller"])
         device["_device_name"] = "SBUS Blind"
         if device_override:
@@ -249,6 +272,7 @@ class TestSbusBlindCover:
 
     def test_has_tilt_feature_when_tilt_present(self):
         from homeassistant.components.cover import CoverEntityFeature
+
         entity, _ = self._make()
         assert entity.supported_features & CoverEntityFeature.SET_TILT_POSITION
 
@@ -256,7 +280,13 @@ class TestSbusBlindCover:
         from homeassistant.components.cover import CoverEntityFeature
 
         from custom_components.sinum.cover import SinumSbusBlindCover
-        device = {"id": 60, "type": "blind_controller", "current_opening": 50, "_device_name": "Blind"}
+
+        device = {
+            "id": 60,
+            "type": "blind_controller",
+            "current_opening": 50,
+            "_device_name": "Blind",
+        }
         coordinator = _make_coordinator(sbus={60: device})
         entity = SinumSbusBlindCover(coordinator, 60, "test_entry")
         assert not (entity.supported_features & CoverEntityFeature.SET_TILT_POSITION)
@@ -292,6 +322,7 @@ class TestSbusBlindCover:
     @pytest.mark.asyncio
     async def test_set_cover_position(self):
         from homeassistant.components.cover import ATTR_POSITION
+
         entity, coordinator = self._make()
         coordinator.sbus_devices[60] = dict(FIXTURES["sbus_blind_controller"])
         coordinator.client.patch_sbus_device = AsyncMock(return_value={})
@@ -303,6 +334,7 @@ class TestSbusBlindCover:
     @pytest.mark.asyncio
     async def test_set_cover_tilt_position(self):
         from homeassistant.components.cover import ATTR_TILT_POSITION
+
         entity, coordinator = self._make()
         coordinator.sbus_devices[60] = dict(FIXTURES["sbus_blind_controller"])
         coordinator.client.patch_sbus_device = AsyncMock(return_value={})
@@ -313,6 +345,7 @@ class TestSbusBlindCover:
 
     def test_sbus_blind_setup_creates_entity(self):
         from custom_components.sinum.cover import async_setup_entry
+
         device = dict(FIXTURES["sbus_blind_controller"])
         device["_device_name"] = "Blind"
         coordinator = _make_coordinator(sbus={60: device})
@@ -324,21 +357,29 @@ class TestSbusBlindCover:
         entry.entry_id = "test"
         added = []
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(
             async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         )
         from custom_components.sinum.cover import SinumSbusBlindCover
+
         assert any(isinstance(e, SinumSbusBlindCover) for e in added)
 
 
 # ─────────────────────── Alarm Arm/Disarm ───────────────────────
 
+
 class TestAlarmArmDisarm:
     def _make(self):
         from custom_components.sinum.alarm_control_panel import SinumAlarmZone
+
         zone = {
-            "id": 1, "name": "Zone 1", "type": "alarm_zone",
-            "zone_status": "disarmed", "armed": False, "violated": False,
+            "id": 1,
+            "name": "Zone 1",
+            "type": "alarm_zone",
+            "zone_status": "disarmed",
+            "armed": False,
+            "violated": False,
         }
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
@@ -353,9 +394,7 @@ class TestAlarmArmDisarm:
     async def test_arm_away_sends_correct_command(self):
         entity, coordinator = self._make()
         await entity.async_alarm_arm_away(code="1234")
-        coordinator.client.command_alarm_device.assert_awaited_once_with(
-            1, "arm", {"arm": "1234"}
-        )
+        coordinator.client.command_alarm_device.assert_awaited_once_with(1, "arm", {"arm": "1234"})
 
     @pytest.mark.asyncio
     async def test_disarm_sends_correct_command(self):
@@ -368,6 +407,7 @@ class TestAlarmArmDisarm:
     @pytest.mark.asyncio
     async def test_arm_without_code_raises_ha_error(self):
         from homeassistant.exceptions import HomeAssistantError
+
         entity, _ = self._make()
         with pytest.raises(HomeAssistantError, match="PIN code is required"):
             await entity.async_alarm_arm_away(code=None)
@@ -375,6 +415,7 @@ class TestAlarmArmDisarm:
     @pytest.mark.asyncio
     async def test_disarm_without_code_raises_ha_error(self):
         from homeassistant.exceptions import HomeAssistantError
+
         entity, _ = self._make()
         with pytest.raises(HomeAssistantError, match="PIN code is required"):
             await entity.async_alarm_disarm(code=None)
@@ -382,6 +423,7 @@ class TestAlarmArmDisarm:
     @pytest.mark.asyncio
     async def test_arm_connection_error_raises_ha_error(self):
         from homeassistant.exceptions import HomeAssistantError
+
         entity, coordinator = self._make()
         coordinator.client.command_alarm_device = AsyncMock(
             side_effect=SinumConnectionError("hub down")
@@ -392,6 +434,7 @@ class TestAlarmArmDisarm:
     @pytest.mark.asyncio
     async def test_disarm_connection_error_raises_ha_error(self):
         from homeassistant.exceptions import HomeAssistantError
+
         entity, coordinator = self._make()
         coordinator.client.command_alarm_device = AsyncMock(
             side_effect=SinumConnectionError("hub down")
@@ -401,6 +444,7 @@ class TestAlarmArmDisarm:
 
     def test_code_format_is_number(self):
         from homeassistant.components.alarm_control_panel import CodeFormat
+
         entity, _ = self._make()
         assert entity.code_format == CodeFormat.NUMBER
 
@@ -411,9 +455,11 @@ class TestAlarmArmDisarm:
 
 # ─────────────────────── SBUS Energy Meter Sensors ──────────────
 
+
 class TestSbusEnergyMeterSensors:
     def _make_sensor(self, key):
         from custom_components.sinum.sensor import SBUS_SENSORS, SinumSensor
+
         device = dict(FIXTURES["sbus_energy_meter"])
         device["_device_name"] = "SBUS Energy"
         coordinator = _make_coordinator(sbus={61: device})
@@ -448,10 +494,18 @@ class TestSbusEnergyMeterSensors:
 
 # ─────────────────────── WTP Battery/Signal Sensors ─────────────
 
+
 class TestWtpBatterySignalSensors:
     def _make_sensor(self, key):
         from custom_components.sinum.sensor import WTP_SENSORS, SinumSensor
-        device = {"id": 20, "type": "temperature_sensor", "battery": 75, "signal": 88, "_device_name": "WTP Dev"}
+
+        device = {
+            "id": 20,
+            "type": "temperature_sensor",
+            "battery": 75,
+            "signal": 88,
+            "_device_name": "WTP Dev",
+        }
         coordinator = _make_coordinator(wtp={20: device})
         desc = next((d for d in WTP_SENSORS if d.key == key), None)
         if desc is None:
@@ -470,15 +524,18 @@ class TestWtpBatterySignalSensors:
 
 # ─────────────────────── LoRa Coordinator Integration ───────────
 
+
 class TestLoraCoordinatorIntegration:
     def _make_coordinator_obj(self, mock_client):
         from unittest.mock import patch
 
         from homeassistant.helpers.frame import report_usage  # noqa: F401
+
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.config_entries = MagicMock()
         from custom_components.sinum.coordinator import SinumCoordinator
+
         with patch("homeassistant.helpers.frame.report_usage", return_value=None):
             coordinator = SinumCoordinator(hass, mock_client, scan_interval=30)
         return coordinator
@@ -486,6 +543,7 @@ class TestLoraCoordinatorIntegration:
     @pytest.mark.asyncio
     async def test_lora_devices_included_in_update(self, mock_client):
         from unittest.mock import patch
+
         lora_device = dict(FIXTURES["lora_temp_sensor"])
         mock_client.get_lora_devices = AsyncMock(return_value=[lora_device])
         mock_client.get_lora_device = AsyncMock(return_value=lora_device)
@@ -498,6 +556,7 @@ class TestLoraCoordinatorIntegration:
     @pytest.mark.asyncio
     async def test_lora_failure_returns_cached(self, mock_client):
         from unittest.mock import patch
+
         lora_device = dict(FIXTURES["lora_temp_sensor"])
         mock_client.get_lora_devices = AsyncMock(return_value=[lora_device])
         coordinator = self._make_coordinator_obj(mock_client)
@@ -505,9 +564,7 @@ class TestLoraCoordinatorIntegration:
             await coordinator._async_update_data()
         assert coordinator.lora_devices
 
-        mock_client.get_lora_devices = AsyncMock(
-            side_effect=SinumConnectionError("lora down")
-        )
+        mock_client.get_lora_devices = AsyncMock(side_effect=SinumConnectionError("lora down"))
         with patch.object(coordinator, "async_set_updated_data"):
             data = await coordinator._async_update_data()
         assert 70 in data["lora"]
