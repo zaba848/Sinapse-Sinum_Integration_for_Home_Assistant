@@ -3,16 +3,58 @@
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
 ---
+## Upgrading
+
+### Before You Update
 1. **Backup your Home Assistant configuration**: `config/custom_components/sinum/` directory.
 2. **Check for breaking changes**: Review the release notes below for your version.
+3. **Test in staging first**: If you have a development HA instance, test there first.
 
 ### After You Update
+1. **Reload the integration**: Go to **Settings** -> **Devices & Services** -> **Sinum** -> **Reload**.
+2. **Verify entities**: Check that all entities are still available in **Settings** -> **Devices & Services** -> **Sinum**.
+3. **Check automations**: If you use Sinum buttons/events in automations, verify they still trigger correctly.
+
 ### Reporting Issues
 - Use [GitHub Issues](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues) for bugs.
 - For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
+---
+
+## [Unreleased]
+
+## [0.2.8] — 2026-06-24
+
+### Important Legal & Support Disclaimer
+- This is an **unofficial** Home Assistant integration.
+- This integration is **not authorized, endorsed, maintained, or supported** by TECH Sterowniki.
+- The plugin does **not originate from TECH Sterowniki** and is maintained independently by the community author.
+- The integration only uses data available from the Sinum hub/central unit APIs to read and control devices.
+- The author/maintainer provides the code **as-is** and takes **no liability** for any direct or indirect damages, losses, or disruptions caused by use of this code.
+- Using this integration is at your own risk and responsibility.
+
+### Added
+- Brand assets: icon (icon.png, icon@2x.png) displayed in Home Assistant UI and HACS marketplace.
+- Code ownership: `.github/CODEOWNERS` defines review responsibilities for critical paths.
+- Quality monitoring: per-module coverage tracking via `scripts/validate_coverage_gates.py` (informational only).
+- Automation workflows:
+  - `hardware-nightly.yml`: nightly smoke tests on real hubs (requires self-hosted runner setup).
+  - `test-stability.yml`: weekly test stability report (slowest tests, pass rate, flaky test detection).
+- Security setup guide: `SECURITY_SETUP.md` documents all manual GitHub configuration steps.
+
+### Changed
+- CI workflow enhanced: integrated quality gate validation step (non-blocking, informational reporting).
+- `pytest.ini`: added markers (`hardware`, `quality`, `smoke`, `slow`) for test categorization.
+- `README.md`: added stability badge linking to test-stability workflow.
+
+## [0.2.7] — 2026-06-24
+
+### Changed
 - CI quality gates strengthened: single-pass coverage report generation with `coverage.xml` and pip cache in `ci.yml`.
 - `tests.yml` now runs **Functional Smoke Tests** (critical behavior paths) instead of duplicating the full suite.
+- Hardware validation process formalized in `HARDWARE_TEST_PLAN.md` with a release checklist and explicit CC + smoke + manual hardware gate.
+- `validate.yml` no longer skips HACS validation on push/PR due to repository visibility checks.
+- Added a documented hardware smoke test result (2026-06-24) for WTP and SBUS hubs.
 - `SECURITY.md` replaced template content with an actionable vulnerability handling policy for current release lines.
 - `codeql.yml` now always executes CodeQL in public-repo mode (no soft skip fallback).
 
