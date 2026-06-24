@@ -27,6 +27,8 @@ def _virtual_switch_entity(
     coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
 ) -> SwitchEntity | None:
     dev_type = device.get("type")
+    if not isinstance(dev_type, str):
+        return None
     if dev_type == VTYPE_HEAT_PUMP_MANAGER:
         return _heat_pump_dhw_switch(coordinator, device_id, entry_id, device)
     factories = {
