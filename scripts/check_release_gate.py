@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Check release gate status from GitHub Actions.
+
+Validates that required workflows have a recent successful run on main.
+Intended for release operators and CI visibility.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.request
+
+REPO = os.getenv("GITHUB_REPOSITORY", "zaba848/Sinapse-Sinum_Integration_for_Home_Assistant")
+API_URL = f"https://api.github.com/repos/{REPO}/actions/runs?per_page=100"
+REQUIRED = {
+    "CI",
+    "CodeQL Security Analysis",
+    "HACS Validation",
+    "Lint",
+}
+
+# PR-only workflows are informative and should not block release on main.
+OPTIONAL = {
+    "Dependency Review",
+}
+
+
+def fetch_runs() -> list[dict]:
+    req = urllib.request.Request(API_URL, headers={"Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        payload = json.load(resp)
+    return payload.get("workflow_runs", [])
+
+
+def main() -> int:
+    runs = fetch_runs()
+
+    latest: dict[str, dict] = {}
+    for run in runs:
+        name = run.get("name")
+        branch = run.get("head_branch")
+        if name in REQUIRED and branch == "main" and name not in latest:
+            latest[name] = run
+
+    print("Release Gate Check\n")
+    failed = False
+    for workflow in sorted(REQUIRED):
+        run = latest.get(workflow)
+        if not run:
+            print(f"- {workflow}: MISSING")
+            failed = True
+            continue
+
+        status = run.get("status")
+        conclusion = run.get("conclusion")
+        url = run.get("html_url")
+        ok = status == "completed" and conclusion == "success"
+        mark = "OK" if ok else "FAIL"
+        print(f"- {workflow}: {mark} (status={status}, conclusion={conclusion})")
+        print(f"  {url}")
+        if not ok:
+            failed = True
+
+    for workflow in sorted(OPTIONAL):
+        run = next(
+            (
+                r
+                for r in runs
+                if r.get("name") == workflow and r.get("head_branch") == "main"
+            ),
+            None,
+        )
+        if not run:
+            print(f"- {workflow}: OPTIONAL/MISSING")
+            continue
+        print(
+            f"- {workflow}: OPTIONAL (status={run.get('status')}, conclusion={run.get('conclusion')})"
+        )
+        print(f"  {run.get('html_url')}")
+
+    print()
+    if failed:
+        print("Result: RELEASE GATE NOT MET")
+        return 1
+
+    print("Result: RELEASE GATE MET")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

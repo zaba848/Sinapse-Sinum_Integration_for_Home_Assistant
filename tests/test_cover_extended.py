@@ -359,6 +359,18 @@ class TestSinumBlindCoverIsOpeningClosing:
             entity = SinumBlindCover(coord, 13, "test_entry")
         assert entity.is_closing is True
 
+    def test_current_position_fallback_when_device_snapshot_missing(self):
+        """Regression: missing device in coordinator must not crash cover state reads."""
+        device = _blind_device(pos=42)
+        coord = _make_coordinator(virtual_devices={13: device})
+        coord.client = MagicMock()
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+
+        # Snapshot disappears after coordinator refresh failure.
+        coord.virtual_devices = {}
+        assert entity.current_cover_position == 42
+
 
 class TestSinumGateCoverStop:
     @pytest.mark.asyncio

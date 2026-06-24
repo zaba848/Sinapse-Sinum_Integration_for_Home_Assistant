@@ -13,6 +13,7 @@ from custom_components.sinum.api import (
     SinumAuthError,
     SinumClient,
     SinumConnectionError,
+    _list_result,
 )
 
 
@@ -100,6 +101,49 @@ class TestRefreshJwt:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client._refresh_jwt()
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_refresh_keeps_existing_refresh_token_when_missing_in_response(self, session):
+        """Regression: some firmware returns only new JWT without refresh token."""
+        resp = make_response(200, {"data": {"session": "new-jwt"}})
+        session.post = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, username="u", password="p")
+        client._refresh_token = "old-ref"
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client._refresh_jwt()
+        assert result is True
+        assert client._jwt == "new-jwt"
+        assert client._refresh_token == "old-ref"
+
+
+class TestFirmwareResponseContracts:
+    def test_list_result_accepts_nested_devices_wrapper(self):
+        """Firmware variant: payload groups lists by bus inside 'devices'."""
+        payload = {
+            "devices": {
+                "wtp": [{"id": 1, "type": "temperature_sensor"}],
+                "sbus": [{"id": 2, "type": "relay"}],
+                "meta": {"ignored": True},
+            }
+        }
+        assert _list_result(payload) == [
+            {"id": 1, "type": "temperature_sensor"},
+            {"id": 2, "type": "relay"},
+        ]
+
+    def test_list_result_accepts_results_wrapper_with_mixed_values(self):
+        """Firmware variant: endpoint returns mixed map under 'results'."""
+        payload = {
+            "results": {
+                "10": {"id": 10, "type": "thermostat"},
+                "status": "ok",
+                "nested": [{"id": 11, "type": "button"}],
+            }
+        }
+        assert _list_result(payload) == [
+            {"id": 10, "type": "thermostat"},
+            {"id": 11, "type": "button"},
+        ]
 
 
 class TestRequestEdgeCases:

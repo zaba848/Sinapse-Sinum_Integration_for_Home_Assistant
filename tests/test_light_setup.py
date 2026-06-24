@@ -712,6 +712,23 @@ class TestSinumBusRgbLightHelpers:
         assert any("set_color" in l for l in lines)
         assert optimistic["color_mode"] == "rgb"
 
+    def test_sbus_lua_hs_switches_mode_from_temperature_to_rgb(self):
+        """Regression: user color command must switch mode out of temperature."""
+        entity = self._make_sbus(
+            {
+                "id": 7,
+                "type": STYPE_RGB_CONTROLLER,
+                "name": "RGB",
+                "state": True,
+                "color_mode": "temperature",
+                "white_temperature": 3200,
+                "led_color": "#cc1000",
+            }
+        )
+        _, optimistic = entity._sbus_lua_commands(**{ATTR_HS_COLOR: (120.0, 100.0)})
+        assert optimistic["color_mode"] == "rgb"
+        assert optimistic["led_color"].startswith("#")
+
     def test_sbus_lua_brightness_produces_set_brightness(self):
         entity = self._make_sbus()
         lines, optimistic = entity._sbus_lua_commands(**{ATTR_BRIGHTNESS: 128})
