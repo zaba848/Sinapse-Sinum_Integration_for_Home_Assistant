@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-06-24
+
+### Hardware/API Validation
+- Read-only hardware smoke check refreshed in `docs/hardware_smoke_latest.md`.
+- Both hubs passed login and core API endpoint checks (`/api/v1/info`, `/api/v1/devices/wtp`, `/api/v1/devices/sbus`, `/api/v1/devices/virtual`).
+
+### Quality
+- Full test suite passed (`1220 passed`).
+- API-focused test suite passed (`117 passed`).
+- Global coverage remains at 99% total for `custom_components/sinum`.
+
 ## [0.3.4] — 2026-06-24
 
 ### Test Coverage
