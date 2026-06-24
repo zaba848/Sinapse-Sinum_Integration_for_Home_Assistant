@@ -23,6 +23,16 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.8] — 2026-06-24
+
+### Test Coverage
+- `custom_components/sinum` reached 100% line coverage (`4071/4071`).
+- Final missing branches were covered in setup/filtering and helper edge-case paths.
+
+### Quality
+- Full local validation passed: `1234 passed`.
+- Release gate checks on main passed (`CI`, `Lint`, `CodeQL Security Analysis`, `HACS Validation`).
+
 ## [0.3.7] — 2026-06-24
 
 ### Quality
