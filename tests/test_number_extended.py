@@ -316,3 +316,56 @@ class TestSinumVariableNumberSetup:
             await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
 
         assert any(isinstance(e, SinumPwmNumber) for e in added)
+
+
+class TestRemainingNumberCoverage:
+    def test_variable_device_property_returns_variable(self):
+        entity, _ = TestSinumVariableNumber()._make_entity(_make_variable(value=10))
+
+        assert entity._device["value"] == 10
+
+    @pytest.mark.asyncio
+    async def test_variable_set_native_value_appends_when_variable_missing(self):
+        entity, coordinator = TestSinumVariableNumber()._make_entity(_make_variable(var_id=77, value=10))
+        coordinator.variables = []
+        coordinator.client.set_variable = AsyncMock(return_value={"id": 77, "value": 22})
+
+        await entity.async_set_native_value(22.0)
+
+        assert coordinator.variables[-1] == {"id": 77, "value": 22}
+
+    @pytest.mark.asyncio
+    async def test_variable_set_native_value_raises_homeassistant_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity, coordinator = TestSinumVariableNumber()._make_entity()
+        coordinator.client.set_variable = AsyncMock(side_effect=Exception("boom"))
+
+        with pytest.raises(HomeAssistantError, match="Cannot set variable"):
+            await entity.async_set_native_value(33.0)
+
+    def test_hub_model_fallbacks(self):
+        from custom_components.sinum.number import _hub_model
+
+        assert _hub_model({"device_type": "sinum_pro"}) == "Sinum Pro"
+        assert _hub_model({"model": "Custom Hub"}) == "Custom Hub"
+        assert _hub_model({}) == "Sinum EH-01"
+        assert _hub_model("bad") == "Sinum EH-01"
+
+    @pytest.mark.asyncio
+    async def test_setup_entry_uses_cached_variables_when_endpoint_unavailable(self):
+        from custom_components.sinum.api import SinumConnectionError
+        from custom_components.sinum.number import async_setup_entry
+
+        coordinator = _make_coordinator(sbus_devices={})
+        coordinator.variables = [{"id": 5, "name": "Cached", "type": "integer", "value": 10, "min": 0, "max": 100}]
+        coordinator.client = MagicMock()
+        coordinator.client.get_variables = AsyncMock(side_effect=SinumConnectionError("missing"))
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+
+        assert any(isinstance(e, SinumVariableNumber) for e in added)

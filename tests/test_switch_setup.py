@@ -339,3 +339,57 @@ class TestSinumDhwSwitchFalsyUpdate:
         )
         await entity.async_turn_off()
         assert coordinator.virtual_devices[5]["dhw_control"]["enabled"] is False
+
+    def test_is_on_false_when_dhw_control_not_dict(self):
+        device = {"id": 5, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "Heat Pump", "dhw_control": "bad"}
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+
+        assert entity.is_on is False
+
+    def test_extra_state_attributes_empty_when_dhw_control_not_dict(self):
+        device = {"id": 5, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "Heat Pump", "dhw_control": "bad"}
+        coordinator = _make_coordinator(virtual={5: device})
+        from custom_components.sinum.switch import SinumDhwSwitch
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+
+        assert entity.extra_state_attributes == {}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_raises_homeassistant_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.sinum.switch import SinumDhwSwitch
+
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": False},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(side_effect=Exception("boom"))
+
+        with pytest.raises(HomeAssistantError, match="Cannot enable DHW"):
+            await entity.async_turn_on()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_raises_homeassistant_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.sinum.switch import SinumDhwSwitch
+
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": {"enabled": True},
+        }
+        coordinator = _make_coordinator(virtual={5: device})
+        entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
+        coordinator.client.patch_virtual_device = AsyncMock(side_effect=Exception("boom"))
+
+        with pytest.raises(HomeAssistantError, match="Cannot disable DHW"):
+            await entity.async_turn_off()
