@@ -23,6 +23,12 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.7] — 2026-06-24
+
+### Quality
+- Fixed Mypy compatibility issues in `climate.py`, `light.py`, and `switch.py` that were failing the CI `Lint` workflow.
+- Re-validated locally with: `ruff check`, `ruff format --check`, `mypy custom_components/sinum --ignore-missing-imports --no-site-packages`, and full test suite (`1220 passed`).
+
 ## [0.3.6] — 2026-06-24
 
 ### Quality

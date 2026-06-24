@@ -527,7 +527,9 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
     @property
     def hvac_action(self) -> HVACAction:
         working_state = self._device.get("working_state")
-        mapped = _WORKING_STATE_TO_ACTION.get(working_state)
+        mapped = (
+            _WORKING_STATE_TO_ACTION.get(working_state) if isinstance(working_state, str) else None
+        )
         if mapped is not None:
             return mapped
         return _state_action_from_text(str(self._device.get("state", "")), self.hvac_mode)
@@ -536,6 +538,8 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
     def fan_mode(self) -> str | None:
         relay_fan = self._device.get("fan", {}).get("relay_fan", {})
         gear = relay_fan.get("current_gear")
+        if not isinstance(gear, str):
+            return None
         return _GEAR_TO_FAN_MODE.get(gear)
 
     @property

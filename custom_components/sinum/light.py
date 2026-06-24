@@ -106,7 +106,10 @@ def _parse_hex_rgb(hex_color: str) -> tuple[float, float, float] | None:
     if len(normalized) < 6:
         return None
     try:
-        return tuple(int(normalized[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+        r = int(normalized[0:2], 16) / 255.0
+        g = int(normalized[2:4], 16) / 255.0
+        b = int(normalized[4:6], 16) / 255.0
+        return (r, g, b)
     except ValueError:
         return None
 
