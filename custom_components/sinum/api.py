@@ -342,33 +342,76 @@ class SinumClient:
             details = f"status {resp.status}"
         raise SinumConnectionError(f"Validation error for {path}: {details}")
 
-    async def _request_inner(self, method: str, path: str, **kwargs: Any) -> Any:
-        if not self._api_token and not self._jwt:
-            await self.login()
+    async def _ensure_authenticated(self) -> None:
+        if self._api_token or self._jwt:
+            return
+        await self.login()
 
-        resp = await self._do_request(method, path, **kwargs)
+    async def _retry_if_401(
+        self,
+        resp: aiohttp.ClientResponse,
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> aiohttp.ClientResponse:
+        if resp.status != 401:
+            return resp
+        return await self._handle_401(method, path, **kwargs)
 
-        if resp.status == 401:
-            resp = await self._handle_401(method, path, **kwargs)
-
+    @staticmethod
+    def _payload_for_304(resp: aiohttp.ClientResponse) -> dict[str, Any] | None:
         if resp.status == 304:
             return {}
+        return None
 
-        if resp.status == 408:
-            resp = await self._handle_408(method, path, **kwargs)
+    async def _retry_if_408(
+        self,
+        resp: aiohttp.ClientResponse,
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> aiohttp.ClientResponse:
+        if resp.status != 408:
+            return resp
+        return await self._handle_408(method, path, **kwargs)
 
-        if resp.status == 408:
-            raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
+    @staticmethod
+    def _raise_if_408(resp: aiohttp.ClientResponse, path: str) -> None:
+        if resp.status != 408:
+            return
+        raise SinumConnectionError(f"Hub internal timeout for {path} (bus may be busy)")
 
-        if resp.status == 422:
-            await self._raise_for_422(resp, path)
+    async def _raise_if_422(self, resp: aiohttp.ClientResponse, path: str) -> None:
+        if resp.status != 422:
+            return
+        await self._raise_for_422(resp, path)
 
-        if resp.status not in (200, 201, 204):
-            raise SinumConnectionError(f"API error {resp.status} for {path}")
+    @staticmethod
+    def _raise_if_unexpected_status(resp: aiohttp.ClientResponse, path: str) -> None:
+        if resp.status in (200, 201, 204):
+            return
+        raise SinumConnectionError(f"API error {resp.status} for {path}")
 
+    async def _unwrap_response_body(self, resp: aiohttp.ClientResponse, path: str) -> Any:
         body = await _read_json(resp, path)
-        # Unwrap {"data": ...} envelope present on all Sinum API responses
         return body.get("data", body) if isinstance(body, dict) else body
+
+    async def _request_inner(self, method: str, path: str, **kwargs: Any) -> Any:
+        await self._ensure_authenticated()
+
+        resp = await self._do_request(method, path, **kwargs)
+        resp = await self._retry_if_401(resp, method, path, **kwargs)
+
+        payload_304 = self._payload_for_304(resp)
+        if payload_304 is not None:
+            return payload_304
+
+        resp = await self._retry_if_408(resp, method, path, **kwargs)
+        self._raise_if_408(resp, path)
+        await self._raise_if_422(resp, path)
+        self._raise_if_unexpected_status(resp, path)
+
+        return await self._unwrap_response_body(resp, path)
 
     # ------------------------------------------------------------------ hub info
 
