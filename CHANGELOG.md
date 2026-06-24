@@ -15,6 +15,8 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ### Added
 - New `dependency-review.yml` workflow for pull requests to detect risky dependency changes.
+- Translation consistency tests (`test_translations_consistency.py`) to keep config/options/entity UI labels synchronized across `strings.json`, `en.json`, and `pl.json`.
+- Additional functional tests for WTP-specific sensor types (`co2_sensor`, `pressure_sensor`, `iaq_sensor`, `aq_sensor`) and WTP `fan_coil_v2` climate setup path.
 
 ## [0.2.6] — 2026-06-24
 

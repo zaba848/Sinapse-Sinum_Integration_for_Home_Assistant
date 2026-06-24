@@ -41,6 +41,7 @@ from custom_components.sinum.const import (
     TEMP_MIN,
     VTYPE_HEAT_PUMP_MANAGER,
     WTYPE_FAN_COIL,
+    WTYPE_FAN_COIL_V2,
 )
 
 
@@ -168,6 +169,29 @@ class TestAsyncSetupEntry:
         entry = MagicMock()
         entry.runtime_data = coordinator
         entry.entry_id = "e5"
+
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda ents, **kw: added.extend(ents))
+
+        assert len(added) == 1
+        assert isinstance(added[0], SinumFanCoilClimate)
+        assert added[0]._source == "wtp"
+
+    @pytest.mark.asyncio
+    async def test_setup_creates_wtp_fan_coil_v2(self):
+        """WTP fan_coil_v2 with climate fields → SinumFanCoilClimate (source=wtp)."""
+        device = {
+            "id": 23,
+            "type": WTYPE_FAN_COIL_V2,
+            "work_mode": "heating",
+            "target_temperature": 220,
+            "room_temperature": 198,
+        }
+        coordinator = _make_coordinator(wtp={23: device})
+
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "e5b"
 
         added = []
         await async_setup_entry(MagicMock(), entry, lambda ents, **kw: added.extend(ents))
