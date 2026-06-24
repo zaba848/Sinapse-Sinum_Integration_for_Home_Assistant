@@ -777,3 +777,174 @@ class TestSinumBusRgbLightHelpers:
         entity = self._make_wtp()
         payload = entity._wtp_color_payload()
         assert payload == {}
+
+
+class TestHexHsvEdgeCases:
+    """Cover _hex_to_hsv branches missed by existing tests (lines 68-83)."""
+
+    def test_short_hex_returns_zero(self):
+        """Line 68: len < 6 → (0, 0, 1)."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("#F")
+        assert h == 0.0 and s == 0.0 and v == 1.0
+
+    def test_invalid_hex_chars_returns_zero(self):
+        """Line 71-72: ValueError in int() → (0, 0, 1)."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("ZZZZZZ")
+        assert h == 0.0 and s == 0.0 and v == 1.0
+
+    def test_green_max_branch(self):
+        """Line 77: max_c == g → hue in 120-240 range."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("#00FF40")  # green is dominant
+        assert 100 < h < 150
+
+    def test_blue_max_branch(self):
+        """Line 80-81: max_c == b → hue in 240-360 range."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("#0040FF")  # blue is dominant
+        assert 220 < h < 260
+
+    def test_zero_saturation_when_achromatic(self):
+        """Line 83: max_c > 0 but delta == 0 → s == 0."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("#808080")  # grey
+        assert s == 0.0
+
+    def test_black_returns_zero_saturation(self):
+        """Line 83: max_c == 0 → s = 0.0."""
+        from custom_components.sinum.light import _hex_to_hsv
+
+        h, s, v = _hex_to_hsv("#000000")
+        assert s == 0.0 and v == 0.0
+
+
+class TestKelvinToHexEdgeCases:
+    """Cover _kelvin_to_hex high-temperature and very-low branches (lines 141-150)."""
+
+    def test_low_kelvin_produces_warm_color(self):
+        """t <= 66: r=255, b from log formula (t > 19)."""
+        from custom_components.sinum.light import _kelvin_to_hex
+
+        result = _kelvin_to_hex(2700)
+        assert result.startswith("#")
+        r = int(result[1:3], 16)
+        assert r == 255  # warm light is always full red
+
+    def test_high_kelvin_produces_cool_color(self):
+        """Lines 141-146: t > 66 branch — r and g computed from power law."""
+        from custom_components.sinum.light import _kelvin_to_hex
+
+        result = _kelvin_to_hex(9000)
+        assert result.startswith("#")
+        b = int(result[5:7], 16)
+        assert b == 255  # cool light has full blue (line 150: t >= 66 → b=255)
+
+    def test_very_low_kelvin_gives_zero_blue(self):
+        """Line 150 elif t <= 19: b = 0 (kelvin ≤ 1900 K)."""
+        from custom_components.sinum.light import _kelvin_to_hex
+
+        result = _kelvin_to_hex(1000)  # clamped to 1000 K → t=10 ≤ 19
+        assert result.startswith("#")
+        b = int(result[5:7], 16)
+        assert b == 0
+
+
+class TestHsToHexAllSectors:
+    """Cover _hs_to_hex mapping indices 2-5 (lines 160-175)."""
+
+    def test_hue_sector_2_cyan(self):
+        """Hue 180° → mapping[2] = (p, v, t)."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        result = _hs_to_hex(180.0, 100.0)
+        assert result.startswith("#")
+        r, g, b = int(result[1:3], 16), int(result[3:5], 16), int(result[5:7], 16)
+        assert r == 0 and b == g  # cyan: equal G and B, no red
+
+    def test_hue_sector_3_azure(self):
+        """Hue 210° → mapping[3] = (p, q, v)."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        result = _hs_to_hex(210.0, 100.0)
+        assert result.startswith("#")
+        b = int(result[5:7], 16)
+        assert b == 255  # dominant blue
+
+    def test_hue_sector_4_violet(self):
+        """Hue 270° → mapping[4] = (t, p, v)."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        result = _hs_to_hex(270.0, 100.0)
+        assert result.startswith("#")
+        b = int(result[5:7], 16)
+        assert b == 255  # violet — full blue component
+
+    def test_hue_sector_5_magenta(self):
+        """Hue 330° → mapping[5] = (v, p, q)."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        result = _hs_to_hex(330.0, 100.0)
+        assert result.startswith("#")
+        r = int(result[1:3], 16)
+        assert r == 255  # magenta — full red component
+
+    def test_hue_sector_0_red(self):
+        """Hue 0° → mapping[0] = (v, t, p) — already covered but explicit."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        assert _hs_to_hex(0.0, 100.0) == "#FF0000"
+
+    def test_hue_sector_1_yellow(self):
+        """Hue 60° → mapping[1] = (q, v, p)."""
+        from custom_components.sinum.light import _hs_to_hex
+
+        result = _hs_to_hex(60.0, 100.0)
+        r, g = int(result[1:3], 16), int(result[3:5], 16)
+        assert r == 255 and g == 255  # yellow
+
+
+class TestButtonLightSetup:
+    """Cover _add_bus_lights button-light path (lines 46-57 area)."""
+
+    @pytest.mark.asyncio
+    async def test_wtp_button_with_color_creates_entity(self):
+        from custom_components.sinum.const import WTYPE_BUTTON
+
+        wtp = {9: {"id": 9, "type": WTYPE_BUTTON, "name": "BTN", "color": "#FF0000"}}
+        coordinator = _make_coordinator(wtp=wtp)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        btns = [e for e in added if isinstance(e, SinumButtonLight)]
+        assert len(btns) == 1
+
+    @pytest.mark.asyncio
+    async def test_wtp_button_without_color_skipped(self):
+        from custom_components.sinum.const import WTYPE_BUTTON
+
+        wtp = {10: {"id": 10, "type": WTYPE_BUTTON, "name": "BTN_NOCOLOR"}}
+        coordinator = _make_coordinator(wtp=wtp)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        btns = [e for e in added if isinstance(e, SinumButtonLight)]
+        assert len(btns) == 0
+
+    @pytest.mark.asyncio
+    async def test_sbus_button_with_color_creates_entity(self):
+        from custom_components.sinum.const import STYPE_BUTTON
+
+        sbus = {11: {"id": 11, "type": STYPE_BUTTON, "name": "SBTN", "color": "#0000FF"}}
+        coordinator = _make_coordinator(sbus=sbus)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        btns = [e for e in added if isinstance(e, SinumButtonLight)]
+        assert len(btns) == 1
