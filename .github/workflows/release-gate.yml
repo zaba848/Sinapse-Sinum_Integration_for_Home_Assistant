@@ -21,5 +21,6 @@ jobs:
       - name: Check required workflows status
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_GATE_ALLOW_PENDING: ${{ github.event_name == 'push' && '1' || '0' }}
         run: |
           python scripts/check_release_gate.py

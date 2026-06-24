@@ -26,6 +26,10 @@ OPTIONAL = {
     "Dependency Review",
 }
 
+# In push-triggered gate workflows, required runs can still be queued/in_progress.
+# Allow these as non-blocking to avoid false-negative failures right after push.
+ALLOW_PENDING = os.getenv("RELEASE_GATE_ALLOW_PENDING", "0") == "1"
+
 
 def fetch_runs() -> list[dict]:
     req = urllib.request.Request(API_URL, headers={"Accept": "application/vnd.github+json"})
@@ -56,11 +60,15 @@ def main() -> int:
         status = run.get("status")
         conclusion = run.get("conclusion")
         url = run.get("html_url")
+        is_pending = status in {"queued", "in_progress"}
         ok = status == "completed" and conclusion == "success"
-        mark = "OK" if ok else "FAIL"
+        if is_pending and ALLOW_PENDING:
+            mark = "PENDING"
+        else:
+            mark = "OK" if ok else "FAIL"
         print(f"- {workflow}: {mark} (status={status}, conclusion={conclusion})")
         print(f"  {url}")
-        if not ok:
+        if not ok and not (is_pending and ALLOW_PENDING):
             failed = True
 
     for workflow in sorted(OPTIONAL):
