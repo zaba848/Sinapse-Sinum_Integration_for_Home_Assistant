@@ -44,6 +44,128 @@ from .sensor_virtual import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _add_virtual_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for device_id, device in coordinator.virtual_devices.items():
+        if device.get("type") == VTYPE_THERMOSTAT_OUTPUT_GROUP:
+            entities.append(SinumThermostatOutputGroupSensor(coordinator, device_id, entry_id))
+        for desc in VIRTUAL_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+
+
+def _add_wtp_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for device_id, device in coordinator.wtp_devices.items():
+        if device.get("type") == "temperature_regulator":
+            for desc in WTP_SENSORS:
+                if desc.source == "wtp_regulator" and desc.api_key in device:
+                    entities.append(
+                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id)
+                    )
+        for desc in WTP_SENSORS:
+            if desc.source == "wtp" and desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+        if device.get("type") == WTYPE_BUTTON:
+            entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "wtp"))
+
+
+def _add_sbus_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for device_id, device in coordinator.sbus_devices.items():
+        if device.get("type") == "temperature_regulator":
+            for desc in SBUS_REGULATOR_SENSORS:
+                if desc.api_key in device:
+                    entities.append(
+                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id)
+                    )
+        else:
+            for desc in SBUS_SENSORS:
+                if desc.api_key in device:
+                    entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+            if device.get("type") == STYPE_BUTTON:
+                entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "sbus"))
+
+
+def _add_lora_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for device_id, device in coordinator.lora_devices.items():
+        for desc in LORA_SENSORS:
+            if desc.api_key in device:
+                entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+
+
+async def _add_optional_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    try:
+        weather = await coordinator.client.get_weather()
+        for desc in WEATHER_SENSORS:
+            if desc.api_key in weather:
+                entities.append(SinumWeatherSensor(coordinator.client, weather, desc, entry_id))
+    except SinumConnectionError:
+        _LOGGER.debug("Weather endpoint not available on this hub")
+
+    try:
+        energy = await coordinator.client.get_energy()
+        for desc in ENERGY_SENSORS:
+            if desc.api_key in energy:
+                entities.append(SinumEnergySensor(coordinator.client, energy, desc, entry_id))
+    except SinumConnectionError:
+        _LOGGER.debug("Energy endpoint not available on this hub")
+
+    try:
+        energy_center = await coordinator.client.get_energy_center_summary()
+        entities.append(SinumEnergyCenterStatusSensor(coordinator.client, energy_center, entry_id))
+    except Exception:
+        _LOGGER.debug("Energy Center endpoints not available on this hub")
+
+    if coordinator.hub_info:
+        entities.append(SinumHubUptimeSensor(coordinator, entry_id))
+        wifi = coordinator.hub_info.get("wifi", {})
+        if isinstance(wifi, dict) and wifi.get("signal") is not None:
+            entities.append(SinumHubWifiSensor(coordinator, entry_id))
+
+
+def _add_schedule_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for schedule in coordinator.schedules:
+        if schedule.get("id") is None:
+            continue
+        if schedule.get("type") == "thermal":
+            entities.append(SinumScheduleTargetTempSensor(coordinator, schedule, entry_id))
+            entities.append(SinumScheduleFallbackTempSensor(coordinator, schedule, entry_id))
+        entities.append(SinumScheduleActivePeriodSensor(coordinator, schedule, entry_id))
+        entities.append(SinumScheduleAssociationCountSensor(coordinator, schedule, entry_id))
+
+
+def _add_automation_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    for automation in coordinator.automations:
+        if automation.get("id") is not None:
+            entities.append(SinumAutomationStatusSensor(coordinator, automation, entry_id))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -52,114 +174,13 @@ async def async_setup_entry(
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[SensorEntity] = []
 
-    # Virtual thermostat sensors
-    for device_id, device in coordinator.virtual_devices.items():
-        if device.get("type") == VTYPE_THERMOSTAT_OUTPUT_GROUP:
-            entities.append(
-                SinumThermostatOutputGroupSensor(coordinator, device_id, entry.entry_id)
-            )
-        for desc in VIRTUAL_SENSORS:
-            if desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
-
-    # WTP device sensors
-    for device_id, device in coordinator.wtp_devices.items():
-        # Temperature regulator sensors (Phase 7B)
-        if device.get("type") == "temperature_regulator":
-            for desc in WTP_SENSORS:
-                if desc.source == "wtp_regulator" and desc.api_key in device:
-                    entities.append(
-                        SinumTemperatureRegulatorSensor(
-                            coordinator, device_id, desc, entry.entry_id
-                        )
-                    )
-        # Generic WTP device sensors
-        for desc in WTP_SENSORS:
-            if desc.source == "wtp" and desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
-
-    # WTP button sensors
-    for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == WTYPE_BUTTON:
-            entities.append(SinumButtonSensor(coordinator, device_id, entry.entry_id, "wtp"))
-
-    # SBUS device sensors
-    for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == "temperature_regulator":
-            for desc in SBUS_REGULATOR_SENSORS:
-                if desc.api_key in device:
-                    entities.append(
-                        SinumTemperatureRegulatorSensor(
-                            coordinator, device_id, desc, entry.entry_id
-                        )
-                    )
-        else:
-            for desc in SBUS_SENSORS:
-                if desc.api_key in device:
-                    entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
-            if device.get("type") == STYPE_BUTTON:
-                entities.append(SinumButtonSensor(coordinator, device_id, entry.entry_id, "sbus"))
-
-    # LoRa device sensors
-    for device_id, device in coordinator.lora_devices.items():
-        for desc in LORA_SENSORS:
-            if desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry.entry_id))
-
-    # Weather sensors (best-effort)
-    try:
-        weather = await coordinator.client.get_weather()
-        for desc in WEATHER_SENSORS:
-            if desc.api_key in weather:
-                entities.append(
-                    SinumWeatherSensor(coordinator.client, weather, desc, entry.entry_id)
-                )
-    except SinumConnectionError:
-        _LOGGER.debug("Weather endpoint not available on this hub")
-
-    # Energy Center sensors (best-effort)
-    try:
-        energy = await coordinator.client.get_energy()
-        for desc in ENERGY_SENSORS:
-            if desc.api_key in energy:
-                entities.append(SinumEnergySensor(coordinator.client, energy, desc, entry.entry_id))
-    except SinumConnectionError:
-        _LOGGER.debug("Energy endpoint not available on this hub")
-
-    # Energy Center diagnostic endpoint coverage (best-effort)
-    try:
-        energy_center = await coordinator.client.get_energy_center_summary()
-        entities.append(
-            SinumEnergyCenterStatusSensor(coordinator.client, energy_center, entry.entry_id)
-        )
-    except Exception:
-        _LOGGER.debug("Energy Center endpoints not available on this hub")
-
-    # Hub diagnostic sensors (from /api/v1/info — always available)
-    if coordinator.hub_info:
-        entities.append(SinumHubUptimeSensor(coordinator, entry.entry_id))
-        # Wi-Fi sensor requires sinapse_api.lua Lua extension (optional)
-        wifi = coordinator.hub_info.get("wifi", {})
-        if isinstance(wifi, dict) and wifi.get("signal") is not None:
-            entities.append(SinumHubWifiSensor(coordinator, entry.entry_id))
-
-    # Schedule sensors (all schedules get active period + association count).
-    # Temperature sensors only for thermal schedules; relay/boolean schedules lack those fields.
-    for schedule in coordinator.schedules:
-        schedule_id = schedule.get("id")
-        if schedule_id is None:
-            continue
-        is_thermal = schedule.get("type") == "thermal"
-        if is_thermal:
-            entities.append(SinumScheduleTargetTempSensor(coordinator, schedule, entry.entry_id))
-            entities.append(SinumScheduleFallbackTempSensor(coordinator, schedule, entry.entry_id))
-        entities.append(SinumScheduleActivePeriodSensor(coordinator, schedule, entry.entry_id))
-        entities.append(SinumScheduleAssociationCountSensor(coordinator, schedule, entry.entry_id))
-
-    # Automation diagnostics are read-only and disabled by default in the entity registry.
-    for automation in coordinator.automations:
-        if automation.get("id") is not None:
-            entities.append(SinumAutomationStatusSensor(coordinator, automation, entry.entry_id))
+    _add_virtual_sensors(coordinator, entities, entry.entry_id)
+    _add_wtp_sensors(coordinator, entities, entry.entry_id)
+    _add_sbus_sensors(coordinator, entities, entry.entry_id)
+    _add_lora_sensors(coordinator, entities, entry.entry_id)
+    await _add_optional_sensors(coordinator, entities, entry.entry_id)
+    _add_schedule_sensors(coordinator, entities, entry.entry_id)
+    _add_automation_sensors(coordinator, entities, entry.entry_id)
 
     async_add_entities(entities)
 

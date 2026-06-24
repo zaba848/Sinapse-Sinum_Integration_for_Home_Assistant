@@ -46,33 +46,19 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
 
-    async def _async_update_data(self) -> dict[str, Any]:
-        # ── Group 1: metadata — all fetched in parallel ───────────────────────
-        (
-            hub_info,
-            rooms,
-            lua_info,
-            floors_list,
-            parent_devices,
-            scenes,
-            schedules,
-            automations,
-            variables,
-        ) = await asyncio.gather(
-            _safe_fetch(self.client.get_hub_info, "hub info"),
-            _safe_fetch(self.client.get_rooms, "rooms", default=[]),
-            _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
-            _safe_fetch(self.client.get_floors, "floors", default=[]),
-            _safe_fetch(
-                self.client.get_parent_devices, "parent devices", default=self.parent_devices
-            ),
-            _safe_fetch(self.client.get_scenes, "scenes", default=self.scenes),
-            _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
-            _safe_fetch(self.client.get_automations, "automations", default=self.automations),
-            _safe_fetch(self.client.get_variables, "variables", default=self.variables),
-        )
-
-        # Apply metadata results (fall back to cache on None/failure)
+    def _apply_metadata_results(
+        self,
+        hub_info: Any,
+        lua_info: Any,
+        rooms: Any,
+        floors_list: Any,
+        parent_devices: Any,
+        scenes: Any,
+        schedules: Any,
+        automations: Any,
+        variables: Any,
+    ) -> list[dict[str, Any]]:
+        """Apply parallel metadata fetch results; returns effective rooms list."""
         if hub_info is not None:
             self.hub_info = hub_info
         elif not self.hub_info:
@@ -82,20 +68,36 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if rooms is not None:
             self.rooms = rooms
-        rooms = self.rooms  # use cached if fetch failed
 
         if floors_list is not None:
             self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
-        if parent_devices is not None:
-            self.parent_devices = parent_devices
-        if scenes is not None:
-            self.scenes = scenes
-        if schedules is not None:
-            self.schedules = schedules
-        if automations is not None:
-            self.automations = automations
-        if variables is not None:
-            self.variables = variables
+
+        for attr, value in (
+            ("parent_devices", parent_devices),
+            ("scenes", scenes),
+            ("schedules", schedules),
+            ("automations", automations),
+            ("variables", variables),
+        ):
+            if value is not None:
+                setattr(self, attr, value)
+
+        return self.rooms
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        # ── Group 1: metadata — all fetched in parallel ───────────────────────
+        meta = await asyncio.gather(
+            _safe_fetch(self.client.get_hub_info, "hub info"),
+            _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
+            _safe_fetch(self.client.get_rooms, "rooms", default=[]),
+            _safe_fetch(self.client.get_floors, "floors", default=[]),
+            _safe_fetch(self.client.get_parent_devices, "parent devices", default=self.parent_devices),
+            _safe_fetch(self.client.get_scenes, "scenes", default=self.scenes),
+            _safe_fetch(self.client.get_schedules, "schedules", default=self.schedules),
+            _safe_fetch(self.client.get_automations, "automations", default=self.automations),
+            _safe_fetch(self.client.get_variables, "variables", default=self.variables),
+        )
+        rooms = self._apply_metadata_results(*meta)
 
         # ── Classify device IDs from rooms and parent-device trees ────────────
         room_ids = _collect_device_ids(rooms)
@@ -110,36 +112,20 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # ── Group 2: device collections — all fetched in parallel ─────────────
         virtual, wtp, sbus, lora, alarm_list = await asyncio.gather(
             self._fetch_device_collection(
-                "virtual",
-                self.client.get_virtual_devices,
-                self.client.get_virtual_device,
-                virtual_ids,
-                rooms,
-                self.virtual_devices,
+                "virtual", self.client.get_virtual_devices, self.client.get_virtual_device,
+                virtual_ids, rooms, self.virtual_devices,
             ),
             self._fetch_device_collection(
-                "WTP",
-                self.client.get_wtp_devices,
-                self.client.get_wtp_device,
-                wtp_ids,
-                rooms,
-                self.wtp_devices,
+                "WTP", self.client.get_wtp_devices, self.client.get_wtp_device,
+                wtp_ids, rooms, self.wtp_devices,
             ),
             self._fetch_device_collection(
-                "SBUS",
-                self.client.get_sbus_devices,
-                self.client.get_sbus_device,
-                sbus_ids,
-                rooms,
-                self.sbus_devices,
+                "SBUS", self.client.get_sbus_devices, self.client.get_sbus_device,
+                sbus_ids, rooms, self.sbus_devices,
             ),
             self._fetch_device_collection(
-                "LoRa",
-                self.client.get_lora_devices,
-                self.client.get_lora_device,
-                lora_ids,
-                rooms,
-                self.lora_devices,
+                "LoRa", self.client.get_lora_devices, self.client.get_lora_device,
+                lora_ids, rooms, self.lora_devices,
             ),
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
         )
