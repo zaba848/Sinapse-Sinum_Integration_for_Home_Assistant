@@ -12,6 +12,9 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # HACS store validation requires a public GitHub repository.
+    # Skip on private repos — the check will pass automatically once the repo is made public.
+    if: github.event.repository.private == false || github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@v4
       - uses: hacs/action@main
