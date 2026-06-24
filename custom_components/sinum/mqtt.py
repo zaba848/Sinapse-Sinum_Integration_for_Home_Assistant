@@ -77,47 +77,43 @@ class SinumMqttBridge:
         self._unsub.clear()
         _LOGGER.debug("Sinapse MQTT bridge stopped")
 
-    @callback
-    def _handle_state(self, msg: mqtt.ReceiveMessage) -> None:
-        """Handle <topic_prefix>/state/<device_id> messages."""
+    def _state_device_id(self, topic: str) -> int | None:
         state_prefix = f"{self._topic_prefix}/state/"
-        if not msg.topic.startswith(state_prefix):
+        if not topic.startswith(state_prefix):
             _LOGGER.debug(
-                "Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, msg.topic
+                "Ignoring MQTT state outside prefix %s: %s", self._topic_prefix, topic
             )
-            return
-
+            return None
         try:
-            device_id = int(msg.topic.removeprefix(state_prefix).split("/")[-1])
+            return int(topic.removeprefix(state_prefix).split("/")[-1])
         except ValueError:
-            _LOGGER.debug("Unexpected state topic: %s", msg.topic)
-            return
+            _LOGGER.debug("Unexpected state topic: %s", topic)
+            return None
 
+    def _state_payload(self, msg: mqtt.ReceiveMessage) -> dict[str, Any] | None:
         try:
-            payload: dict[str, Any] = json.loads(msg.payload)
+            return json.loads(msg.payload)
         except json.JSONDecodeError:
             _LOGGER.warning("Invalid JSON on %s: %s", msg.topic, msg.payload)
-            return
+            return None
 
-        source = payload.get("source", "virtual")
+    def _store_for_source(self, source: str) -> dict[int, dict[str, Any]] | None:
         stores = {
             "virtual": self._coordinator.virtual_devices,
             "wtp": self._coordinator.wtp_devices,
             "sbus": self._coordinator.sbus_devices,
             "lora": self._coordinator.lora_devices,
         }
-        store = stores.get(source)
-        if store is None:
-            _LOGGER.debug("Ignoring MQTT state for unsupported source %s: %s", source, payload)
-            return
+        return stores.get(source)
 
+    def _apply_state_update(self, store: dict[int, dict[str, Any]], device_id: int, payload: dict[str, Any]) -> None:
         if device_id in store:
             store[device_id].update(payload)
-        else:
-            payload["_id"] = device_id
-            store[device_id] = payload
+            return
+        payload["_id"] = device_id
+        store[device_id] = payload
 
-        # Push entity refresh without a full coordinator poll
+    def _publish_coordinator_data(self) -> None:
         self._coordinator.async_set_updated_data(
             {
                 "virtual": self._coordinator.virtual_devices,
@@ -126,6 +122,28 @@ class SinumMqttBridge:
                 "lora": self._coordinator.lora_devices,
             }
         )
+
+    @callback
+    def _handle_state(self, msg: mqtt.ReceiveMessage) -> None:
+        """Handle <topic_prefix>/state/<device_id> messages."""
+        device_id = self._state_device_id(msg.topic)
+        if device_id is None:
+            return
+
+        payload = self._state_payload(msg)
+        if payload is None:
+            return
+
+        source = payload.get("source", "virtual")
+        store = self._store_for_source(source)
+        if store is None:
+            _LOGGER.debug("Ignoring MQTT state for unsupported source %s: %s", source, payload)
+            return
+
+        self._apply_state_update(store, device_id, payload)
+
+        # Push entity refresh without a full coordinator poll
+        self._publish_coordinator_data()
         _LOGGER.debug("MQTT state update: device %s → %s", device_id, payload)
 
     @callback
