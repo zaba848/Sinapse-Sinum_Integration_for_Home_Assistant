@@ -299,3 +299,193 @@ class TestReauthFlow:
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "invalid_auth"
+
+
+class TestReconfigureFlow:
+    """Tests for async_step_reconfigure (change host/creds without reinstall)."""
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_shows_form_prefilled(self, hass, mock_aiohttp_session):
+        """Step reconfigure shows form pre-filled with current host and auth_mode."""
+        from custom_components.sinum.config_flow import SinumConfigFlow
+
+        flow = SinumConfigFlow()
+        flow.hass = hass
+        flow.context = {}
+
+        mock_entry = MagicMock()
+        mock_entry.data = {
+            "host": "10.0.61.132",
+            CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+            CONF_API_TOKEN: "old_token",
+        }
+        flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+
+        result = await flow.async_step_reconfigure(None)
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "reconfigure"
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_token_success(self, hass, mock_aiohttp_session):
+        """Reconfigure with token → updates entry data and reloads."""
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.get_hub_info = AsyncMock(return_value={"name": "tablica-new"})
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+
+            mock_entry = MagicMock()
+            mock_entry.data = {
+                "host": "10.0.61.132",
+                CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+                CONF_API_TOKEN: "old_token",
+            }
+            flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+            flow.async_update_reload_and_abort = MagicMock(
+                return_value={"type": "abort", "reason": "reconfigure_successful"}
+            )
+
+            # Step 1: reconfigure form
+            await flow.async_step_reconfigure(None)
+            # Step 2: submit new host + auth_mode
+            await flow.async_step_reconfigure(
+                {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+            )
+            # Step 3: submit token credentials
+            result = await flow.async_step_token(
+                {CONF_API_TOKEN: "new_token", "scan_interval": 30}
+            )
+
+        assert result["type"] == "abort"
+        flow.async_update_reload_and_abort.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_password_success(self, hass, mock_aiohttp_session):
+        """Reconfigure with password → updates entry data."""
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.login = AsyncMock(return_value=None)
+            client.get_hub_info = AsyncMock(return_value={"name": "hub"})
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+
+            mock_entry = MagicMock()
+            mock_entry.data = {
+                "host": "10.0.61.132",
+                CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
+                "username": "admin",
+                "password": "old",
+            }
+            flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+            flow.async_update_reload_and_abort = MagicMock(
+                return_value={"type": "abort", "reason": "reconfigure_successful"}
+            )
+
+            await flow.async_step_reconfigure(None)
+            await flow.async_step_reconfigure(
+                {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_PASSWORD}
+            )
+            result = await flow.async_step_password(
+                {"username": "admin", "password": "new_pass", "scan_interval": 30}
+            )
+
+        assert result["type"] == "abort"
+        flow.async_update_reload_and_abort.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_connection_error(self, hass, mock_aiohttp_session):
+        """Reconfigure with unreachable host → shows form with cannot_connect error."""
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.get_hub_info = AsyncMock(side_effect=SinumConnectionError("timeout"))
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+
+            mock_entry = MagicMock()
+            mock_entry.data = {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+            flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+
+            await flow.async_step_reconfigure(None)
+            await flow.async_step_reconfigure(
+                {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+            )
+            result = await flow.async_step_token(
+                {CONF_API_TOKEN: "tok", "scan_interval": 30}
+            )
+
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "cannot_connect"
+
+
+class TestMigrateEntry:
+    """Tests for async_migrate_entry."""
+
+    @pytest.mark.asyncio
+    async def test_migrate_backfills_auth_mode(self, hass):
+        """Entries missing auth_mode get AUTH_MODE_TOKEN backfilled."""
+        from custom_components.sinum import async_migrate_entry
+
+        mock_entry = MagicMock()
+        mock_entry.version = 1
+        mock_entry.data = {"host": "10.0.61.132", "api_token": "tok"}
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_update_entry = MagicMock()
+
+        result = await async_migrate_entry(hass, mock_entry)
+
+        assert result is True
+        hass.config_entries.async_update_entry.assert_called_once()
+        call_kwargs = hass.config_entries.async_update_entry.call_args[1]
+        assert call_kwargs["data"][CONF_AUTH_MODE] == AUTH_MODE_TOKEN
+
+    @pytest.mark.asyncio
+    async def test_migrate_skips_if_auth_mode_present(self, hass):
+        """Entries that already have auth_mode are not modified."""
+        from custom_components.sinum import async_migrate_entry
+
+        mock_entry = MagicMock()
+        mock_entry.version = 1
+        mock_entry.data = {
+            "host": "10.0.61.132",
+            CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
+            "username": "admin",
+            "password": "pass",
+        }
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_update_entry = MagicMock()
+
+        result = await async_migrate_entry(hass, mock_entry)
+
+        assert result is True
+        hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_migrate_rejects_unknown_version(self, hass):
+        """Entries with version > 1 cannot be migrated — returns False."""
+        from custom_components.sinum import async_migrate_entry
+
+        mock_entry = MagicMock()
+        mock_entry.version = 99
+        mock_entry.data = {}
+
+        result = await async_migrate_entry(hass, mock_entry)
+
+        assert result is False
