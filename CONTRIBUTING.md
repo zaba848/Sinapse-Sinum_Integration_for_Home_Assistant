@@ -42,3 +42,11 @@ python3 -m pytest tests/ --cov=custom_components/sinum --cov-fail-under=80 -q
 - All tests must pass
 - Coverage must not drop below 80%
 - Update `CHANGELOG.md` under `## [Unreleased]`
+
+## Legal and Compliance Rules
+
+- Do not describe this integration as official or authorized by TECH Sterowniki.
+- Do not add code or assets that bypass authentication, licensing, encryption, or access controls.
+- Avoid using third-party logos/brand assets unless you have explicit rights to distribute them.
+- Only contribute code that uses available Sinum hub APIs for user-owned installations.
+- By submitting a contribution, you confirm you have the right to contribute the code/assets.

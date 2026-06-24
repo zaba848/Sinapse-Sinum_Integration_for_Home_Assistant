@@ -11,6 +11,16 @@
 
 ---
 
+## Legal Notice
+
+- This is an unofficial community project and is not affiliated with, authorized by, endorsed by, or maintained by TECH Sterowniki.
+- "TECH", "Sinum" and related names/logos may be trademarks of their respective owners.
+- This integration uses documented/available hub APIs to read and control devices in the user's own installation.
+- Users are responsible for ensuring their use complies with local law, vendor terms, and network/security policies.
+- The software is provided as-is; see [LICENSE](LICENSE) for warranty and liability limitations.
+
+---
+
 ## Table of Contents
 
 - [How It Works](#how-it-works)
