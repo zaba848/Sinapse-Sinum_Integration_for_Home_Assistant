@@ -57,6 +57,10 @@ def _add_virtual_sensors(
                 entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
 
 
+_WTP_REGULATOR_SENSORS = tuple(d for d in WTP_SENSORS if d.source == "wtp_regulator")
+_WTP_NORMAL_SENSORS = tuple(d for d in WTP_SENSORS if d.source == "wtp")
+
+
 def _add_wtp_sensors(
     coordinator: SinumCoordinator,
     entities: list[SensorEntity],
@@ -64,13 +68,13 @@ def _add_wtp_sensors(
 ) -> None:
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") == "temperature_regulator":
-            for desc in WTP_SENSORS:
-                if desc.source == "wtp_regulator" and desc.api_key in device:
+            for desc in _WTP_REGULATOR_SENSORS:
+                if desc.api_key in device:
                     entities.append(
                         SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id)
                     )
-        for desc in WTP_SENSORS:
-            if desc.source == "wtp" and desc.api_key in device:
+        for desc in _WTP_NORMAL_SENSORS:
+            if desc.api_key in device:
                 entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
         if device.get("type") == WTYPE_BUTTON:
             entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "wtp"))
@@ -107,11 +111,7 @@ def _add_lora_sensors(
                 entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
 
 
-async def _add_optional_sensors(
-    coordinator: SinumCoordinator,
-    entities: list[SensorEntity],
-    entry_id: str,
-) -> None:
+async def _try_add_weather_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
     try:
         weather = await coordinator.client.get_weather()
         for desc in WEATHER_SENSORS:
@@ -120,6 +120,8 @@ async def _add_optional_sensors(
     except SinumConnectionError:
         _LOGGER.debug("Weather endpoint not available on this hub")
 
+
+async def _try_add_energy_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
     try:
         energy = await coordinator.client.get_energy()
         for desc in ENERGY_SENSORS:
@@ -128,17 +130,33 @@ async def _add_optional_sensors(
     except SinumConnectionError:
         _LOGGER.debug("Energy endpoint not available on this hub")
 
+
+async def _try_add_energy_center_sensor(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
     try:
-        energy_center = await coordinator.client.get_energy_center_summary()
-        entities.append(SinumEnergyCenterStatusSensor(coordinator.client, energy_center, entry_id))
+        ec = await coordinator.client.get_energy_center_summary()
+        entities.append(SinumEnergyCenterStatusSensor(coordinator.client, ec, entry_id))
     except Exception:
         _LOGGER.debug("Energy Center endpoints not available on this hub")
 
-    if coordinator.hub_info:
-        entities.append(SinumHubUptimeSensor(coordinator, entry_id))
-        wifi = coordinator.hub_info.get("wifi", {})
-        if isinstance(wifi, dict) and wifi.get("signal") is not None:
-            entities.append(SinumHubWifiSensor(coordinator, entry_id))
+
+def _add_hub_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
+    if not coordinator.hub_info:
+        return
+    entities.append(SinumHubUptimeSensor(coordinator, entry_id))
+    wifi = coordinator.hub_info.get("wifi", {})
+    if isinstance(wifi, dict) and wifi.get("signal") is not None:
+        entities.append(SinumHubWifiSensor(coordinator, entry_id))
+
+
+async def _add_optional_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+) -> None:
+    await _try_add_weather_sensors(coordinator, entities, entry_id)
+    await _try_add_energy_sensors(coordinator, entities, entry_id)
+    await _try_add_energy_center_sensor(coordinator, entities, entry_id)
+    _add_hub_sensors(coordinator, entities, entry_id)
 
 
 def _add_schedule_sensors(
