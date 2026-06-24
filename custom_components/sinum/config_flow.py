@@ -62,6 +62,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     def __init__(self) -> None:
         self._host: str = ""
         self._auth_mode: str = AUTH_MODE_TOKEN
+        self._reconfigure: bool = False
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -159,6 +160,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     async def _create_entry(
         self, data: dict[str, Any], hub_name: str | None = None
     ) -> ConfigFlowResult:
+        if self._reconfigure:
+            entry = self._get_reconfigure_entry()
+            return self.async_update_reload_and_abort(entry, data={**entry.data, **data})
         unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
@@ -168,6 +172,40 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     def _make_client(self, **kwargs: Any) -> SinumClient:
         session = async_get_clientsession(self.hass, verify_ssl=False)
         return SinumClient(self._host, session, **kwargs)
+
+    # ------------------------------------------------------------ reconfigure
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Allow changing host and credentials without removing the integration."""
+        self._reconfigure = True
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._host = user_input[CONF_HOST].strip()
+            self._auth_mode = user_input[CONF_AUTH_MODE]
+            if self._auth_mode == AUTH_MODE_TOKEN:
+                return await self.async_step_token()
+            return await self.async_step_password()
+        self._host = entry.data.get(CONF_HOST, "")
+        self._auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_TOKEN)
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_HOST, default=self._host): str,
+                    vol.Required(CONF_AUTH_MODE, default=self._auth_mode): vol.In(
+                        [AUTH_MODE_TOKEN, AUTH_MODE_PASSWORD]
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "token_mode": AUTH_MODE_TOKEN,
+                "password_mode": AUTH_MODE_PASSWORD,
+            },
+        )
 
     # ----------------------------------------------------------------- reauth
 
