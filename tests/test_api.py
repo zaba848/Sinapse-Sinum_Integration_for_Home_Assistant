@@ -104,6 +104,10 @@ class TestTokenAuth:
         client = SinumClient("192.168.1.1", session, api_token="tok")
         assert client.base_url == "http://192.168.1.1"
 
+    def test_unwrap_data_returns_empty_dict_for_non_dict_body(self, session):
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        assert client._unwrap_data("not-a-dict") == {}
+
 
 class TestApiRequests:
     @pytest.mark.asyncio

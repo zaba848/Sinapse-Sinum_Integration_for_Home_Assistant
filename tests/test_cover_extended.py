@@ -550,6 +550,26 @@ class TestCoverAsyncSetupEntry:
         assert "SinumWtpBlindCover" in types
         assert "SinumSbusBlindCover" in types
 
+    @pytest.mark.asyncio
+    async def test_setup_skips_non_blind_bus_devices(self):
+        coord = _make_coordinator(
+            virtual_devices={1: {"id": 1, "type": VTYPE_GATE}},
+            wtp_devices={3: {"id": 3, "type": "relay"}},
+            sbus_devices={4: {"id": 4, "type": "temperature_sensor"}},
+        )
+        entry = MagicMock()
+        entry.runtime_data = coord
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(MagicMock(), entry, lambda entities: added.extend(entities))
+
+        types = {type(e).__name__ for e in added}
+        assert "SinumGateCover" in types
+        assert "SinumWtpBlindCover" not in types
+        assert "SinumSbusBlindCover" not in types
+
 
 class TestRestorePaths:
     """Cover async_added_to_hass restore paths for all cover entity types."""

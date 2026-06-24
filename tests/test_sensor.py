@@ -171,6 +171,9 @@ class TestPhase7BTemperatureRegulators:
         attrs = entity.extra_state_attributes
         assert len(attrs) == 0  # No mode, parent_id, etc. in partial device
 
+    def test_target_temperature_mode_passthrough_for_non_dict(self):
+        assert SinumTemperatureRegulatorSensor._target_temperature_mode("constant") == "constant"
+
 
 class TestCountItems:
     """Lines 292, 294-298, 301: _count_items helper edge cases."""

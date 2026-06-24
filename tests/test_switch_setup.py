@@ -21,6 +21,7 @@ from custom_components.sinum.switch import (
     SinumDhwSwitch,
     SinumRelaySwitch,
     SinumWicketSwitch,
+    _bus_switch_entity,
     async_setup_entry,
 )
 
@@ -30,6 +31,7 @@ def _make_coordinator(*, virtual=None, wtp=None, sbus=None):
     c.virtual_devices = virtual or {}
     c.wtp_devices = wtp or {}
     c.sbus_devices = sbus or {}
+    c.lora_devices = {}
     c.client = MagicMock()
     c.client.patch_virtual_device = AsyncMock(return_value={})
     c.client.patch_wtp_device = AsyncMock(return_value={})
@@ -154,6 +156,15 @@ class TestAsyncSetupEntry:
         assert any(isinstance(e, SinumBusRelaySwitch) for e in added)
 
     @pytest.mark.asyncio
+    async def test_wtp_non_relay_is_skipped(self):
+        wtp = {11: {"id": 11, "type": "temperature_sensor", "name": "WTP Temp"}}
+        coordinator = _make_coordinator(wtp=wtp)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        assert not any(isinstance(e, SinumBusRelaySwitch) and e._bus == "wtp" for e in added)
+
+    @pytest.mark.asyncio
     async def test_sbus_valve_pump_not_in_switch_setup(self):
         # valve_pump is hub-managed (read-only state) — lives in binary_sensor, not switch
         sbus = {21: {"id": 21, "type": STYPE_VALVE_PUMP, "name": "Pump", "state": False}}
@@ -180,6 +191,31 @@ class TestAsyncSetupEntry:
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         assert len(added) == 0
+
+    @pytest.mark.asyncio
+    async def test_virtual_device_without_string_type_is_skipped(self):
+        virtual = {101: {"id": 101, "type": None, "name": "Bad"}}
+        coordinator = _make_coordinator(virtual=virtual)
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        assert added == []
+
+    @pytest.mark.asyncio
+    async def test_lora_non_relay_is_skipped(self):
+        coordinator = _make_coordinator()
+        coordinator.lora_devices = {30: {"id": 30, "type": "temperature_sensor", "name": "T"}}
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        assert not any(isinstance(e, SinumBusRelaySwitch) and e._bus == "lora" for e in added)
+
+    def test_bus_switch_entity_returns_none_for_unknown_bus(self):
+        coordinator = _make_coordinator()
+        assert (
+            _bus_switch_entity(coordinator, 1, "test_entry", "unknown", {"type": WTYPE_RELAY})
+            is None
+        )
 
 
 class TestSinumRelaySwitch:
@@ -426,3 +462,13 @@ class TestSinumDhwSwitchFalsyUpdate:
 
         with pytest.raises(HomeAssistantError, match="Cannot disable DHW"):
             await entity.async_turn_off()
+
+    def test_copy_helpers_skip_missing_source_keys(self):
+        attrs: dict[str, object] = {}
+
+        SinumDhwSwitch._copy_decoded_temperature(
+            attrs, {}, "target_temperature", "dhw_target_temperature", lambda v: v
+        )
+        SinumDhwSwitch._copy_if_present(attrs, {}, "state", "dhw_state")
+
+        assert attrs == {}
