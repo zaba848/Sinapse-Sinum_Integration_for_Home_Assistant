@@ -1,7 +1,7 @@
 {
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "documentation": "https://github.com/zaba848/Sinum_HomeAsistant_connector",
   "issue_tracker": "https://github.com/zaba848/Sinum_HomeAsistant_connector/issues",
   "homeassistant": "2024.1.0",
@@ -9,5 +9,6 @@
   "dependencies": [],
   "codeowners": ["@zaba848"],
   "config_flow": true,
-  "iot_class": "local_polling"
+  "iot_class": "local_polling",
+  "quality_scale": "silver"
 }
