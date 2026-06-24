@@ -3,16 +3,20 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.cover import (
+    ATTR_CURRENT_POSITION,
+    ATTR_CURRENT_TILT_POSITION,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
@@ -73,7 +77,9 @@ def _device_info(
     )
 
 
-class SinumBlindCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumBlindCover(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity, RestoreEntity
+):
     """Blind controller integrator — position 0 (closed) – 100 (open), optional tilt."""
 
     _attr_has_entity_name = True
@@ -95,16 +101,42 @@ class SinumBlindCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
             coordinator, device_id, entry_id, "Sinum Blind Controller"
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
+            self._attr_current_cover_position = int(v)
+        if (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
+            self._attr_current_cover_tilt_position = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
 
     @property
-    def is_closed(self) -> bool | None:
+    def current_cover_position(self) -> int | None:
         pos = self._device.get("last_set_target_opening")
+        if pos is not None:
+            return int(pos)
+        return self._attr_current_cover_position
+
+    @property
+    def current_cover_tilt_position(self) -> int | None:
+        tilt = self._device.get("last_set_target_tilt")
+        if tilt is not None:
+            return int(tilt)
+        return self._attr_current_cover_tilt_position
+
+    @property
+    def is_closed(self) -> bool | None:
+        pos = self.current_cover_position
         if pos is None:
             return None
-        return int(pos) == 0
+        return pos == 0
 
     @property
     def is_opening(self) -> bool:
@@ -113,16 +145,6 @@ class SinumBlindCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
     @property
     def is_closing(self) -> bool:
         return bool(self._device.get("action_in_progress")) and bool(self.is_closed)
-
-    @property
-    def current_cover_position(self) -> int | None:
-        pos = self._device.get("last_set_target_opening")
-        return int(pos) if pos is not None else None
-
-    @property
-    def current_cover_tilt_position(self) -> int | None:
-        tilt = self._device.get("last_set_target_tilt")
-        return int(tilt) if tilt is not None else None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         try:
@@ -177,7 +199,9 @@ class SinumBlindCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
         self.async_write_ha_state()
 
 
-class SinumGateCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumGateCover(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity, RestoreEntity
+):
     """Gate controller — open/close/stop."""
 
     _attr_has_entity_name = True
@@ -190,8 +214,18 @@ class SinumGateCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
+        self._restored_closed: bool | None = None
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
         self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Gate")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        self._restored_closed = last.state == GATE_STATE_CLOSED
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -200,9 +234,9 @@ class SinumGateCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
     @property
     def is_closed(self) -> bool | None:
         state = self._device.get("state")
-        if state is None:
-            return None
-        return state == GATE_STATE_CLOSED
+        if state is not None:
+            return state == GATE_STATE_CLOSED
+        return self._restored_closed
 
     @property
     def is_opening(self) -> bool:
@@ -246,7 +280,7 @@ class SinumGateCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
 
 
 class SinumWtpBlindCover(
-    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity, RestoreEntity
 ):
     """WTP blind_controller — position 0 (closed) – 100 (open), no tilt."""
 
@@ -275,16 +309,33 @@ class SinumWtpBlindCover(
             via_device=via_device_for(device, entry_id),
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
+            self._attr_current_cover_position = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.wtp_devices.get(self._device_id, {})
 
     @property
-    def is_closed(self) -> bool | None:
+    def current_cover_position(self) -> int | None:
         pos = self._device.get("current_opening")
+        if pos is not None:
+            return int(pos)
+        return self._attr_current_cover_position
+
+    @property
+    def is_closed(self) -> bool | None:
+        pos = self.current_cover_position
         if pos is None:
             return None
-        return int(pos) == 0
+        return pos == 0
 
     @property
     def is_opening(self) -> bool:
@@ -309,11 +360,6 @@ class SinumWtpBlindCover(
             return bool(d.get("action_in_progress")) and int(target) < int(current)
         except (TypeError, ValueError):
             return False
-
-    @property
-    def current_cover_position(self) -> int | None:
-        pos = self._device.get("current_opening")
-        return int(pos) if pos is not None else None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         try:
@@ -358,7 +404,7 @@ class SinumWtpBlindCover(
 
 
 class SinumSbusBlindCover(
-    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity, RestoreEntity
 ):
     """SBUS blind_controller — position + tilt (venetian blinds)."""
 
@@ -389,16 +435,42 @@ class SinumSbusBlindCover(
             via_device=via_device_for(device, entry_id),
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
+            self._attr_current_cover_position = int(v)
+        if (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
+            self._attr_current_cover_tilt_position = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.sbus_devices.get(self._device_id, {})
 
     @property
-    def is_closed(self) -> bool | None:
+    def current_cover_position(self) -> int | None:
         pos = self._device.get("current_opening")
+        if pos is not None:
+            return int(pos)
+        return self._attr_current_cover_position
+
+    @property
+    def current_cover_tilt_position(self) -> int | None:
+        tilt = self._device.get("current_tilt")
+        if tilt is not None:
+            return int(tilt)
+        return self._attr_current_cover_tilt_position
+
+    @property
+    def is_closed(self) -> bool | None:
+        pos = self.current_cover_position
         if pos is None:
             return None
-        return int(pos) == 0
+        return pos == 0
 
     @property
     def is_opening(self) -> bool:
@@ -423,16 +495,6 @@ class SinumSbusBlindCover(
             return int(target) < int(current)
         except (TypeError, ValueError):
             return False
-
-    @property
-    def current_cover_position(self) -> int | None:
-        pos = self._device.get("current_opening")
-        return int(pos) if pos is not None else None
-
-    @property
-    def current_cover_tilt_position(self) -> int | None:
-        tilt = self._device.get("current_tilt")
-        return int(tilt) if tilt is not None else None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         try:

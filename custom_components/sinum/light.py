@@ -11,11 +11,12 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.const import EntityCategory
+from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
@@ -191,7 +192,9 @@ def _color_mode(device: dict[str, Any]) -> ColorMode:
     return ColorMode.BRIGHTNESS
 
 
-class SinumDimmerLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumDimmerLight(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
+):
     """Dimmer/RGB controller integrator."""
 
     _attr_has_entity_name = True
@@ -213,6 +216,17 @@ class SinumDimmerLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
             suggested_area=device.get("_area") or None,
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        self._attr_is_on = last.state == STATE_ON
+        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
+            self._attr_brightness = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
@@ -227,14 +241,16 @@ class SinumDimmerLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
 
     @property
     def is_on(self) -> bool:
-        return bool(self._device.get("state"))
+        if self._device:
+            return bool(self._device.get("state"))
+        return bool(self._attr_is_on)
 
     @property
     def brightness(self) -> int | None:
         raw = self._device.get("brightness")
-        if raw is None:
-            return None
-        return round(raw / 100 * 255)
+        if raw is not None:
+            return round(raw / 100 * 255)
+        return self._attr_brightness
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
@@ -283,7 +299,7 @@ class SinumDimmerLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
 
 
 class SinumBusDimmerLight(
-    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
 ):
     """SBUS or WTP dimmer — uses target_level (0-100) for brightness."""
 
@@ -313,6 +329,17 @@ class SinumBusDimmerLight(
             via_device=via_device_for(device, entry_id),
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        self._attr_is_on = last.state == STATE_ON
+        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
+            self._attr_brightness = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         store = (
@@ -322,14 +349,16 @@ class SinumBusDimmerLight(
 
     @property
     def is_on(self) -> bool:
-        return bool(self._device.get("state"))
+        if self._device:
+            return bool(self._device.get("state"))
+        return bool(self._attr_is_on)
 
     @property
     def brightness(self) -> int | None:
         raw = self._device.get("target_level")
-        if raw is None:
-            return None
-        return round(raw / 100 * 255)
+        if raw is not None:
+            return round(raw / 100 * 255)
+        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         payload: dict[str, Any] = {"state": True}
@@ -363,7 +392,9 @@ class SinumBusDimmerLight(
         self.async_write_ha_state()
 
 
-class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumBusRgbLight(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
+):
     """SBUS or WTP rgb_controller.
 
     SBUS devices are controlled via Lua scenes (set_color / set_brightness /
@@ -399,6 +430,17 @@ class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
             via_device=via_device_for(device, entry_id),
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        self._attr_is_on = last.state == STATE_ON
+        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
+            self._attr_brightness = int(v)
+
     @property
     def _device(self) -> dict[str, Any]:
         store = (
@@ -408,7 +450,9 @@ class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
 
     @property
     def is_on(self) -> bool:
-        return bool(self._device.get("state"))
+        if self._device:
+            return bool(self._device.get("state"))
+        return bool(self._attr_is_on)
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
@@ -421,9 +465,9 @@ class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
     @property
     def brightness(self) -> int | None:
         raw = self._device.get("brightness")
-        if raw is None:
-            return None
-        return round(raw / 100 * 255)
+        if raw is not None:
+            return round(raw / 100 * 255)
+        return self._attr_brightness
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
@@ -573,7 +617,9 @@ class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
         self.async_write_ha_state()
 
 
-class SinumButtonLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumButtonLight(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
+):
     """Button panel backlight — controls the physical LED color via the 'color' field."""
 
     _attr_has_entity_name = True
@@ -601,6 +647,18 @@ class SinumButtonLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),
         )
+        self._restored_color: str | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._device:
+            return
+        last = await self.async_get_last_state()
+        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+        self._attr_is_on = last.state == STATE_ON
+        if last.attributes.get(ATTR_HS_COLOR):
+            self._attr_hs_color = tuple(last.attributes[ATTR_HS_COLOR])  # type: ignore[assignment]
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -611,15 +669,18 @@ class SinumButtonLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
 
     @property
     def is_on(self) -> bool:
-        color = self._device.get("color", "#000000")
-        return color.lstrip("#").lower() not in ("000000", "")
+        d = self._device
+        if d:
+            color = d.get("color", "#000000")
+            return color.lstrip("#").lower() not in ("000000", "")
+        return bool(self._attr_is_on)
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
         color = self._device.get("color")
-        if not color:
-            return None
-        return _hex_to_hs(color)
+        if color:
+            return _hex_to_hs(color)
+        return self._attr_hs_color
 
     def _store(self) -> dict[int, dict[str, Any]]:
         return self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
