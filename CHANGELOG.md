@@ -23,6 +23,24 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-24
+
+### Added
+- Release stabilization policy and rollback procedure documented in `README.md` (Etap 0).
+- Hardware smoke automation script (`scripts/hardware_smoke_check.py`) for WTP/SBUS API reachability and endpoint checks.
+- Release gate status checker (`scripts/check_release_gate.py`) to validate required workflow outcomes before release activities.
+- CI quality dashboard generator (`scripts/ci_quality_dashboard.py`) and scheduled workflow (`quality-dashboard.yml`) for pass-rate and duration tracking.
+- Regression tests for critical areas:
+  - API auth refresh edge case (refresh token retention)
+  - Cover fallback behavior when device snapshot disappears
+  - Firmware response normalization contracts (wrapper variants)
+
+### Changed
+- Neutral community branding mode (Etap 2A):
+  - removed vendor-specific icon mapping from `manifest.json`
+  - replaced brand assets with neutral community icon set
+- Project version bumped to `0.3.0`.
+
 ## [0.2.9] — 2026-06-24
 
 ### Added

@@ -6,7 +6,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/tests-1044%20passing-brightgreen.svg)](tests/)
 [![Stability](https://img.shields.io/badge/stability-weekly%20validated-green.svg)](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/actions/workflows/test-stability.yml)
-[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -32,9 +32,11 @@
 - [HA Services](#ha-services)
 - [Sinum Scenes, Automations and Variables](#sinum-scenes-automations-and-variables)
 - [MQTT Real-Time Bridge](#mqtt-real-time-bridge)
+- [Release Stabilization Policy](#release-stabilization-policy)
 - [Development Guide](#development-guide)
 - [Adding New Device Types](#adding-new-device-types)
 - [Known Limitations](#known-limitations)
+- [Rollback Procedure](#rollback-procedure)
 - [License](#license)
 
 ---
@@ -127,6 +129,16 @@ cp -r custom_components/sinum /config/custom_components/
 ```
 
 Restart Home Assistant.
+
+## Release Stabilization Policy
+
+During release stabilization windows, the project follows a temporary feature freeze.
+
+- New features are paused until hardware smoke checks pass on both WTP and SBUS hubs.
+- Only regressions, reliability fixes, and release-blocking issues are allowed.
+- A release is cut only after CI/CodeQL/HACS checks are green and the smoke checklist is completed.
+
+Current stabilization artifacts are tracked in `HARDWARE_TEST_PLAN.md` and workflow summaries.
 
 ---
 
@@ -727,6 +739,18 @@ Integration is tested against two live hubs in production:
 | **Schedules** | Read-only sensors + `sinum.update_schedule` service. Full schedule editing UI is not implemented. |
 | **LoRa / SLINK / Video** | Require specific hardware modules. Video streams and SLINK devices are not mapped to HA entities. |
 | **Alpha firmware 408s** | Intermittent on bus polling; the integration retries once then uses cached state. |
+
+## Rollback Procedure
+
+If a release introduces a regression, rollback quickly:
+
+1. Download the previous `sinum.zip` from GitHub Releases.
+2. Replace `config/custom_components/sinum` with the older version.
+3. Restart Home Assistant Core.
+4. Verify integration setup, entity availability, and key automations.
+5. Open an issue with logs and the exact version pair (from -> to).
+
+For production environments, keep the previous two release zip files archived locally.
 
 ---
 
