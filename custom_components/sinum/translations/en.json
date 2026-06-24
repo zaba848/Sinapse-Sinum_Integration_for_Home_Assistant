@@ -37,6 +37,17 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Sinum hub",
+        "description": "Change the hub address or authentication method. All existing entities will be preserved.",
+        "data": {
+          "host": "IP address or hostname",
+          "auth_mode": "Authentication method"
+        },
+        "data_description": {
+          "auth_mode": "**API Token** (recommended) or **Password** authentication."
+        }
       }
     },
     "error": {
@@ -45,7 +56,8 @@
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This Sinum hub is already configured."
+      "already_configured": "This Sinum hub is already configured.",
+      "reconfigure_successful": "Sinum hub reconfigured successfully."
     }
   },
   "options": {

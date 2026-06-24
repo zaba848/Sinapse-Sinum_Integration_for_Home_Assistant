@@ -2,6 +2,31 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.4] — 2026-06-24
+
+### Added
+- **`SinumDeviceAvailableMixin`** — all 28 entity classes now report `unavailable` immediately when
+  the hub is offline or the device is missing from the coordinator snapshot.
+- **`async_step_reconfigure`** in config flow — change hub IP or credentials without removing
+  the integration; all entities and automations are preserved.
+- **`async_migrate_entry`** — automatic data migration for older config entries (backfills
+  `auth_mode` key missing from pre-0.2 entries).
+- **`RestoreEntity`** for all cover and light classes — last-known position, tilt, brightness,
+  and color survive a Home Assistant restart without waiting for the next hub poll.
+- **`device_trigger.py`** — Sinum buttons appear as native device triggers in the HA automation
+  editor ("A button was pressed").
+- **`quality_scale: silver`** in `manifest.json`.
+- GitHub issue templates (bug report, feature request), Dependabot weekly updates, CodeQL workflow.
+- Config flow tests for reconfigure flow and `async_migrate_entry` (1020 tests total).
+- LoRa devices included in `diagnostics.py` output (`lora_devices`, `lora_count`).
+- `reconfigure` step translations in `en.json` and `pl.json`.
+
+### Fixed
+- `translations/en.json` and `pl.json` were missing `reconfigure` step and
+  `reconfigure_successful` abort reason — now in sync with `strings.json`.
+
+---
+
 ## [0.2.3] — 2026-06-22
 
 ### Fixed

@@ -37,6 +37,17 @@
           "username": "Nazwa użytkownika",
           "password": "Hasło"
         }
+      },
+      "reconfigure": {
+        "title": "Rekonfiguracja centrali Sinum",
+        "description": "Zmień adres centrali lub metodę uwierzytelniania. Wszystkie istniejące encje zostaną zachowane.",
+        "data": {
+          "host": "Adres IP lub nazwa hosta",
+          "auth_mode": "Metoda uwierzytelniania"
+        },
+        "data_description": {
+          "auth_mode": "**Token API** (zalecane) lub uwierzytelnianie **Hasłem**."
+        }
       }
     },
     "error": {
@@ -45,7 +56,8 @@
       "unknown": "Wystąpił nieoczekiwany błąd."
     },
     "abort": {
-      "already_configured": "Ta centrala Sinum jest już skonfigurowana."
+      "already_configured": "Ta centrala Sinum jest już skonfigurowana.",
+      "reconfigure_successful": "Centrala Sinum pomyślnie zrekonfigurowana."
     }
   },
   "options": {
