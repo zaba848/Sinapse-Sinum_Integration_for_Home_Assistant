@@ -2,20 +2,35 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+The project follows a "latest minor" support model. Security fixes are provided
+for the current release line.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| Version | Supported |
+| ------- | --------- |
+| 0.2.x   | :white_check_mark: |
+| 0.1.x   | :x: |
+| < 0.1   | :x: |
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Please report vulnerabilities privately.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+1. Preferred: use GitHub private vulnerability reporting (Security Advisories).
+2. If private reporting is unavailable, open a normal issue only for non-sensitive hardening ideas.
+3. Do not publish exploit details, secrets, credentials, or proof-of-concept payloads in public issues.
+
+Please include:
+
+- Affected component and version
+- Reproduction steps
+- Impact assessment
+- Suggested remediation (if available)
+
+Response targets:
+
+- Initial acknowledgement: up to 72 hours
+- Status update cadence: at least every 7 days until closure
+- Fix target: critical/high as soon as possible, medium/low in the next planned release
+
+If a report is accepted, we coordinate disclosure timing with the reporter.
+If it is declined, we provide a short rationale.
