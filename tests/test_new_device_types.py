@@ -1,4 +1,5 @@
 """Tests for new SBUS/WTP device type entities (relay, blind, dimmer, rgb, motion)."""
+
 from __future__ import annotations
 
 import json
@@ -13,9 +14,7 @@ from custom_components.sinum.light import SinumBusDimmerLight, SinumBusRgbLight
 from custom_components.sinum.sensor import SBUS_SENSORS, SinumSensor
 from custom_components.sinum.switch import SinumBusRelaySwitch
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_coordinator(*, wtp=None, sbus=None, virtual=None):
@@ -37,6 +36,7 @@ def _wire(entity):
 
 
 # ── Switch (relay) ─────────────────────────────────────────────────────────────
+
 
 class TestBusRelaySwitch:
     def test_sbus_relay_is_on(self):
@@ -83,6 +83,7 @@ class TestBusRelaySwitch:
 
 # ── Cover (WTP blind) ──────────────────────────────────────────────────────────
 
+
 class TestWtpBlindCover:
     def test_position_is_75(self):
         device = dict(FIXTURES["wtp_blind"])
@@ -109,14 +110,26 @@ class TestWtpBlindCover:
         assert entity.is_closed is None
 
     def test_is_opening(self):
-        device = {"id": 42, "type": "blind_controller", "current_opening": 30, "target_opening": 80, "action_in_progress": True}
+        device = {
+            "id": 42,
+            "type": "blind_controller",
+            "current_opening": 30,
+            "target_opening": 80,
+            "action_in_progress": True,
+        }
         coordinator = _make_coordinator(wtp={42: device})
         entity = SinumWtpBlindCover(coordinator, 42, "test_entry")
         assert entity.is_opening is True
         assert entity.is_closing is False
 
     def test_is_closing(self):
-        device = {"id": 42, "type": "blind_controller", "current_opening": 80, "target_opening": 10, "action_in_progress": True}
+        device = {
+            "id": 42,
+            "type": "blind_controller",
+            "current_opening": 80,
+            "target_opening": 10,
+            "action_in_progress": True,
+        }
         coordinator = _make_coordinator(wtp={42: device})
         entity = SinumWtpBlindCover(coordinator, 42, "test_entry")
         assert entity.is_closing is True
@@ -128,7 +141,9 @@ class TestWtpBlindCover:
         coordinator = _make_coordinator(wtp={42: device})
         entity = _wire(SinumWtpBlindCover(coordinator, 42, "test_entry"))
         await entity.async_open_cover()
-        coordinator.client.patch_wtp_device.assert_called_once_with(42, {"command": "open", "opening_percentage": 100})
+        coordinator.client.patch_wtp_device.assert_called_once_with(
+            42, {"command": "open", "opening_percentage": 100}
+        )
 
     @pytest.mark.asyncio
     async def test_close_cover_patches_0(self):
@@ -136,7 +151,9 @@ class TestWtpBlindCover:
         coordinator = _make_coordinator(wtp={42: device})
         entity = _wire(SinumWtpBlindCover(coordinator, 42, "test_entry"))
         await entity.async_close_cover()
-        coordinator.client.patch_wtp_device.assert_called_once_with(42, {"command": "open", "opening_percentage": 0})
+        coordinator.client.patch_wtp_device.assert_called_once_with(
+            42, {"command": "open", "opening_percentage": 0}
+        )
 
     @pytest.mark.asyncio
     async def test_set_position(self):
@@ -144,11 +161,15 @@ class TestWtpBlindCover:
         coordinator = _make_coordinator(wtp={42: device})
         entity = _wire(SinumWtpBlindCover(coordinator, 42, "test_entry"))
         from homeassistant.components.cover import ATTR_POSITION
+
         await entity.async_set_cover_position(**{ATTR_POSITION: 45})
-        coordinator.client.patch_wtp_device.assert_called_once_with(42, {"command": "open", "opening_percentage": 45})
+        coordinator.client.patch_wtp_device.assert_called_once_with(
+            42, {"command": "open", "opening_percentage": 45}
+        )
 
 
 # ── Light (SBUS/WTP dimmer) ────────────────────────────────────────────────────
+
 
 class TestBusDimmerLight:
     def test_sbus_dimmer_is_on(self):
@@ -180,8 +201,11 @@ class TestBusDimmerLight:
         coordinator = _make_coordinator(sbus={43: device})
         entity = _wire(SinumBusDimmerLight(coordinator, 43, "test_entry", "sbus"))
         from homeassistant.components.light import ATTR_BRIGHTNESS
+
         await entity.async_turn_on(**{ATTR_BRIGHTNESS: 128})
-        coordinator.client.patch_sbus_device.assert_called_once_with(43, {"state": True, "target_level": round(128 / 255 * 100)})
+        coordinator.client.patch_sbus_device.assert_called_once_with(
+            43, {"state": True, "target_level": round(128 / 255 * 100)}
+        )
 
     @pytest.mark.asyncio
     async def test_wtp_turn_off(self):
@@ -194,6 +218,7 @@ class TestBusDimmerLight:
 
 # ── Light (SBUS RGB controller) ────────────────────────────────────────────────
 
+
 class TestBusRgbLight:
     def test_sbus_rgb_is_on(self):
         device = dict(FIXTURES["sbus_rgb"])
@@ -203,6 +228,7 @@ class TestBusRgbLight:
 
     def test_sbus_rgb_exposes_color(self):
         from homeassistant.components.light import ColorMode
+
         device = dict(FIXTURES["sbus_rgb"])
         coordinator = _make_coordinator(sbus={45: device})
         entity = SinumBusRgbLight(coordinator, 45, "test_entry", "sbus")
@@ -219,11 +245,12 @@ class TestBusRgbLight:
         coordinator.client.run_scene = AsyncMock(return_value=None)
         entity = _wire(SinumBusRgbLight(coordinator, 45, "test_entry", "sbus"))
         from homeassistant.components.light import ATTR_HS_COLOR
+
         await entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0)})
         # SBUS uses Lua — verify set_color was sent with green #00FF00
         lua_code = coordinator.client.patch_scene_lua.await_args.args[1]
-        assert 'set_color' in lua_code
-        assert '#00FF00' in lua_code.upper()
+        assert "set_color" in lua_code
+        assert "#00FF00" in lua_code.upper()
         # REST PATCH carries only state=True (no color — hub ignores color field for rgb_controllers)
         call_args = coordinator.client.patch_sbus_device.call_args
         assert call_args[0][0] == 45
@@ -231,6 +258,7 @@ class TestBusRgbLight:
 
 
 # ── Binary sensor (SBUS motion) ────────────────────────────────────────────────
+
 
 class TestSbusMotionSensor:
     def _motion_desc(self):
@@ -259,6 +287,7 @@ class TestSbusMotionSensor:
 
 # ── Sensor (SBUS illuminance) ──────────────────────────────────────────────────
 
+
 class TestSbusIlluminanceSensor:
     def _illuminance_desc(self):
         return next(d for d in SBUS_SENSORS if d.key == "illuminance")
@@ -274,6 +303,7 @@ class TestSbusIlluminanceSensor:
 
 
 # ── Virtual dimmer_rgb_integrator ──────────────────────────────────────────────
+
 
 class TestVirtualDimmerRgbIntegrator:
     def test_integrator_type_creates_light_entity(self):

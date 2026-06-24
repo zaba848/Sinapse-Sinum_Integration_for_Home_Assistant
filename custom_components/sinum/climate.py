@@ -179,7 +179,9 @@ def _target_temperature_mode_value(value: Any) -> Any:
     return value
 
 
-def _copy_keys_if_present(source: dict[str, Any], target: dict[str, Any], keys: tuple[str, ...]) -> None:
+def _copy_keys_if_present(
+    source: dict[str, Any], target: dict[str, Any], keys: tuple[str, ...]
+) -> None:
     for key in keys:
         if key in source:
             target[key] = source[key]

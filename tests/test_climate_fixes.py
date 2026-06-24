@@ -1,4 +1,5 @@
 """Tests for climate temperature fix: dynamic min/max, HomeAssistantError, 422 handling."""
+
 from __future__ import annotations
 
 import json as _json
@@ -40,13 +41,17 @@ class TestSinumThermostatDynamicMinMax:
 
     def test_min_max_from_device_when_valid_range(self):
         """min/max read from API when max > min."""
-        entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250})
+        entity, _ = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250}
+        )
         assert entity.min_temp == 5.0
         assert entity.max_temp == 25.0
 
     def test_min_max_fallback_when_min_equals_max(self):
         """When schedule-locked (min == max), use the actual values to prevent 'exceeds range' errors."""
-        entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50})
+        entity, _ = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50}
+        )
         assert entity.min_temp == 5.0
         assert entity.max_temp == 5.0
 
@@ -59,7 +64,9 @@ class TestSinumThermostatDynamicMinMax:
     @pytest.mark.asyncio
     async def test_set_temperature_clamps_to_max(self):
         """Temperature above max is clamped to max before sending."""
-        entity, c = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250})
+        entity, c = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250}
+        )
         # Try to set 30°C but max is 25°C
         await entity.async_set_temperature(temperature=30.0)
         raw = c.client.patch_virtual_device.await_args.args[1]["target_temperature"]
@@ -68,7 +75,9 @@ class TestSinumThermostatDynamicMinMax:
     @pytest.mark.asyncio
     async def test_set_temperature_clamps_to_min(self):
         """Temperature below min is clamped to min before sending."""
-        entity, c = self._make({"id": 1, "target_temperature_minimum": 150, "target_temperature_maximum": 250})
+        entity, c = self._make(
+            {"id": 1, "target_temperature_minimum": 150, "target_temperature_maximum": 250}
+        )
         await entity.async_set_temperature(temperature=10.0)
         raw = c.client.patch_virtual_device.await_args.args[1]["target_temperature"]
         assert raw == 150  # clamped to 15.0°C
@@ -77,14 +86,18 @@ class TestSinumThermostatDynamicMinMax:
     async def test_set_temperature_raises_ha_error_on_api_failure(self):
         """SinumConnectionError is converted to HomeAssistantError."""
         entity, c = self._make({"id": 1})
-        c.client.patch_virtual_device = AsyncMock(side_effect=SinumConnectionError("Validation error"))
+        c.client.patch_virtual_device = AsyncMock(
+            side_effect=SinumConnectionError("Validation error")
+        )
         with pytest.raises(HomeAssistantError, match="Cannot set temperature"):
             await entity.async_set_temperature(temperature=20.0)
 
     @pytest.mark.asyncio
     async def test_set_temperature_normal_within_range(self):
         """Normal temperature within range is sent correctly."""
-        entity, c = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 300})
+        entity, c = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 300}
+        )
         c.client.patch_virtual_device = AsyncMock(return_value={"target_temperature": 210})
         await entity.async_set_temperature(temperature=21.0)
         raw = c.client.patch_virtual_device.await_args.args[1]["target_temperature"]
@@ -94,24 +107,32 @@ class TestSinumThermostatDynamicMinMax:
 class TestSinumTempRegClimateMinMax:
     def _make(self, device: dict, bus="wtp"):
         store = {1: device}
-        c = _make_coordinator(wtp=store if bus == "wtp" else {}, sbus=store if bus == "sbus" else {})
+        c = _make_coordinator(
+            wtp=store if bus == "wtp" else {}, sbus=store if bus == "sbus" else {}
+        )
         entity = _wire(SinumTemperatureRegulatorClimate(c, 1, "e", bus=bus))
         return entity, c
 
     def test_min_max_from_wtp_device(self):
-        entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 350})
+        entity, _ = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 350}
+        )
         assert entity.min_temp == 5.0
         assert entity.max_temp == 35.0
 
     def test_min_max_fallback_when_locked(self):
         """When locked (min == max), use actual values to prevent 'exceeds range' errors."""
-        entity, _ = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50})
+        entity, _ = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 50}
+        )
         assert entity.min_temp == 5.0
         assert entity.max_temp == 5.0
 
     @pytest.mark.asyncio
     async def test_set_temperature_clamps_and_sends(self):
-        entity, c = self._make({"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250})
+        entity, c = self._make(
+            {"id": 1, "target_temperature_minimum": 50, "target_temperature_maximum": 250}
+        )
         await entity.async_set_temperature(temperature=30.0)
         raw = c.client.patch_wtp_device.await_args.args[1]["target_temperature"]
         assert raw == 250
@@ -137,7 +158,9 @@ class TestApiValidationError:
         resp.status = 422
         _body = {
             "error": {
-                "errors": {"target_temperature": {"id": 7250, "text": "Parameter exceeds maximum range"}},
+                "errors": {
+                    "target_temperature": {"id": 7250, "text": "Parameter exceeds maximum range"}
+                },
                 "message": {"text": "Validation failed"},
             }
         }
@@ -182,7 +205,9 @@ class TestNotifyEntity:
         entity.hass = MagicMock()
 
         await entity.async_send_message("Message without title")
-        c.client.send_notification.assert_awaited_once_with(title="Sinum", message="Message without title")
+        c.client.send_notification.assert_awaited_once_with(
+            title="Sinum", message="Message without title"
+        )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_entity(self):

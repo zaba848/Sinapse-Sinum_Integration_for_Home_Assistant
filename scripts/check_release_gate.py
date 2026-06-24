@@ -27,10 +27,13 @@ OPTIONAL = {
 
 # In push-triggered gate workflows, required runs can still be queued/in_progress.
 # Allow these as non-blocking to avoid false-negative failures right after push.
-ALLOW_PENDING = os.getenv(
-    "RELEASE_GATE_ALLOW_PENDING",
-    "1" if os.getenv("GITHUB_EVENT_NAME") == "push" else "0",
-) == "1"
+ALLOW_PENDING = (
+    os.getenv(
+        "RELEASE_GATE_ALLOW_PENDING",
+        "1" if os.getenv("GITHUB_EVENT_NAME") == "push" else "0",
+    )
+    == "1"
+)
 
 
 def fetch_runs() -> list[dict]:
@@ -74,11 +77,7 @@ def _print_required_status(latest: dict[str, dict]) -> bool:
 def _print_optional_status(runs: list[dict]) -> None:
     for workflow in sorted(OPTIONAL):
         run = next(
-            (
-                r
-                for r in runs
-                if r.get("name") == workflow and r.get("head_branch") == "main"
-            ),
+            (r for r in runs if r.get("name") == workflow and r.get("head_branch") == "main"),
             None,
         )
         if not run:

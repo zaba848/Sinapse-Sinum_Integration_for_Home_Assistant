@@ -1,4 +1,5 @@
 """Tests for switch async_setup_entry and entity turn_on/turn_off actions."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -71,7 +72,14 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_virtual_heat_pump_manager_with_dhw_creates_dhw_switch(self):
-        virtual = {3: {"id": 3, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "HP", "dhw_control": {"enabled": True}}}
+        virtual = {
+            3: {
+                "id": 3,
+                "type": VTYPE_HEAT_PUMP_MANAGER,
+                "name": "HP",
+                "dhw_control": {"enabled": True},
+            }
+        }
         coordinator = _make_coordinator(virtual=virtual)
         entry = _make_entry(coordinator)
         added = []
@@ -89,7 +97,9 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_virtual_heat_pump_manager_dhw_without_enabled_skipped(self):
-        virtual = {3: {"id": 3, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "HP", "dhw_control": "not_a_dict"}}
+        virtual = {
+            3: {"id": 3, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "HP", "dhw_control": "not_a_dict"}
+        }
         coordinator = _make_coordinator(virtual=virtual)
         entry = _make_entry(coordinator)
         added = []
@@ -120,7 +130,14 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_sbus_relay_managed_by_thermostat_skipped(self):
-        sbus = {20: {"id": 20, "type": STYPE_RELAY, "name": "Managed Relay", "labels": ["managed_by_thermostat"]}}
+        sbus = {
+            20: {
+                "id": 20,
+                "type": STYPE_RELAY,
+                "name": "Managed Relay",
+                "labels": ["managed_by_thermostat"],
+            }
+        }
         coordinator = _make_coordinator(sbus=sbus)
         entry = _make_entry(coordinator)
         added = []
@@ -286,6 +303,7 @@ class TestSinumDhwSwitchFalsyUpdate:
         }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
         coordinator.client.patch_virtual_device = AsyncMock(return_value={})
         await entity.async_turn_on()
@@ -301,6 +319,7 @@ class TestSinumDhwSwitchFalsyUpdate:
         }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
         coordinator.client.patch_virtual_device = AsyncMock(return_value={})
         await entity.async_turn_off()
@@ -316,6 +335,7 @@ class TestSinumDhwSwitchFalsyUpdate:
         }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
         coordinator.client.patch_virtual_device = AsyncMock(
             return_value={"dhw_control": {"enabled": True}}
@@ -333,6 +353,7 @@ class TestSinumDhwSwitchFalsyUpdate:
         }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
         coordinator.client.patch_virtual_device = AsyncMock(
             return_value={"dhw_control": {"enabled": False}}
@@ -341,17 +362,29 @@ class TestSinumDhwSwitchFalsyUpdate:
         assert coordinator.virtual_devices[5]["dhw_control"]["enabled"] is False
 
     def test_is_on_false_when_dhw_control_not_dict(self):
-        device = {"id": 5, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "Heat Pump", "dhw_control": "bad"}
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": "bad",
+        }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
 
         assert entity.is_on is False
 
     def test_extra_state_attributes_empty_when_dhw_control_not_dict(self):
-        device = {"id": 5, "type": VTYPE_HEAT_PUMP_MANAGER, "name": "Heat Pump", "dhw_control": "bad"}
+        device = {
+            "id": 5,
+            "type": VTYPE_HEAT_PUMP_MANAGER,
+            "name": "Heat Pump",
+            "dhw_control": "bad",
+        }
         coordinator = _make_coordinator(virtual={5: device})
         from custom_components.sinum.switch import SinumDhwSwitch
+
         entity = _wire(SinumDhwSwitch(coordinator, 5, "test_entry"))
 
         assert entity.extra_state_attributes == {}

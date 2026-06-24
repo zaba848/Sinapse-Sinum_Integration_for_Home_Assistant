@@ -6,6 +6,7 @@ on the second, the command SUCCEEDS and state is correctly updated.
 
 Testing errors is not a substitute for testing that the fix works.
 """
+
 from __future__ import annotations
 
 import json as _json
@@ -22,6 +23,7 @@ from custom_components.sinum.api import SinumClient
 # ---------------------------------------------------------------------------
 # HTTP-level helpers (mirror test_api.py pattern)
 # ---------------------------------------------------------------------------
+
 
 def _resp(status: int, data: object = None) -> MagicMock:
     r = MagicMock()
@@ -51,6 +53,7 @@ def _patches():
 # into an entity. This tests the whole path: entity → api._request → retry.
 # ---------------------------------------------------------------------------
 
+
 def _make_client(responses: list) -> tuple[SinumClient, MagicMock]:
     session = MagicMock(spec=aiohttp.ClientSession)
     session.request = AsyncMock(side_effect=responses)
@@ -79,11 +82,13 @@ def _wire(entity):
 # SinumThermostat — the exact entity from the bug report
 # ===========================================================================
 
+
 class TestThermostatRetryIntegration:
     """Verify set_hvac_mode works end-to-end when hub returns 408 → 200."""
 
     def _make(self, device, responses):
         from custom_components.sinum.climate import SinumThermostat
+
         client, session = _make_client(responses)
         c = _coordinator_with_client(client, virtual={device["id"]: device})
         entity = _wire(SinumThermostat(c, device["id"], "e"))
@@ -92,8 +97,13 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_set_hvac_mode_succeeds_after_408_retry(self):
         """Reproduce the bug: 408 on first PATCH → retry → 200 → success, no exception."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 9, "mode": "off"}})
         entity, c, session = self._make(device, [first, second])
@@ -110,8 +120,14 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_set_hvac_mode_updates_state_after_retry(self):
         """After 408→200 retry, coordinator data is merged with hub response."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215, "state": True}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+            "state": True,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 9, "mode": "cooling", "state": False}})
         entity, c, session = self._make(device, [first, second])
@@ -125,8 +141,13 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_set_hvac_mode_raises_only_when_both_attempts_fail(self):
         """If both the first attempt and retry return 408, HomeAssistantError is raised."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+        }
         entity, c, session = self._make(device, [_resp(408, {}), _resp(408, {})])
 
         with _patches()[0], _patches()[1], pytest.raises(HomeAssistantError):
@@ -137,8 +158,13 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_set_hvac_mode_succeeds_on_first_try_no_retry(self):
         """Normal case: hub returns 200 directly, only one request made."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+        }
         entity, c, session = self._make(device, [_resp(200, {"data": {"id": 9, "mode": "off"}})])
 
         with _patches()[0], _patches()[1]:
@@ -150,9 +176,15 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_set_temperature_succeeds_after_408_retry(self):
         """set_temperature also retries on 408 (uses same api._request path)."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215,
-                  "target_temperature_minimum": 50, "target_temperature_maximum": 300}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+            "target_temperature_minimum": 50,
+            "target_temperature_maximum": 300,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 9, "target_temperature": 230}})
         entity, c, session = self._make(device, [first, second])
@@ -166,8 +198,13 @@ class TestThermostatRetryIntegration:
     @pytest.mark.asyncio
     async def test_retry_sleeps_one_second_before_second_attempt(self):
         """Retry must pause 1 second to let bus recover (timing contract)."""
-        device = {"id": 9, "type": "thermostat", "mode": "heating",
-                  "target_temperature": 220, "temperature": 215}
+        device = {
+            "id": 9,
+            "type": "thermostat",
+            "mode": "heating",
+            "target_temperature": 220,
+            "temperature": 215,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 9, "mode": "off"}})
         entity, c, _ = self._make(device, [first, second])
@@ -183,10 +220,11 @@ class TestThermostatRetryIntegration:
 # _BusClimateMixin — FanCoil (SBUS)
 # ===========================================================================
 
-class TestFanCoilRetryIntegration:
 
+class TestFanCoilRetryIntegration:
     def _make_sbus(self, device, responses):
         from custom_components.sinum.climate import SinumFanCoilClimate
+
         client, session = _make_client(responses)
         c = _coordinator_with_client(client, sbus={device["id"]: device})
         entity = _wire(SinumFanCoilClimate(c, device["id"], "e", "sbus"))
@@ -194,8 +232,7 @@ class TestFanCoilRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_succeeds_after_408_retry(self):
-        device = {"id": 5, "type": "fan_coil", "work_mode": "heating",
-                  "target_temperature": 220}
+        device = {"id": 5, "type": "fan_coil", "work_mode": "heating", "target_temperature": 220}
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 5, "work_mode": "cooling"}})
         entity, c, session = self._make_sbus(device, [first, second])
@@ -208,8 +245,7 @@ class TestFanCoilRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_set_fan_mode_succeeds_after_408_retry(self):
-        device = {"id": 5, "type": "fan_coil", "work_mode": "heating",
-                  "target_temperature": 220}
+        device = {"id": 5, "type": "fan_coil", "work_mode": "heating", "target_temperature": 220}
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 5, "fan": {"manual_fan_gear": "second"}}})
         entity, c, session = self._make_sbus(device, [first, second])
@@ -224,10 +260,11 @@ class TestFanCoilRetryIntegration:
 # SinumTemperatureRegulatorClimate
 # ===========================================================================
 
-class TestTemperatureRegulatorRetryIntegration:
 
+class TestTemperatureRegulatorRetryIntegration:
     def _make(self, device, responses, bus="sbus"):
         from custom_components.sinum.climate import SinumTemperatureRegulatorClimate
+
         client, session = _make_client(responses)
         store = {device["id"]: device}
         c = _coordinator_with_client(
@@ -240,8 +277,13 @@ class TestTemperatureRegulatorRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_succeeds_after_408_retry(self):
-        device = {"id": 6, "type": "temperature_regulator", "system_mode": "heating",
-                  "target_temperature": 220, "mode_mutable": True}
+        device = {
+            "id": 6,
+            "type": "temperature_regulator",
+            "system_mode": "heating",
+            "target_temperature": 220,
+            "mode_mutable": True,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 6, "system_mode": "off"}})
         entity, c, session = self._make(device, [first, second])
@@ -254,8 +296,13 @@ class TestTemperatureRegulatorRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_turn_on_succeeds_after_408_retry(self):
-        device = {"id": 6, "type": "temperature_regulator", "system_mode": "off",
-                  "target_temperature": 220, "mode_mutable": True}
+        device = {
+            "id": 6,
+            "type": "temperature_regulator",
+            "system_mode": "off",
+            "target_temperature": 220,
+            "mode_mutable": True,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 6, "system_mode": "heating"}})
         entity, c, session = self._make(device, [first, second])
@@ -268,8 +315,13 @@ class TestTemperatureRegulatorRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_turn_off_succeeds_after_408_retry(self):
-        device = {"id": 6, "type": "temperature_regulator", "system_mode": "heating",
-                  "target_temperature": 220, "mode_mutable": True}
+        device = {
+            "id": 6,
+            "type": "temperature_regulator",
+            "system_mode": "heating",
+            "target_temperature": 220,
+            "mode_mutable": True,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 6, "system_mode": "off"}})
         entity, c, session = self._make(device, [first, second])
@@ -284,10 +336,11 @@ class TestTemperatureRegulatorRetryIntegration:
 # Switch — virtual relay
 # ===========================================================================
 
-class TestSwitchRetryIntegration:
 
+class TestSwitchRetryIntegration:
     def _make_relay(self, device, responses):
         from custom_components.sinum.switch import SinumRelaySwitch
+
         client, session = _make_client(responses)
         c = _coordinator_with_client(client, virtual={device["id"]: device})
         entity = _wire(SinumRelaySwitch(c, device["id"], "e"))
@@ -295,6 +348,7 @@ class TestSwitchRetryIntegration:
 
     def _make_bus_relay(self, device, responses, bus="wtp"):
         from custom_components.sinum.switch import SinumBusRelaySwitch
+
         client, session = _make_client(responses)
         store = {device["id"]: device}
         c = _coordinator_with_client(
@@ -362,10 +416,11 @@ class TestSwitchRetryIntegration:
 # Cover — virtual blind
 # ===========================================================================
 
-class TestCoverRetryIntegration:
 
+class TestCoverRetryIntegration:
     def _make_blind(self, device, responses):
         from custom_components.sinum.cover import SinumBlindCover
+
         client, session = _make_client(responses)
         c = _coordinator_with_client(client, virtual={device["id"]: device})
         entity = _wire(SinumBlindCover(c, device["id"], "e"))
@@ -373,8 +428,12 @@ class TestCoverRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_open_cover_succeeds_after_408_retry(self):
-        device = {"id": 14, "type": "blind_controller_integrator", "state": "closed",
-                  "last_set_target_opening": 0}
+        device = {
+            "id": 14,
+            "type": "blind_controller_integrator",
+            "state": "closed",
+            "last_set_target_opening": 0,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 14, "last_set_target_opening": 100}})
         entity, c, session = self._make_blind(device, [first, second])
@@ -387,8 +446,12 @@ class TestCoverRetryIntegration:
 
     @pytest.mark.asyncio
     async def test_set_position_succeeds_after_408_retry(self):
-        device = {"id": 14, "type": "blind_controller_integrator", "state": "open",
-                  "last_set_target_opening": 100}
+        device = {
+            "id": 14,
+            "type": "blind_controller_integrator",
+            "state": "open",
+            "last_set_target_opening": 100,
+        }
         first = _resp(408, {})
         second = _resp(200, {"data": {"id": 14, "last_set_target_opening": 50}})
         entity, c, session = self._make_blind(device, [first, second])
@@ -404,10 +467,11 @@ class TestCoverRetryIntegration:
 # Light — bus dimmer
 # ===========================================================================
 
-class TestLightRetryIntegration:
 
+class TestLightRetryIntegration:
     def _make_dimmer(self, device, responses, bus="wtp"):
         from custom_components.sinum.light import SinumBusDimmerLight
+
         client, session = _make_client(responses)
         store = {device["id"]: device}
         c = _coordinator_with_client(
@@ -450,8 +514,8 @@ class TestLightRetryIntegration:
 # on transient bus-busy conditions during coordinator polling
 # ===========================================================================
 
-class TestGetRetry:
 
+class TestGetRetry:
     @pytest.mark.asyncio
     async def test_get_virtual_devices_retries_on_408_and_succeeds(self):
         """Coordinator poll retries on 408 so entities stay available on transient bus busy."""
@@ -469,6 +533,7 @@ class TestGetRetry:
     async def test_get_virtual_devices_raises_only_when_both_408(self):
         """Only if both the poll and retry return 408 do entities go unavailable."""
         from custom_components.sinum.api import SinumConnectionError
+
         client, session = _make_client([_resp(408, {}), _resp(408, {})])
 
         with _patches()[0], _patches()[1], pytest.raises(SinumConnectionError):

@@ -190,9 +190,7 @@ class TestAttachTrigger:
             hass = _make_hass()
             unsubscribe_mock = MagicMock()
             hass.bus.async_listen = MagicMock(return_value=unsubscribe_mock)
-            result = await async_attach_trigger(
-                hass, _standard_config(), MagicMock(), MagicMock()
-            )
+            result = await async_attach_trigger(hass, _standard_config(), MagicMock(), MagicMock())
 
         hass.bus.async_listen.assert_called_once()
         assert hass.bus.async_listen.call_args[0][0] == "state_changed"

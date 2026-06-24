@@ -1,4 +1,5 @@
 """Extended tests for cover entities (improves 60% → 80%+ coverage)."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -108,7 +109,9 @@ class TestSinumBlindCover:
         assert entity.is_closed is False
 
     def test_is_closed_none_when_no_position(self):
-        coord = _make_coordinator(virtual_devices={13: {"id": 13, "type": "blind_controller_integrator"}})
+        coord = _make_coordinator(
+            virtual_devices={13: {"id": 13, "type": "blind_controller_integrator"}}
+        )
         with patch("homeassistant.helpers.frame.report_usage", return_value=None):
             entity = SinumBlindCover(coord, 13, "test_entry")
         assert entity.is_closed is None
@@ -325,9 +328,7 @@ class TestSinumWtpBlindCover:
         entity = _make_wtp_blind()
         entity.coordinator.client.patch_wtp_device = AsyncMock(return_value={})
         await entity.async_stop_cover()
-        entity.coordinator.client.patch_wtp_device.assert_awaited_once_with(
-            25, {"command": "stop"}
-        )
+        entity.coordinator.client.patch_wtp_device.assert_awaited_once_with(25, {"command": "stop"})
 
     def test_is_closed_none_when_no_current_opening(self):
         coord = _make_coordinator(wtp_devices={25: {"id": 25, "type": "blind_controller"}})
@@ -781,9 +782,7 @@ class TestCoverErrorPaths:
         from homeassistant.exceptions import HomeAssistantError
 
         entity = _make_blind()
-        entity.coordinator.client.patch_virtual_device = AsyncMock(
-            side_effect=Exception("timeout")
-        )
+        entity.coordinator.client.patch_virtual_device = AsyncMock(side_effect=Exception("timeout"))
         with pytest.raises(HomeAssistantError, match="Cannot set cover tilt"):
             await entity.async_set_cover_tilt_position(**{ATTR_TILT_POSITION: 30})
 

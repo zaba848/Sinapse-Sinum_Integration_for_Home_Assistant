@@ -1,4 +1,5 @@
 """Tests for Sinum alarm control panel."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -170,6 +171,7 @@ class TestAlarmZoneIdentity:
 
     def test_no_supported_features(self):
         from homeassistant.components.alarm_control_panel import AlarmControlPanelEntityFeature
+
         zone = _make_zone()
         entity = _make_entity(zone)
         assert entity.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY

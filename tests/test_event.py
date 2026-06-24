@@ -1,4 +1,5 @@
 """Tests for SinumButtonEvent entity."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -197,7 +198,9 @@ class TestSinumButtonEvent:
 
         added = []
         with patch("homeassistant.helpers.frame.report_usage", return_value=None):
-            await async_setup_entry(MagicMock(), entry, lambda entities, **_: added.extend(entities))
+            await async_setup_entry(
+                MagicMock(), entry, lambda entities, **_: added.extend(entities)
+            )
 
         assert len(added) == 2
         buses = {e._bus for e in added}

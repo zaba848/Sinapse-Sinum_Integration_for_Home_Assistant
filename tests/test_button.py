@@ -1,4 +1,5 @@
 """Tests for Sinum button entities."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -21,7 +22,9 @@ def _make_coordinator(scenes=None):
 class TestSinumSceneButton:
     def _make(self, scene_id=2, name="Good Night"):
         coordinator = _make_coordinator()
-        return SinumSceneButton(coordinator, {"id": scene_id, "name": name}, "test_entry"), coordinator
+        return SinumSceneButton(
+            coordinator, {"id": scene_id, "name": name}, "test_entry"
+        ), coordinator
 
     @pytest.mark.asyncio
     async def test_press_runs_scene(self):
@@ -63,7 +66,9 @@ class TestSinumSceneButton:
         scenes = [{"id": 1, "name": "A"}, {"id": 2, "name": "B"}]
         coordinator = _make_coordinator(scenes=scenes)
         added = []
-        await async_setup_entry(MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e))
+        await async_setup_entry(
+            MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e)
+        )
         assert len(added) == 2
         coordinator.client.get_scenes.assert_not_awaited()
 
@@ -74,7 +79,9 @@ class TestSinumSceneButton:
         coordinator = _make_coordinator(scenes=[])
         coordinator.client.get_scenes = AsyncMock(return_value=scenes)
         added = []
-        await async_setup_entry(MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e))
+        await async_setup_entry(
+            MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e)
+        )
         assert len(added) == 1
         coordinator.client.get_scenes.assert_awaited_once()
 
@@ -84,7 +91,9 @@ class TestSinumSceneButton:
         coordinator = _make_coordinator(scenes=[])
         coordinator.client.get_scenes = AsyncMock(side_effect=SinumConnectionError("404"))
         added = []
-        await async_setup_entry(MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e))
+        await async_setup_entry(
+            MagicMock(), _make_entry(coordinator), lambda e, **_: added.extend(e)
+        )
         assert added == []
 
 

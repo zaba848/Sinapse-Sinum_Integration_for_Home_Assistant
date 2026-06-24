@@ -1,4 +1,5 @@
 """Tests for SinumClient."""
+
 from __future__ import annotations
 
 import json as _json
@@ -66,14 +67,20 @@ class TestLogin:
         resp = make_response(401, {})
         session.post = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, username="user", password="wrong")
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumAuthError):
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumAuthError),
+        ):
             await client.login()
 
     @pytest.mark.asyncio
     async def test_login_connection_error(self, session):
         session.post = AsyncMock(side_effect=aiohttp.ClientError("unreachable"))
         client = SinumClient("192.168.1.1", session, username="user", password="pass")
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumConnectionError):
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError),
+        ):
             await client.login()
 
 
@@ -105,7 +112,10 @@ class TestApiRequests:
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
 
-        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout), pytest.raises(SinumConnectionError, match="API error 404"):
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="API error 404"),
+        ):
             await client.get_energy()
 
     @pytest.mark.asyncio
@@ -161,7 +171,9 @@ class TestApiRequests:
     @pytest.mark.asyncio
     async def test_408_on_get_retries_once_and_raises_if_both_fail(self, session):
         """GET 408 retries once; if both attempts return 408, SinumConnectionError is raised."""
-        resp = make_response(408, {"error": {"message": {"text": "Request timeout exceeded", "id": 7334}}})
+        resp = make_response(
+            408, {"error": {"message": {"text": "Request timeout exceeded", "id": 7334}}}
+        )
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
 

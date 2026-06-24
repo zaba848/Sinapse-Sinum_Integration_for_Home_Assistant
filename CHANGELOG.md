@@ -23,6 +23,12 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.6] — 2026-06-24
+
+### Quality
+- Fixed CI `Lint` workflow failures by applying repository-wide `ruff format` changes.
+- Verified locally after formatting: `ruff format --check`, `ruff check`, and full test suite (`1220 passed`).
+
 ## [0.3.5] — 2026-06-24
 
 ### Hardware/API Validation

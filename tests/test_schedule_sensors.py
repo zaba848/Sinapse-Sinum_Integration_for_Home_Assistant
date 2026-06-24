@@ -1,4 +1,5 @@
 """Tests for Sinum thermal schedule sensors."""
+
 from __future__ import annotations
 
 import json
@@ -11,9 +12,7 @@ from custom_components.sinum.sensor import (
     SinumScheduleTargetTempSensor,
 )
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_coordinator(schedule: dict):
@@ -75,8 +74,6 @@ class TestSinumScheduleSensors:
                 }
             },
         }
-        entries = SinumScheduleActivePeriodSensor._day_entries(
-            schedule["weekly_program"]["monday"]
-        )
+        entries = SinumScheduleActivePeriodSensor._day_entries(schedule["weekly_program"]["monday"])
 
         assert entries == [{"time_from": "06:00", "time_to": "08:00"}]

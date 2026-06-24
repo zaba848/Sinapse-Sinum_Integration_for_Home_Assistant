@@ -98,7 +98,9 @@ def _flatten_values(result: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _list_result_from_dict(result: dict[str, Any], preferred_keys: tuple[str, ...]) -> list[dict[str, Any]]:
+def _list_result_from_dict(
+    result: dict[str, Any], preferred_keys: tuple[str, ...]
+) -> list[dict[str, Any]]:
     extracted = _extract_by_keys(result, (*preferred_keys, "items", "devices", "results", "data"))
     if extracted is not None:
         return extracted
@@ -211,7 +213,9 @@ class SinumClient:
             "uuid_device": "sinapse-ha-integration",
         }
 
-    async def _post_with_timeout(self, path: str, payload: dict[str, Any]) -> aiohttp.ClientResponse:
+    async def _post_with_timeout(
+        self, path: str, payload: dict[str, Any]
+    ) -> aiohttp.ClientResponse:
         async with asyncio.timeout(REQUEST_TIMEOUT):
             return await self._session.post(self._url(path), json=payload, ssl=False)
 

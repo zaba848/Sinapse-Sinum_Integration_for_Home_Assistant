@@ -1,4 +1,5 @@
 """Tests for Sinum binary sensor entities."""
+
 from __future__ import annotations
 
 import json
@@ -11,9 +12,7 @@ from custom_components.sinum.binary_sensor import (
     SinumBinarySensor,
 )
 
-FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text()
-)
+FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
 
 
 def _make_wtp_coordinator(device_id: int, device: dict):
@@ -31,7 +30,7 @@ def _make_sbus_coordinator(device: dict):
 
 
 def _desc(key: str, source: str = "wtp"):
-    for d in (BINARY_SENSOR_TYPES if source == "wtp" else SBUS_BINARY_SENSOR_TYPES):
+    for d in BINARY_SENSOR_TYPES if source == "wtp" else SBUS_BINARY_SENSOR_TYPES:
         if d.key == key:
             return d
     raise KeyError(key)
@@ -53,9 +52,14 @@ class TestWtpFanCoilValve:
     def test_valve_state_true_is_on(self):
         """WTP fan_coil with valve_state=True reports is_on=True."""
         device = {
-            "id": 4, "type": "fan_coil", "class": "wtp",
-            "name": "Fan Coil", "valve_state": True,
-            "gear_1": {"state": False}, "gear_2": {"state": False}, "gear_3": {"state": True},
+            "id": 4,
+            "type": "fan_coil",
+            "class": "wtp",
+            "name": "Fan Coil",
+            "valve_state": True,
+            "gear_1": {"state": False},
+            "gear_2": {"state": False},
+            "gear_3": {"state": True},
         }
         coordinator = _make_wtp_coordinator(4, device)
         entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
@@ -63,8 +67,11 @@ class TestWtpFanCoilValve:
 
     def test_valve_state_false_is_off(self):
         device = {
-            "id": 4, "type": "fan_coil", "class": "wtp",
-            "name": "Fan Coil", "valve_state": False,
+            "id": 4,
+            "type": "fan_coil",
+            "class": "wtp",
+            "name": "Fan Coil",
+            "valve_state": False,
         }
         coordinator = _make_wtp_coordinator(4, device)
         entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
@@ -79,8 +86,11 @@ class TestWtpFanCoilValve:
     def test_valve_state_exposes_gear_attributes(self):
         """Valve binary sensor exposes gear states and hotel_mode as attributes."""
         device = {
-            "id": 4, "type": "fan_coil", "class": "wtp",
-            "name": "Fan Coil", "valve_state": True,
+            "id": 4,
+            "type": "fan_coil",
+            "class": "wtp",
+            "name": "Fan Coil",
+            "valve_state": True,
             "gear_1": {"hysteresis": 3, "state": False},
             "gear_2": {"hysteresis": 30, "state": False},
             "gear_3": {"hysteresis": 42, "state": True},
@@ -99,6 +109,7 @@ class TestThermostatAttributes:
     def test_thermostat_exposes_heating_cooling_targets(self):
         """Thermostat exposes target_temperature_heating/cooling as attributes."""
         from custom_components.sinum.climate import SinumThermostat
+
         device = {
             **FIXTURES["virtual_thermostat"],
             "target_temperature_heating": 350,
@@ -120,4 +131,3 @@ class TestThermostatAttributes:
         assert attrs["target_temperature_mode"] == "constant"
         assert attrs["is_window_open"] is False
         assert attrs["floor_temperature"] == 28.0
-
