@@ -2,6 +2,15 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.6] — 2026-06-24
+
+### Changed
+- **Repository rebranding**: canonical repository path updated to
+  `zaba848/sinapse-sinum-integration-for-home-assistant`.
+- **Project metadata**: integration manifest and Python project metadata version bumped to `0.2.6`.
+- **Documentation links**: README installation and clone instructions now point to the new repository URL.
+- **Contributor docs**: issue tracker links in `CONTRIBUTING.md` updated to the renamed repository.
+
 ## [0.2.5] — 2026-06-24
 
 ### Changed

@@ -4,7 +4,7 @@ Thank you for your interest in contributing!
 
 ## How to Report a Bug
 
-1. Check [existing issues](https://github.com/zaba848/Sinum_HomeAsistant_connector/issues) first
+1. Check [existing issues](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues) first
 2. Include: Home Assistant version, integration version, hub firmware version, and relevant log output
 3. Enable debug logging:
    ```yaml
