@@ -100,6 +100,11 @@ class SinumBlindCover(
         self._attr_device_info = _device_info(
             coordinator, device_id, entry_id, "Sinum Blind Controller"
         )
+        device = coordinator.virtual_devices.get(device_id, {})
+        if (pos := device.get("last_set_target_opening")) is not None:
+            self._attr_current_cover_position = int(pos)
+        if (tilt := device.get("last_set_target_tilt")) is not None:
+            self._attr_current_cover_tilt_position = int(tilt)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -121,14 +126,18 @@ class SinumBlindCover(
     def current_cover_position(self) -> int | None:
         if self._device:
             pos = self._device.get("last_set_target_opening")
-            return int(pos) if pos is not None else None
+            if pos is not None:
+                self._attr_current_cover_position = int(pos)
+                return int(pos)
         return self._attr_current_cover_position
 
     @property
     def current_cover_tilt_position(self) -> int | None:
         if self._device:
             tilt = self._device.get("last_set_target_tilt")
-            return int(tilt) if tilt is not None else None
+            if tilt is not None:
+                self._attr_current_cover_tilt_position = int(tilt)
+                return int(tilt)
         return self._attr_current_cover_tilt_position
 
     @property

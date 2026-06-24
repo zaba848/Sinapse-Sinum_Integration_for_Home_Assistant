@@ -522,8 +522,10 @@ class SinumBusRgbLight(
         else:
             if ATTR_HS_COLOR in kwargs:
                 h, s = kwargs[ATTR_HS_COLOR]
-                lua_lines.append(f'{prefix}:call("set_color",{{"{_hs_to_hex(h, s, 1.0)}",200}})')
+                color_hex = _hs_to_hex(h, s, 1.0)
+                lua_lines.append(f'{prefix}:call("set_color",{{"{color_hex}",200}})')
                 optimistic["color_mode"] = "rgb"
+                optimistic["led_color"] = color_hex
             if ATTR_BRIGHTNESS in kwargs:
                 pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
                 lua_lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')

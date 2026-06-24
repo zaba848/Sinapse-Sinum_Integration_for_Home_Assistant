@@ -1,6 +1,6 @@
 # Hardware Smoke Test (Latest)
 
-Generated: 2026-06-24 08:49:26Z
+Generated: 2026-06-24 08:57:27Z
 
 | Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual |
 |---|---:|---:|---:|---:|---:|

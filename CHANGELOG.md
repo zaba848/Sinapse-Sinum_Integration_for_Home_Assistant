@@ -23,6 +23,13 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-06-24
+
+### Fixed
+- Cover regression fix: `SinumBlindCover` now preserves last known position/tilt when coordinator snapshot is temporarily missing.
+- SBUS RGB regression fix: optimistic state after HS color command now stores `led_color` and correctly reflects switch to RGB mode.
+- Post-release validation: hardware smoke check refreshed in `docs/hardware_smoke_latest.md`.
+
 ## [0.3.0] — 2026-06-24
 
 ### Added
