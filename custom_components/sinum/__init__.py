@@ -89,18 +89,22 @@ def _coordinators(hass: HomeAssistant) -> dict[str, SinumCoordinator]:
     return cast(dict[str, SinumCoordinator], domain_data.setdefault(DATA_COORDINATORS, {}))
 
 
-def _select_coordinator(hass: HomeAssistant, entry_id: str | None) -> SinumCoordinator:
-    coordinators = _coordinators(hass)
-    if entry_id:
-        coordinator = coordinators.get(entry_id)
-        if coordinator is None:
-            raise HomeAssistantError(f"Sinum config entry not loaded: {entry_id}")
-        return coordinator
+def _single_coordinator_or_raise(coordinators: dict[str, SinumCoordinator]) -> SinumCoordinator:
     if len(coordinators) == 1:
         return next(iter(coordinators.values()))
     if coordinators:
         raise HomeAssistantError("entry_id is required when multiple Sinum hubs are loaded")
     raise HomeAssistantError("No Sinum hubs are loaded")
+
+
+def _select_coordinator(hass: HomeAssistant, entry_id: str | None) -> SinumCoordinator:
+    coordinators = _coordinators(hass)
+    if not entry_id:
+        return _single_coordinator_or_raise(coordinators)
+    coordinator = coordinators.get(entry_id)
+    if coordinator is None:
+        raise HomeAssistantError(f"Sinum config entry not loaded: {entry_id}")
+    return coordinator
 
 
 def _merge_schedule(
@@ -174,6 +178,17 @@ async def _start_mqtt_bridge(
         coordinator.mqtt_bridge = bridge
 
 
+def _register_service_if_missing(
+    hass: HomeAssistant,
+    service: str,
+    handler: Any,
+    schema: vol.Schema,
+) -> None:
+    if hass.services.has_service(DOMAIN, service):
+        return
+    hass.services.async_register(DOMAIN, service, handler, schema=schema)
+
+
 def _register_services(hass: HomeAssistant) -> None:
     """Register HA services; safe to call on every entry load (no-ops if already registered)."""
 
@@ -196,14 +211,38 @@ def _register_services(hass: HomeAssistant) -> None:
         _merge_schedule(coordinator, schedule_id, updated or payload)
         _publish_schedule_update(coordinator)
 
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
-        hass.services.async_register(
-            DOMAIN, SERVICE_SEND_NOTIFICATION, handle_send_notification, schema=NOTIFY_SCHEMA
-        )
-    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE):
-        hass.services.async_register(
-            DOMAIN, SERVICE_UPDATE_SCHEDULE, handle_update_schedule, schema=UPDATE_SCHEDULE_SCHEMA
-        )
+    _register_service_if_missing(
+        hass,
+        SERVICE_SEND_NOTIFICATION,
+        handle_send_notification,
+        NOTIFY_SCHEMA,
+    )
+    _register_service_if_missing(
+        hass,
+        SERVICE_UPDATE_SCHEDULE,
+        handle_update_schedule,
+        UPDATE_SCHEDULE_SCHEMA,
+    )
+
+
+async def _stop_mqtt_bridge_for_entry(entry_id: str) -> None:
+    bridge = _MQTT_BRIDGES.pop(entry_id, None)
+    if bridge:
+        await bridge.async_stop()
+
+
+def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:
+    _notification_clients(hass).pop(entry_id, None)
+    _coordinators(hass).pop(entry_id, None)
+
+
+def _remove_domain_services_if_no_coordinators(hass: HomeAssistant) -> None:
+    if _coordinators(hass):
+        return
+    if hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
+        hass.services.async_remove(DOMAIN, SERVICE_SEND_NOTIFICATION)
+    if hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE):
+        hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SCHEDULE)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
@@ -247,25 +286,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
-    # Stop MQTT bridge
-    bridge = _MQTT_BRIDGES.pop(entry.entry_id, None)
-    if bridge:
-        await bridge.async_stop()
+    await _stop_mqtt_bridge_for_entry(entry.entry_id)
 
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        _notification_clients(hass).pop(entry.entry_id, None)
-        _coordinators(hass).pop(entry.entry_id, None)
-    if (
-        unloaded
-        and not _coordinators(hass)
-        and hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION)
-    ):
-        hass.services.async_remove(DOMAIN, SERVICE_SEND_NOTIFICATION)
-    if (
-        unloaded
-        and not _coordinators(hass)
-        and hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE)
-    ):
-        hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SCHEDULE)
+    if not unloaded:
+        return unloaded
+
+    _remove_entry_runtime_data(hass, entry.entry_id)
+    _remove_domain_services_if_no_coordinators(hass)
     return unloaded
