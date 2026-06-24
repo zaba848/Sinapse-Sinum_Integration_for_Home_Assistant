@@ -21,15 +21,38 @@ async def async_setup_entry(
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[EventEntity] = []
 
-    for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == WTYPE_BUTTON:
-            entities.append(SinumButtonEvent(coordinator, device_id, entry.entry_id, "wtp"))
-
-    for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_BUTTON:
-            entities.append(SinumButtonEvent(coordinator, device_id, entry.entry_id, "sbus"))
+    _add_button_events(
+        coordinator,
+        entry.entry_id,
+        entities,
+        coordinator.wtp_devices,
+        WTYPE_BUTTON,
+        "wtp",
+    )
+    _add_button_events(
+        coordinator,
+        entry.entry_id,
+        entities,
+        coordinator.sbus_devices,
+        STYPE_BUTTON,
+        "sbus",
+    )
 
     async_add_entities(entities)
+
+
+def _add_button_events(
+    coordinator: SinumCoordinator,
+    entry_id: str,
+    entities: list[EventEntity],
+    device_store: dict[int, dict[str, Any]],
+    expected_type: str,
+    bus: str,
+) -> None:
+    for device_id, device in device_store.items():
+        if device.get("type") != expected_type:
+            continue
+        entities.append(SinumButtonEvent(coordinator, device_id, entry_id, bus))
 
 
 class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
