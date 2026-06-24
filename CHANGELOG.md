@@ -2,6 +2,26 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+---
+
+## Upgrading
+
+### Before You Update
+1. **Backup your Home Assistant configuration**: `config/custom_components/sinum/` directory.
+2. **Check for breaking changes**: Review the release notes below for your version.
+3. **Test in staging first**: If you have a development HA instance, test there first.
+
+### After You Update
+1. **Reload the integration**: Go to **Settings** → **Devices & Services** → **Sinum** → **Reload**.
+2. **Verify entities**: Check that all entities are still available in **Settings** → **Devices & Services** → **Sinum**.
+3. **Check automations**: If you use Sinum buttons/events in automations, verify they still trigger correctly.
+
+### Reporting Issues
+- Use [GitHub Issues](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues) for bugs.
+- For security vulnerabilities, see [SECURITY.md](SECURITY.md).
+
+---
+
 ## [Unreleased]
 
 ## [0.2.7] — 2026-06-24

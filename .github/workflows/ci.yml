@@ -41,6 +41,11 @@ jobs:
             --cov-fail-under=80 \
             -q
 
+      - name: Validate per-module quality gates
+        if: always()
+        run: |
+          python scripts/validate_coverage_gates.py
+
       - name: Coverage summary
         if: always()
         run: |

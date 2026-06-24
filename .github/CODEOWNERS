@@ -1,0 +1,40 @@
+# CODEOWNERS file defines code ownership for automatic review requests.
+# 
+# When a PR modifies files matching a pattern, the owners listed will be
+# automatically requested as reviewers (GitHub handles this automatically).
+#
+# Format: pattern @owner
+
+# Global default
+* @zaba848
+
+# API client (auth, requests, connection handling)
+custom_components/sinum/api.py @zaba848
+
+# Coordinator (device polling, state management, coordinator logic)
+custom_components/sinum/coordinator.py @zaba848
+
+# CI/CD workflows and automation
+.github/workflows/ @zaba848
+.github/dependabot.yml @zaba848
+
+# Release and version management
+CHANGELOG.md @zaba848
+pyproject.toml @zaba848
+custom_components/sinum/manifest.json @zaba848
+
+# Security and policies
+SECURITY.md @zaba848
+.github/CODEOWNERS @zaba848
+LICENSE @zaba848
+
+# Hardware validation and integration tests
+HARDWARE_TEST_PLAN.md @zaba848
+tests/test_api.py @zaba848
+tests/test_api_extended.py @zaba848
+tests/test_coordinator.py @zaba848
+tests/test_coordinator_extended.py @zaba848
+
+# Config flow and integation initialization
+custom_components/sinum/config_flow.py @zaba848
+custom_components/sinum/__init__.py @zaba848
