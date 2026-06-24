@@ -208,8 +208,8 @@ class TestThermostatOutputGroupSensor:
     """Lines 342, 346-353: SinumThermostatOutputGroupSensor extra_state_attributes."""
 
     def _make(self):
-        from unittest.mock import MagicMock
-        from unittest.mock import patch
+        from unittest.mock import MagicMock, patch
+
         from custom_components.sinum.sensor_virtual import SinumThermostatOutputGroupSensor
         coord = MagicMock()
         coord.virtual_devices = {5: {
@@ -245,6 +245,7 @@ class TestAutomationStatusSensor:
 
     def _make(self, automation):
         from unittest.mock import MagicMock, patch
+
         from custom_components.sinum.sensor_virtual import SinumAutomationStatusSensor
         coord = MagicMock()
         coord.automations = [automation]
@@ -282,9 +283,9 @@ class TestEnergyCenterStatusSensor:
     """Lines 434, 440-443: SinumEnergyCenterStatusSensor extra attrs + async_update."""
 
     def _make(self, data=None):
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from custom_components.sinum.sensor_virtual import SinumEnergyCenterStatusSensor
-        from custom_components.sinum.api import SinumConnectionError
         client = MagicMock()
         client.get_energy_center_summary = AsyncMock(return_value=data or {
             "available_endpoints": ["prices", "storage"],

@@ -4,6 +4,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
 
 from custom_components.sinum.api import SinumAuthError, SinumConnectionError
 from custom_components.sinum.const import (
@@ -14,8 +15,6 @@ from custom_components.sinum.const import (
     CONF_MQTT_ENABLED,
     CONF_MQTT_TOPIC_PREFIX,
     DEFAULT_MQTT_TOPIC_PREFIX,
-    DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
 )
 
 
@@ -195,7 +194,7 @@ class TestOptionsFlow:
 
         result = await flow.async_step_init(None)
         schema = result["data_schema"]
-        with pytest.raises(Exception):
+        with pytest.raises(vol.Invalid):
             schema(
                 {
                     "scan_interval": 60,

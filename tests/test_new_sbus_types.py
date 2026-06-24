@@ -91,7 +91,10 @@ class TestButtonSensor:
 
 class TestValvePumpBinarySensor:
     def test_is_on_when_state_true(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            SBUS_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         from custom_components.sinum.const import STYPE_VALVE_PUMP
 
         desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)
@@ -104,7 +107,10 @@ class TestValvePumpBinarySensor:
         assert entity.is_on is True
 
     def test_is_off_when_state_false(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            SBUS_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         from custom_components.sinum.const import STYPE_VALVE_PUMP
 
         desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)
@@ -118,7 +124,10 @@ class TestValvePumpBinarySensor:
         assert entity.is_on is False
 
     def test_unique_id_contains_pump_key(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, SBUS_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            SBUS_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         from custom_components.sinum.const import STYPE_VALVE_PUMP
 
         desc = next(d for d in SBUS_BINARY_SENSOR_TYPES if d.wtp_type == STYPE_VALVE_PUMP)

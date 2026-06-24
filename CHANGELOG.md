@@ -23,6 +23,21 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-06-24
+
+### Added
+- Complexity quality gate enabled in Ruff (`C901`, mccabe max-complexity = 8) to prevent high-complexity regressions.
+
+### Changed
+- Release Gate behavior on push: pending required workflows are now treated as non-blocking to avoid false failures immediately after push.
+
+### Test Coverage
+- `custom_components/sinum/api.py`: raised to 100%.
+- `custom_components/sinum/config_flow.py`: raised to 99%.
+- `custom_components/sinum/cover.py`: raised to 98%.
+- `custom_components/sinum/light.py`: raised to 95%.
+- `custom_components/sinum/sensor_virtual.py`: raised to 99%.
+
 ## [0.3.1] — 2026-06-24
 
 ### Fixed

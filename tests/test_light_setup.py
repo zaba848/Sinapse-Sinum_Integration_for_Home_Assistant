@@ -701,7 +701,7 @@ class TestSinumBusRgbLightHelpers:
     def test_sbus_lua_kelvin_produces_set_temperature(self):
         entity = self._make_sbus()
         lines, optimistic = entity._sbus_lua_commands(**{ATTR_COLOR_TEMP_KELVIN: 4000})
-        assert any("set_temperature" in l for l in lines)
+        assert any("set_temperature" in line for line in lines)
         assert 4000 in lines[0].__class__.__mro__ or "4000" in lines[0]
         assert optimistic["color_mode"] == "temperature"
         assert optimistic["white_temperature"] == 4000
@@ -709,7 +709,7 @@ class TestSinumBusRgbLightHelpers:
     def test_sbus_lua_hs_produces_set_color(self):
         entity = self._make_sbus()
         lines, optimistic = entity._sbus_lua_commands(**{ATTR_HS_COLOR: (0.0, 100.0)})
-        assert any("set_color" in l for l in lines)
+        assert any("set_color" in line for line in lines)
         assert optimistic["color_mode"] == "rgb"
 
     def test_sbus_lua_hs_switches_mode_from_temperature_to_rgb(self):
@@ -732,22 +732,22 @@ class TestSinumBusRgbLightHelpers:
     def test_sbus_lua_brightness_produces_set_brightness(self):
         entity = self._make_sbus()
         lines, optimistic = entity._sbus_lua_commands(**{ATTR_BRIGHTNESS: 128})
-        assert any("set_brightness" in l for l in lines)
+        assert any("set_brightness" in line for line in lines)
         assert optimistic["brightness"] == round(128 / 255 * 100)
 
     def test_sbus_lua_hs_and_brightness_produces_two_commands(self):
         entity = self._make_sbus()
         lines, _ = entity._sbus_lua_commands(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 200})
         assert len(lines) == 2
-        assert any("set_color" in l for l in lines)
-        assert any("set_brightness" in l for l in lines)
+        assert any("set_color" in line for line in lines)
+        assert any("set_brightness" in line for line in lines)
 
     def test_sbus_lua_kelvin_takes_precedence_over_hs(self):
         entity = self._make_sbus()
         lines, optimistic = entity._sbus_lua_commands(
             **{ATTR_COLOR_TEMP_KELVIN: 3000, ATTR_HS_COLOR: (0.0, 100.0)}
         )
-        assert all("set_temperature" in l or l == "" for l in lines)
+        assert all("set_temperature" in line or line == "" for line in lines)
         assert "white_temperature" in optimistic
 
     def test_wtp_color_payload_kelvin(self):
@@ -969,23 +969,26 @@ class TestLightHelperEdgeCases:
 
     def test_color_mode_temperature_explicit(self):
         """Line 190: _color_mode returns COLOR_TEMP when color_mode='temperature'."""
-        from custom_components.sinum.light import _color_mode
         from homeassistant.components.light import ColorMode
+
+        from custom_components.sinum.light import _color_mode
 
         assert _color_mode({"color_mode": "temperature"}) == ColorMode.COLOR_TEMP
         assert _color_mode({"color_mode": "color_temp"}) == ColorMode.COLOR_TEMP
 
     def test_color_mode_brightness_fallback(self):
         """Lines 191-192: _color_mode returns BRIGHTNESS when no rgb/temp."""
-        from custom_components.sinum.light import _color_mode
         from homeassistant.components.light import ColorMode
+
+        from custom_components.sinum.light import _color_mode
 
         assert _color_mode({}) == ColorMode.BRIGHTNESS
 
     def test_color_mode_color_temp_when_only_white_temperature(self):
         """Line 192: _supports_color_temperature path in _color_mode."""
-        from custom_components.sinum.light import _color_mode
         from homeassistant.components.light import ColorMode
+
+        from custom_components.sinum.light import _color_mode
 
         assert _color_mode({"white_temperature": 3000}) == ColorMode.COLOR_TEMP
 
