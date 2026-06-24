@@ -58,6 +58,29 @@ _FAN_MODES: list[str] = ["1", "2", "3"]
 _WTP_FAN_COIL_TYPES = {WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2}
 
 
+def _add_virtual_climate(
+    coordinator: SinumCoordinator, entities: list[ClimateEntity], entry_id: str
+) -> None:
+    for device_id, device in coordinator.virtual_devices.items():
+        if _is_thermostat(device):
+            entities.append(SinumThermostat(coordinator, device_id, entry_id))
+        elif device.get("type") == VTYPE_HEAT_PUMP_MANAGER:
+            entities.append(SinumHeatPumpManagerClimate(coordinator, device_id, entry_id))
+
+
+def _add_bus_climate(
+    coordinator: SinumCoordinator, entities: list[ClimateEntity], entry_id: str, bus: str
+) -> None:
+    store = coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
+    fan_coil_types = {STYPE_FAN_COIL} if bus == "sbus" else _WTP_FAN_COIL_TYPES
+    for device_id, device in store.items():
+        dev_type = device.get("type")
+        if dev_type in fan_coil_types and _has_climate_control(device, source=bus):
+            entities.append(SinumFanCoilClimate(coordinator, device_id, entry_id, bus))
+        elif dev_type == "temperature_regulator":
+            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry_id, bus))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -65,33 +88,9 @@ async def async_setup_entry(
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[ClimateEntity] = []
-
-    # Virtual thermostats and heat pump manager
-    for device_id, device in coordinator.virtual_devices.items():
-        dev_type = device.get("type")
-        if _is_thermostat(device):
-            entities.append(SinumThermostat(coordinator, device_id, entry.entry_id))
-        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
-            entities.append(SinumHeatPumpManagerClimate(coordinator, device_id, entry.entry_id))
-
-    # SBUS fan coils (full climate control: work_mode + temp + fan)
-    for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_FAN_COIL and _has_climate_control(device, source="sbus"):
-            entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "sbus"))
-        elif device.get("type") == "temperature_regulator":
-            entities.append(
-                SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "sbus")
-            )
-
-    # WTP fan coils and temperature regulators
-    for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") in _WTP_FAN_COIL_TYPES and _has_climate_control(device, source="wtp"):
-            entities.append(SinumFanCoilClimate(coordinator, device_id, entry.entry_id, "wtp"))
-        elif device.get("type") == "temperature_regulator":
-            entities.append(
-                SinumTemperatureRegulatorClimate(coordinator, device_id, entry.entry_id, "wtp")
-            )
-
+    _add_virtual_climate(coordinator, entities, entry.entry_id)
+    _add_bus_climate(coordinator, entities, entry.entry_id, "sbus")
+    _add_bus_climate(coordinator, entities, entry.entry_id, "wtp")
     async_add_entities(entities)
 
 
@@ -110,34 +109,37 @@ def _has_climate_control(device: dict[str, Any], source: str = "sbus") -> bool:
     return "work_mode" in device and "target_temperature" in device
 
 
-def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
-    modes = [HVACMode.OFF]
+def _modes_from_declared(declared: list[str]) -> list[HVACMode]:
+    """Build HA mode list from Sinum available_work_modes field."""
+    modes: list[HVACMode] = [HVACMode.OFF]
+    for sinum_mode in declared:
+        ha_mode = _MODE_TO_HVAC.get(sinum_mode)
+        if ha_mode and ha_mode not in modes:
+            modes.append(ha_mode)
+    return modes
 
-    # Explicit list (FanCoil may populate this); skip empty lists to fall through to inference
-    declared = device.get("available_work_modes")
-    if declared:
-        for sinum_mode in declared:
-            ha_mode = _MODE_TO_HVAC.get(sinum_mode)
-            if ha_mode and ha_mode not in modes:
-                modes.append(ha_mode)
-        return modes
 
-    # Infer from mode-specific temperature fields (thermostat with null available_work_modes)
+def _infer_modes(device: dict[str, Any]) -> list[HVACMode]:
+    """Infer HVAC mode list from temperature field presence when hub lists no modes."""
+    modes: list[HVACMode] = [HVACMode.OFF]
     if device.get("target_temperature_heating_minimum") is not None:
         modes.append(HVACMode.HEAT)
     if device.get("target_temperature_cooling_minimum") is not None and HVACMode.COOL not in modes:
         modes.append(HVACMode.COOL)
-
-    # Always include current active mode so it never disappears from the picker
     current = device.get("mode") or device.get("work_mode")
     if current and current not in ("off", ""):
         ha_mode = _MODE_TO_HVAC.get(current)
         if ha_mode and ha_mode not in modes:
             modes.append(ha_mode)
-
     if len(modes) == 1:
         modes.append(HVACMode.HEAT)
     return modes
+
+
+def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
+    if declared := device.get("available_work_modes"):
+        return _modes_from_declared(declared)
+    return _infer_modes(device)
 
 
 class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
