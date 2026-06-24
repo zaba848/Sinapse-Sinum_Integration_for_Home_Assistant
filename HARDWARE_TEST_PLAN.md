@@ -6,6 +6,33 @@ HA:       http://homeassistant.local:8123 (token HA)
 
 ---
 
+## Bramka wydania (CC + sprzęt)
+
+Ten projekt traktuje testy jako walidację funkcji, nie "liczbę testów".
+Przed każdym release obowiązuje bramka:
+
+1. **CC (Coverage Check)** w CI (`ci.yml`) musi przejść z progiem `--cov-fail-under=80`.
+2. **Functional Smoke Tests** (`tests.yml`) muszą przejść na PR/release.
+3. **Manualny test sprzętowy** poniżej musi zostać odhaczony i udokumentowany.
+
+### Manualny smoke test sprzętowy (release checklist)
+
+Wykonaj na żywych hubach SBUS/WTP i zapisz wynik (OK/NOK + krótka notatka):
+
+| Obszar | Scenariusz | Wynik |
+|---|---|---|
+| API/Auth | Ponowne logowanie token/JWT po restarcie HA | ☐ |
+| MQTT | Zmiana stanu urządzenia propaguje się < 1 s | ☐ |
+| Climate | `set_temperature` i `set_hvac_mode` działają | ☐ |
+| Light | SBUS RGB: kolor + jasność + temp. barwowa | ☐ |
+| Cover | Brama/roleta reaguje na open/close/stop | ☐ |
+| Switch | Relay on/off zgodny ze stanem fizycznym | ☐ |
+| Sensor | Odczyty temperatury/wilgotności bez regresji | ☐ |
+
+Release bez pełnego przejścia tej checklisty powinien być traktowany jako RC, nie final.
+
+---
+
 ## ELEMENT 1: RGB controller — jasność/kolor/temperatura
 **Status: DONE ✓ (2026-06-22)**
 
