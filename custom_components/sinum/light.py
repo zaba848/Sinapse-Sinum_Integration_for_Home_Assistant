@@ -45,13 +45,38 @@ def _add_bus_lights(
     button_type = WTYPE_BUTTON if bus == "wtp" else STYPE_BUTTON
 
     for device_id, device in store.items():
-        dev_type = device.get("type")
-        if dev_type == dimmer_type:
-            entities.append(SinumBusDimmerLight(coordinator, device_id, entry_id, bus))
-        elif dev_type == rgb_type:
-            entities.append(SinumBusRgbLight(coordinator, device_id, entry_id, bus))
-        elif dev_type == button_type and "color" in device:
-            entities.append(SinumButtonLight(coordinator, device_id, entry_id, bus))
+        entity = _bus_light_entity(
+            coordinator,
+            device_id,
+            entry_id,
+            bus,
+            device,
+            dimmer_type,
+            rgb_type,
+            button_type,
+        )
+        if entity is not None:
+            entities.append(entity)
+
+
+def _bus_light_entity(
+    coordinator: SinumCoordinator,
+    device_id: int,
+    entry_id: str,
+    bus: str,
+    device: dict[str, Any],
+    dimmer_type: str,
+    rgb_type: str,
+    button_type: str,
+) -> LightEntity | None:
+    dev_type = device.get("type")
+    if dev_type == dimmer_type:
+        return SinumBusDimmerLight(coordinator, device_id, entry_id, bus)
+    if dev_type == rgb_type:
+        return SinumBusRgbLight(coordinator, device_id, entry_id, bus)
+    if dev_type == button_type and "color" in device:
+        return SinumButtonLight(coordinator, device_id, entry_id, bus)
+    return None
 
 
 async def async_setup_entry(
@@ -76,26 +101,36 @@ def _label(device: dict[str, Any]) -> str:
     return (device.get("_device_name") or device.get("name", "")).strip()
 
 
+def _parse_hex_rgb(hex_color: str) -> tuple[float, float, float] | None:
+    normalized = hex_color.lstrip("#")
+    if len(normalized) < 6:
+        return None
+    try:
+        return tuple(int(normalized[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except ValueError:
+        return None
+
+
+def _hue_from_rgb(r: float, g: float, b: float, delta: float, max_c: float) -> float:
+    if delta == 0:
+        return 0.0
+    if max_c == r:
+        return 60 * (((g - b) / delta) % 6)
+    if max_c == g:
+        return 60 * ((b - r) / delta + 2)
+    return 60 * ((r - g) / delta + 4)
+
+
 def _hex_to_hsv(hex_color: str) -> tuple[float, float, float]:
     """Convert #RRGGBB to (hue 0-360, saturation 0-100, value 0-1)."""
-    hex_color = hex_color.lstrip("#")
-    if len(hex_color) < 6:
+    rgb = _parse_hex_rgb(hex_color)
+    if rgb is None:
         return (0.0, 0.0, 1.0)
-    try:
-        r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
-    except ValueError:
-        return (0.0, 0.0, 1.0)
+    r, g, b = rgb
     max_c = max(r, g, b)
     min_c = min(r, g, b)
     delta = max_c - min_c
-    if delta == 0:
-        h = 0.0
-    elif max_c == r:
-        h = 60 * (((g - b) / delta) % 6)
-    elif max_c == g:
-        h = 60 * ((b - r) / delta + 2)
-    else:
-        h = 60 * ((r - g) / delta + 4)
+    h = _hue_from_rgb(r, g, b, delta, max_c)
     s = 0.0 if max_c == 0 else (delta / max_c) * 100
     return h, s, max_c
 
