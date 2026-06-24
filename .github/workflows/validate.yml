@@ -16,7 +16,7 @@ jobs:
     # Skip on private repos — the check will pass automatically once the repo is made public.
     if: github.event.repository.private == false || github.event_name == 'schedule'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: hacs/action@main
         with:
           category: integration
