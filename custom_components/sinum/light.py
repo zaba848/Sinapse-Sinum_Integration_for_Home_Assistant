@@ -30,7 +30,7 @@ from .const import (
     WTYPE_DIMMER,
     WTYPE_RGB_CONTROLLER,
 )
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -191,7 +191,7 @@ def _color_mode(device: dict[str, Any]) -> ColorMode:
     return ColorMode.BRIGHTNESS
 
 
-class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumDimmerLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
     """Dimmer/RGB controller integrator."""
 
     _attr_has_entity_name = True
@@ -282,7 +282,9 @@ class SinumDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self.async_write_ha_state()
 
 
-class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumBusDimmerLight(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity
+):
     """SBUS or WTP dimmer — uses target_level (0-100) for brightness."""
 
     _attr_has_entity_name = True
@@ -361,7 +363,7 @@ class SinumBusDimmerLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self.async_write_ha_state()
 
 
-class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumBusRgbLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
     """SBUS or WTP rgb_controller.
 
     SBUS devices are controlled via Lua scenes (set_color / set_brightness /
@@ -571,7 +573,7 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
         self.async_write_ha_state()
 
 
-class SinumButtonLight(CoordinatorEntity[SinumCoordinator], LightEntity):
+class SinumButtonLight(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity):
     """Button panel backlight — controls the physical LED color via the 'color' field."""
 
     _attr_has_entity_name = True

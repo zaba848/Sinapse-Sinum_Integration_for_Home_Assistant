@@ -20,7 +20,7 @@ from .const import (
     VTYPE_WICKET,
     WTYPE_RELAY,
 )
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
 def _add_virtual_switches(
@@ -83,7 +83,9 @@ def _device_info(
     )
 
 
-class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+class SinumRelaySwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_icon = "mdi:electric-switch"
@@ -125,7 +127,9 @@ class SinumRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self.async_write_ha_state()
 
 
-class SinumWicketSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+class SinumWicketSwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
     """Wicket (electric strike) — on = unlock, off = lock."""
 
     _attr_has_entity_name = True
@@ -167,7 +171,9 @@ class SinumWicketSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self.async_write_ha_state()
 
 
-class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+class SinumBusRelaySwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
     """Physical relay on WTP or SBUS bus."""
 
     _attr_has_entity_name = True
@@ -252,7 +258,9 @@ class SinumBusRelaySwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self.async_write_ha_state()
 
 
-class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+class SinumCommonValveSwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
     """SBUS common_valve — enabled bool, complex calibration settings as attributes."""
 
     _attr_has_entity_name = True
@@ -315,7 +323,7 @@ class SinumCommonValveSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
         self.async_write_ha_state()
 
 
-class SinumDhwSwitch(CoordinatorEntity[SinumCoordinator], SwitchEntity):
+class SinumDhwSwitch(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity):
     """DHW (domestic hot water) enable switch on heat_pump_manager virtual devices."""
 
     _attr_has_entity_name = True

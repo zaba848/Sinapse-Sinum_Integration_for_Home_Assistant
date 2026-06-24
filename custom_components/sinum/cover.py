@@ -26,7 +26,7 @@ from .const import (
     VTYPE_GATE,
     WTYPE_BLIND_CONTROLLER,
 )
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
 async def async_setup_entry(
@@ -73,7 +73,7 @@ def _device_info(
     )
 
 
-class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumBlindCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity):
     """Blind controller integrator — position 0 (closed) – 100 (open), optional tilt."""
 
     _attr_has_entity_name = True
@@ -177,7 +177,7 @@ class SinumBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self.async_write_ha_state()
 
 
-class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumGateCover(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity):
     """Gate controller — open/close/stop."""
 
     _attr_has_entity_name = True
@@ -245,7 +245,9 @@ class SinumGateCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self.async_write_ha_state()
 
 
-class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumWtpBlindCover(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity
+):
     """WTP blind_controller — position 0 (closed) – 100 (open), no tilt."""
 
     _attr_has_entity_name = True
@@ -355,7 +357,9 @@ class SinumWtpBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
         self.async_write_ha_state()
 
 
-class SinumSbusBlindCover(CoordinatorEntity[SinumCoordinator], CoverEntity):
+class SinumSbusBlindCover(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], CoverEntity
+):
     """SBUS blind_controller — position + tilt (venetian blinds)."""
 
     _attr_has_entity_name = True

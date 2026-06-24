@@ -462,6 +462,18 @@ def _inject_parent_models(
                 device["_parent_id"] = pid
 
 
+class SinumDeviceAvailableMixin:
+    """Marks entity unavailable when its backing device is absent from the coordinator store.
+
+    Mix in *before* CoordinatorEntity so MRO resolves available here first:
+        class MyEntity(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], ...):
+    """
+
+    @property
+    def available(self) -> bool:  # type: ignore[override]
+        return super().available and bool(self._device)  # type: ignore[misc]
+
+
 def via_device_for(device: dict[str, Any], entry_id: str) -> tuple[str, str] | None:
     """Return (DOMAIN, unique_key) for the parent hardware device, or None."""
     cls = device.get("_parent_class")

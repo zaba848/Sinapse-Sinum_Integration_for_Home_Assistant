@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .api import SinumConnectionError
 from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,7 +48,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class SinumVariableNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
+class SinumVariableNumber(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], NumberEntity
+):
     """Sinum global variable exposed as a HA number entity."""
 
     _attr_has_entity_name = True
@@ -86,6 +88,10 @@ class SinumVariableNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
         return {}
 
     @property
+    def _device(self) -> dict[str, Any]:
+        return self._variable
+
+    @property
     def native_value(self) -> float | None:
         value = self._variable.get("value")
         return float(value) if value is not None else None
@@ -115,7 +121,9 @@ def _hub_model(hub_info: dict[str, Any]) -> str:
     return hub_info.get("model") or model_map.get(hub_info.get("device_type", "")) or "Sinum EH-01"
 
 
-class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
+class SinumAnalogOutputNumber(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], NumberEntity
+):
     """SBUS analog_output — writable output value (e.g. 0–10 V control signal)."""
 
     _attr_has_entity_name = True
@@ -162,7 +170,7 @@ class SinumAnalogOutputNumber(CoordinatorEntity[SinumCoordinator], NumberEntity)
         self.async_write_ha_state()
 
 
-class SinumPwmNumber(CoordinatorEntity[SinumCoordinator], NumberEntity):
+class SinumPwmNumber(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], NumberEntity):
     """SBUS pulse_width_modulation — duty_cycle control (0–100 %)."""
 
     _attr_has_entity_name = True

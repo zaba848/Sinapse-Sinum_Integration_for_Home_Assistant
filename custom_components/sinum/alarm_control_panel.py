@@ -35,7 +35,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .api import SinumConnectionError
 from .const import DOMAIN
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +66,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class SinumAlarmZone(CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntity):
+class SinumAlarmZone(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], AlarmControlPanelEntity
+):
     """Alarm zone from the Sinum alarm system."""
 
     _attr_has_entity_name = True

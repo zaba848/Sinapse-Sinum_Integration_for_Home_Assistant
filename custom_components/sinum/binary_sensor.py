@@ -31,7 +31,7 @@ from .const import (
     WTYPE_TEMPERATURE_REGULATOR,
     WTYPE_TWO_STATE_INPUT_SENSOR,
 )
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -245,7 +245,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class SinumBinarySensor(CoordinatorEntity[SinumCoordinator], BinarySensorEntity):
+class SinumBinarySensor(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], BinarySensorEntity
+):
     _attr_has_entity_name = True
     entity_description: SinumBinarySensorDescription
 

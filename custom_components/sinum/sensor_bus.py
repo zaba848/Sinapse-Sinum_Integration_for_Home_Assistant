@@ -25,7 +25,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 # Sinum hub encodes "no value / sensor error" as signed 16-bit minimum (-32768).
 # Multiply by 0.1 scale → -3276.8°C. Treat this as unavailable.
@@ -507,7 +507,7 @@ LORA_SENSORS: tuple[SinumSensorDescription, ...] = (
 )
 
 
-class SinumSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SensorEntity):
     _attr_has_entity_name = True
     entity_description: SinumSensorDescription
 
@@ -618,7 +618,9 @@ class SinumTemperatureRegulatorSensor(SinumSensor):
         return attrs
 
 
-class SinumButtonSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+class SinumButtonSensor(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SensorEntity
+):
     """Last-action sensor for WTP/SBUS button devices (diagnostic fallback)."""
 
     _attr_has_entity_name = True

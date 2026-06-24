@@ -26,7 +26,7 @@ from .const import (
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
 )
-from .coordinator import SinumCoordinator, via_device_for
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +153,9 @@ def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
     return _infer_modes(device)
 
 
-class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
+class SinumThermostat(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], ClimateEntity
+):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -611,7 +613,9 @@ class SinumTemperatureRegulatorClimate(
         self.async_write_ha_state()
 
 
-class SinumHeatPumpManagerClimate(CoordinatorEntity[SinumCoordinator], ClimateEntity):
+class SinumHeatPumpManagerClimate(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], ClimateEntity
+):
     """Virtual heat_pump_manager — controls heat pump work mode and target temperature."""
 
     _attr_has_entity_name = True
