@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 
 from custom_components.sinum.sensor import (
@@ -168,3 +169,161 @@ class TestPhase7BTemperatureRegulators:
         # Attributes should only include fields that exist
         attrs = entity.extra_state_attributes
         assert len(attrs) == 0  # No mode, parent_id, etc. in partial device
+
+
+class TestCountItems:
+    """Lines 292, 294-298, 301: _count_items helper edge cases."""
+
+    def test_none_returns_zero(self):
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items(None) == 0
+
+    def test_empty_dict_returns_zero(self):
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items({}) == 0
+
+    def test_flat_dict_returns_len(self):
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items({"a": 1, "b": 2}) == 2
+
+    def test_nested_dict_sums_recursively(self):
+        """Lines 296-298: nested dict/list values trigger recursive sum."""
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items({"a": [1, 2, 3], "b": [4, 5]}) == 5
+
+    def test_list_returns_len(self):
+        """Line 301: list/tuple/set returns len."""
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items([1, 2, 3]) == 3
+        assert _count_items(("a", "b")) == 2
+        assert _count_items({"x", "y", "z"}) == 3
+
+    def test_scalar_returns_one(self):
+        from custom_components.sinum.sensor_virtual import _count_items
+        assert _count_items(42) == 1
+        assert _count_items("hello") == 1
+
+
+class TestThermostatOutputGroupSensor:
+    """Lines 342, 346-353: SinumThermostatOutputGroupSensor extra_state_attributes."""
+
+    def _make(self):
+        from unittest.mock import MagicMock
+        from unittest.mock import patch
+        from custom_components.sinum.sensor_virtual import SinumThermostatOutputGroupSensor
+        coord = MagicMock()
+        coord.virtual_devices = {5: {
+            "id": 5, "type": "thermostat_output_group",
+            "name": "Group A", "room_id": 2, "state": True,
+            "enabled": True, "mode": "auto", "class": "virtual", "source": "api",
+            "zones": [1, 2, 3],
+        }}
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumThermostatOutputGroupSensor(coord, 5, "e")
+        return entity
+
+    def test_extra_state_attributes_includes_all_keys(self):
+        entity = self._make()
+        attrs = entity.extra_state_attributes
+        assert attrs["device_id"] == 5
+        assert attrs["name"] == "Group A"
+        assert attrs["state"] is True
+        assert attrs["mode"] == "auto"
+
+    def test_native_value_counts_list_from_output_key(self):
+        entity = self._make()
+        # "outputs" is a valid _OUTPUT_GROUP_KEYS key — list of 3 items
+        entity.coordinator.virtual_devices = {5: {
+            "id": 5, "type": "thermostat_output_group",
+            "name": "Group A", "outputs": [1, 2, 3],
+        }}
+        assert entity.native_value == 3
+
+
+class TestAutomationStatusSensor:
+    """Lines 387, 395-396, 400-404: SinumAutomationStatusSensor properties."""
+
+    def _make(self, automation):
+        from unittest.mock import MagicMock, patch
+        from custom_components.sinum.sensor_virtual import SinumAutomationStatusSensor
+        coord = MagicMock()
+        coord.automations = [automation]
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumAutomationStatusSensor(coord, automation, "e")
+        return entity
+
+    def test_native_value_enabled_true(self):
+        entity = self._make({"id": 1, "enabled": True, "name": "auto1"})
+        assert entity.native_value == "enabled"
+
+    def test_native_value_enabled_false(self):
+        entity = self._make({"id": 1, "enabled": False})
+        assert entity.native_value == "disabled"
+
+    def test_native_value_state_string_fallback(self):
+        """Line 400: state/status string fallback."""
+        entity = self._make({"id": 1, "state": "running"})
+        assert entity.native_value == "running"
+
+    def test_native_value_unknown_when_nothing(self):
+        entity = self._make({"id": 1})
+        assert entity.native_value == "unknown"
+
+    def test_extra_state_attributes_includes_name_and_tags(self):
+        """Lines 401-404: extra_state_attributes includes known keys."""
+        entity = self._make({"id": 1, "name": "auto1", "tags": ["heat"]})
+        attrs = entity.extra_state_attributes
+        assert attrs["automation_id"] == 1  # stored as raw int
+        assert attrs["name"] == "auto1"
+        assert attrs["tags"] == ["heat"]
+
+
+class TestEnergyCenterStatusSensor:
+    """Lines 434, 440-443: SinumEnergyCenterStatusSensor extra attrs + async_update."""
+
+    def _make(self, data=None):
+        from unittest.mock import MagicMock, AsyncMock
+        from custom_components.sinum.sensor_virtual import SinumEnergyCenterStatusSensor
+        from custom_components.sinum.api import SinumConnectionError
+        client = MagicMock()
+        client.get_energy_center_summary = AsyncMock(return_value=data or {
+            "available_endpoints": ["prices", "storage"],
+            "missing_endpoints": ["consumption"],
+        })
+        entity = SinumEnergyCenterStatusSensor(client, data or {
+            "available_endpoints": ["prices", "storage"],
+            "missing_endpoints": ["consumption"],
+        }, "e")
+        entity._client = client
+        return entity
+
+    def test_native_value_counts_available_endpoints(self):
+        entity = self._make()
+        assert entity.native_value == 2
+
+    def test_extra_state_attributes_has_available_and_missing(self):
+        """Line 440-443: extra_state_attributes returns both endpoint lists."""
+        entity = self._make()
+        attrs = entity.extra_state_attributes
+        assert "prices" in attrs["available_endpoints"]
+        assert "consumption" in attrs["missing_endpoints"]
+
+    @pytest.mark.asyncio
+    async def test_async_update_refreshes_data(self):
+        """Line 434: async_update fetches new data."""
+        entity = self._make()
+        new_data = {"available_endpoints": ["prices"], "missing_endpoints": []}
+        entity._client.get_energy_center_summary = AsyncMock(return_value=new_data)
+        await entity.async_update()
+        assert entity.native_value == 1
+
+    @pytest.mark.asyncio
+    async def test_async_update_handles_connection_error(self):
+        """Line 443: SinumConnectionError during update is swallowed."""
+        from custom_components.sinum.api import SinumConnectionError
+        entity = self._make()
+        entity._client.get_energy_center_summary = AsyncMock(
+            side_effect=SinumConnectionError("unreachable")
+        )
+        # Should not raise
+        await entity.async_update()
