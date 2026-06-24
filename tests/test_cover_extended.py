@@ -540,3 +540,205 @@ class TestCoverAsyncSetupEntry:
         assert "SinumGateCover" in types
         assert "SinumWtpBlindCover" in types
         assert "SinumSbusBlindCover" in types
+
+
+class TestRestorePaths:
+    """Cover async_added_to_hass restore paths for all cover entity types."""
+
+    @pytest.mark.asyncio
+    async def test_blind_cover_restores_position_from_last_state(self):
+        """Lines 110-119: restore position/tilt from HA state when device missing."""
+        coord = _make_coordinator(virtual_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "open"
+        last.attributes = {"current_position": 60, "current_tilt_position": 30}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_current_cover_position = None
+        entity._attr_current_cover_tilt_position = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position == 60
+        assert entity._attr_current_cover_tilt_position == 30
+
+    @pytest.mark.asyncio
+    async def test_blind_cover_skips_restore_when_unavailable(self):
+        coord = _make_coordinator(virtual_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "unavailable"
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_current_cover_position = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position is None
+
+    @pytest.mark.asyncio
+    async def test_gate_restores_closed_state_from_last_state(self):
+        """Lines 231-237: gate cover restores _restored_closed from HA state."""
+        coord = _make_coordinator(virtual_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumGateCover(coord, 14, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "closed"
+        last.attributes = {}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+
+        await entity.async_added_to_hass()
+
+        assert entity._restored_closed is True
+
+    @pytest.mark.asyncio
+    async def test_gate_is_closed_uses_restored_state_when_no_device(self):
+        """Line 248: is_closed falls back to _restored_closed."""
+        coord = _make_coordinator(virtual_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumGateCover(coord, 14, "test_entry")
+        entity._restored_closed = True
+        assert entity.is_closed is True
+
+    @pytest.mark.asyncio
+    async def test_wtp_blind_restores_position_from_last_state(self):
+        """Lines 322-329: WTP blind restores position from HA state."""
+        coord = _make_coordinator(wtp_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "open"
+        last.attributes = {"current_position": 75}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_current_cover_position = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position == 75
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_restores_position_and_tilt_from_last_state(self):
+        """Lines 448-457: SBUS blind restores position + tilt from HA state."""
+        coord = _make_coordinator(sbus_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "open"
+        last.attributes = {"current_position": 50, "current_tilt_position": 45}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_current_cover_position = None
+        entity._attr_current_cover_tilt_position = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position == 50
+        assert entity._attr_current_cover_tilt_position == 45
+
+    @pytest.mark.asyncio
+    async def test_sbus_position_fallback_when_no_device(self):
+        """Line 468/475: SBUS position/tilt fallback to _attr when no device."""
+        coord = _make_coordinator(sbus_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        entity._attr_current_cover_position = 33
+        entity._attr_current_cover_tilt_position = 10
+        assert entity.current_cover_position == 33
+        assert entity.current_cover_tilt_position == 10
+
+
+class TestCoverErrorPaths:
+    """Cover exception branches in async actions."""
+
+    @pytest.mark.asyncio
+    async def test_blind_set_tilt_raises_on_error(self):
+        """Lines 205-206: async_set_cover_tilt_position raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.components.cover import ATTR_TILT_POSITION
+
+        entity = _make_blind()
+        entity.coordinator.client.patch_virtual_device = AsyncMock(
+            side_effect=Exception("timeout")
+        )
+        with pytest.raises(HomeAssistantError, match="Cannot set cover tilt"):
+            await entity.async_set_cover_tilt_position(**{ATTR_TILT_POSITION: 30})
+
+    @pytest.mark.asyncio
+    async def test_wtp_blind_stop_raises_on_error(self):
+        """Lines 398-399: WTP stop raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity = _make_sbus_blind()
+        entity._bus = "wtp"
+        # Swap to WTP blind:
+        coord = _make_coordinator(wtp_devices={25: {"id": 25, "type": WTYPE_BLIND_CONTROLLER}})
+        coord.client = MagicMock()
+        coord.client.patch_wtp_device = AsyncMock(side_effect=Exception("err"))
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            wtp_entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        wtp_entity.hass = MagicMock()
+        wtp_entity.async_write_ha_state = MagicMock()
+        with pytest.raises(HomeAssistantError, match="Cannot stop cover"):
+            await wtp_entity.async_stop_cover()
+
+    @pytest.mark.asyncio
+    async def test_wtp_blind_set_position_raises_on_error(self):
+        """Lines 398-399: WTP set_position raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.components.cover import ATTR_POSITION
+
+        coord = _make_coordinator(wtp_devices={25: {"id": 25, "type": WTYPE_BLIND_CONTROLLER}})
+        coord.client = MagicMock()
+        coord.client.patch_wtp_device = AsyncMock(side_effect=Exception("err"))
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        with pytest.raises(HomeAssistantError, match="Cannot set cover position"):
+            await entity.async_set_cover_position(**{ATTR_POSITION: 50})
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_close_raises_on_error(self):
+        """Lines 523-524: SBUS close raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(side_effect=Exception("err"))
+        with pytest.raises(HomeAssistantError, match="Cannot close cover"):
+            await entity.async_close_cover()
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_stop_raises_on_error(self):
+        """Lines 533-534: SBUS stop raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(side_effect=Exception("err"))
+        with pytest.raises(HomeAssistantError, match="Cannot stop cover"):
+            await entity.async_stop_cover()
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_set_position_raises_on_error(self):
+        """Lines 544-545: SBUS set_position raises HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.components.cover import ATTR_POSITION
+
+        entity = _make_sbus_blind()
+        entity.coordinator.client.patch_sbus_device = AsyncMock(side_effect=Exception("err"))
+        with pytest.raises(HomeAssistantError, match="Cannot set cover position"):
+            await entity.async_set_cover_position(**{ATTR_POSITION: 40})

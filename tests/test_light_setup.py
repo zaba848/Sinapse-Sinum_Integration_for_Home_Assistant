@@ -948,3 +948,288 @@ class TestButtonLightSetup:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         btns = [e for e in added if isinstance(e, SinumButtonLight)]
         assert len(btns) == 1
+
+
+class TestLightHelperEdgeCases:
+    """Cover _labels, _color_mode, _supported_color_modes edge paths."""
+
+    def test_labels_returns_empty_set_for_non_list(self):
+        """Line 145: _labels when device has non-list labels."""
+        from custom_components.sinum.light import _labels
+
+        assert _labels({"labels": "not-a-list"}) == set()
+        assert _labels({}) == set()
+
+    def test_supports_color_temperature_via_labels(self):
+        """Line 180: _supports_color_temperature via rgbww/ww labels."""
+        from custom_components.sinum.light import _supports_color_temperature
+
+        assert _supports_color_temperature({"labels": ["rgbww"]}) is True
+        assert _supports_color_temperature({"labels": ["ww"]}) is True
+
+    def test_color_mode_temperature_explicit(self):
+        """Line 190: _color_mode returns COLOR_TEMP when color_mode='temperature'."""
+        from custom_components.sinum.light import _color_mode
+        from homeassistant.components.light import ColorMode
+
+        assert _color_mode({"color_mode": "temperature"}) == ColorMode.COLOR_TEMP
+        assert _color_mode({"color_mode": "color_temp"}) == ColorMode.COLOR_TEMP
+
+    def test_color_mode_brightness_fallback(self):
+        """Lines 191-192: _color_mode returns BRIGHTNESS when no rgb/temp."""
+        from custom_components.sinum.light import _color_mode
+        from homeassistant.components.light import ColorMode
+
+        assert _color_mode({}) == ColorMode.BRIGHTNESS
+
+    def test_color_mode_color_temp_when_only_white_temperature(self):
+        """Line 192: _supports_color_temperature path in _color_mode."""
+        from custom_components.sinum.light import _color_mode
+        from homeassistant.components.light import ColorMode
+
+        assert _color_mode({"white_temperature": 3000}) == ColorMode.COLOR_TEMP
+
+
+class TestDimmerLightRestorePath:
+    """Lines 220-228, 246, 279: SinumDimmerLight restore from HA state."""
+
+    @pytest.mark.asyncio
+    async def test_dimmer_restores_is_on_and_brightness_from_last_state(self):
+        coordinator = _make_coordinator(virtual={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            from custom_components.sinum.light import SinumDimmerLight
+            entity = SinumDimmerLight(coordinator, 1, "e")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "on"
+        last.attributes = {"brightness": 128}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_is_on = None
+        entity._attr_brightness = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_is_on is True
+        assert entity._attr_brightness == 128
+
+    @pytest.mark.asyncio
+    async def test_dimmer_skips_restore_when_state_unavailable(self):
+        coordinator = _make_coordinator(virtual={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            from custom_components.sinum.light import SinumDimmerLight
+            entity = SinumDimmerLight(coordinator, 1, "e")
+        entity.hass = MagicMock()
+
+        last = MagicMock()
+        last.state = "unavailable"
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_is_on = None
+
+        await entity.async_added_to_hass()
+        assert entity._attr_is_on is None
+
+    def test_dimmer_is_on_uses_restored_state_when_no_device(self):
+        """Line 246: is_on uses _attr_is_on when no device."""
+        coordinator = _make_coordinator(virtual={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            from custom_components.sinum.light import SinumDimmerLight
+            entity = SinumDimmerLight(coordinator, 1, "e")
+        entity._attr_is_on = True
+        assert entity.is_on is True
+
+    def test_dimmer_color_mode_temperature_via_device(self):
+        """Line 220-228: SinumDimmerLight.supported_color_modes/color_mode."""
+        coordinator = _make_coordinator(virtual={1: {
+            "id": 1, "type": "dimmer_rgb_integrator", "color_mode": "temperature", "white_temperature": 3000
+        }})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            from custom_components.sinum.light import SinumDimmerLight
+            entity = SinumDimmerLight(coordinator, 1, "e")
+        from homeassistant.components.light import ColorMode
+        assert entity.color_mode == ColorMode.COLOR_TEMP
+
+
+class TestBusDimmerLightRestorePath:
+    """Lines 333-341, 354: SinumBusDimmerLight restore path and is_on fallback."""
+
+    @pytest.mark.asyncio
+    async def test_bus_dimmer_restores_brightness_from_last_state(self):
+        coordinator = _make_coordinator(wtp={})
+        with MagicMock() as _patch:
+            from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusDimmerLight(coordinator, 3, "e", "wtp")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "on"
+        last.attributes = {"brightness": 200}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_is_on = None
+        entity._attr_brightness = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_is_on is True
+        assert entity._attr_brightness == 200
+
+    def test_bus_dimmer_is_on_uses_attr_when_no_device(self):
+        """Line 354: is_on fallback to _attr_is_on when device is empty."""
+        coordinator = _make_coordinator(wtp={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusDimmerLight(coordinator, 3, "e", "wtp")
+        entity._attr_is_on = True
+        assert entity.is_on is True
+
+
+class TestBusRgbLightRestorePath:
+    """Lines 434-442, 455, 470, 478, 483, 501-506: SinumBusRgbLight paths."""
+
+    @pytest.mark.asyncio
+    async def test_rgb_light_restores_is_on_and_brightness_from_last_state(self):
+        """Lines 434-442: restore is_on + brightness from HA state."""
+        coordinator = _make_coordinator(sbus={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "on"
+        last.attributes = {ATTR_BRIGHTNESS: 180}
+        entity.async_get_last_state = AsyncMock(return_value=last)
+        entity._attr_is_on = None
+        entity._attr_brightness = None
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_is_on is True
+        assert entity._attr_brightness == 180
+
+    def test_rgb_light_is_on_uses_attr_when_no_device(self):
+        """Line 455: is_on fallback when no device."""
+        coordinator = _make_coordinator(sbus={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        entity._attr_is_on = True
+        assert entity.is_on is True
+
+    def test_rgb_light_hs_color_none_when_no_led_color(self):
+        """Line 470: hs_color returns None when device has no led_color/color."""
+        coordinator = _make_coordinator(sbus={})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        assert entity.hs_color is None
+
+    @pytest.mark.asyncio
+    async def test_rgb_light_will_remove_deletes_scene(self):
+        """Lines 501-506: async_will_remove_from_hass deletes scene."""
+        coordinator = _make_coordinator(sbus={7: {"id": 7, "type": STYPE_RGB_CONTROLLER}})
+        coordinator.client.delete_scene = AsyncMock(return_value=None)
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        entity.hass = MagicMock()
+        entity._lua_scene_id = 42
+
+        await entity.async_will_remove_from_hass()
+
+        coordinator.client.delete_scene.assert_awaited_once_with(42)
+        assert entity._lua_scene_id is None
+
+    @pytest.mark.asyncio
+    async def test_rgb_light_will_remove_handles_delete_error(self):
+        """Line 503: delete_scene exception is silently ignored."""
+        coordinator = _make_coordinator(sbus={7: {"id": 7, "type": STYPE_RGB_CONTROLLER}})
+        coordinator.client.delete_scene = AsyncMock(side_effect=Exception("gone"))
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBusRgbLight(coordinator, 7, "e", "sbus")
+        entity.hass = MagicMock()
+        entity._lua_scene_id = 42
+
+        await entity.async_will_remove_from_hass()
+        assert entity._lua_scene_id is None  # cleaned up despite error
+
+
+class TestButtonLightBehavior:
+    """Lines 563, 567-568: SinumButtonLight properties and actions."""
+
+    def _make(self, bus="wtp", color="#FF0000"):
+        from custom_components.sinum.const import WTYPE_BUTTON
+        store = {9: {"id": 9, "type": WTYPE_BUTTON, "color": color, "state": True}}
+        coordinator = _make_coordinator(wtp=store) if bus == "wtp" else _make_coordinator(sbus=store)
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumButtonLight(coordinator, 9, "e", bus)
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def test_is_on_true_when_color_not_black(self):
+        entity = self._make(color="#FF0000")
+        assert entity.is_on is True
+
+    def test_is_on_false_when_color_black(self):
+        entity = self._make(color="#000000")
+        assert entity.is_on is False
+
+    def test_hs_color_from_device(self):
+        entity = self._make(color="#FF0000")
+        hs = entity.hs_color
+        assert hs is not None
+        assert hs[0] == 0.0  # red hue
+
+    def test_hs_color_none_when_no_color_key(self):
+        """Line 567-568: hs_color falls back to _attr_hs_color."""
+        from custom_components.sinum.const import WTYPE_BUTTON
+        coordinator = _make_coordinator(wtp={9: {"id": 9, "type": WTYPE_BUTTON}})
+        from unittest.mock import patch as _patch
+        with _patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumButtonLight(coordinator, 9, "e", "wtp")
+        entity._attr_hs_color = (180.0, 50.0)
+        assert entity.hs_color == (180.0, 50.0)
+
+    @pytest.mark.asyncio
+    async def test_turn_on_with_hs_color(self):
+        entity = self._make()
+        entity.coordinator.client.patch_wtp_device = AsyncMock(return_value={"color": "#FF0000"})
+        await entity.async_turn_on(**{ATTR_HS_COLOR: (0.0, 100.0)})
+        entity.async_write_ha_state.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_turn_on_uses_existing_color_when_no_hs(self):
+        entity = self._make(color="#00FF00")
+        entity.coordinator.client.patch_wtp_device = AsyncMock(return_value={"color": "#00FF00"})
+        await entity.async_turn_on()
+        entity.coordinator.client.patch_wtp_device.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_turn_on_raises_on_error(self):
+        """Line 563: turn_on propagates HomeAssistantError on API failure."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity = self._make()
+        entity.coordinator.client.patch_wtp_device = AsyncMock(side_effect=Exception("err"))
+        with pytest.raises(HomeAssistantError, match="Cannot set backlight color"):
+            await entity.async_turn_on()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_raises_on_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity = self._make()
+        entity.coordinator.client.patch_wtp_device = AsyncMock(side_effect=Exception("err"))
+        with pytest.raises(HomeAssistantError, match="Cannot turn off backlight"):
+            await entity.async_turn_off()
