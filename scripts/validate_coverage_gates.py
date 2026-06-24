@@ -58,7 +58,6 @@ def parse_coverage_xml(xml_path: Path) -> dict[str, float]:
 
 def validate_gates(coverage_by_file: dict[str, float]) -> bool:
     """Validate that all modules meet their thresholds."""
-    all_passed = True
     failed_modules = []
 
     print("\n📊 Per-Module Coverage Validation\n")
@@ -72,7 +71,6 @@ def validate_gates(coverage_by_file: dict[str, float]) -> bool:
         print(f"{module:<50} {actual:>10.1f}% {threshold:>10}% {status}")
 
         if actual < threshold:
-            all_passed = False
             failed_modules.append((module, actual, threshold))
 
     # Global gate
@@ -81,9 +79,6 @@ def validate_gates(coverage_by_file: dict[str, float]) -> bool:
         status = "✅" if global_coverage >= GLOBAL_THRESHOLD else "❌"
         print("─" * 90)
         print(f"{'GLOBAL':<50} {global_coverage:>10.1f}% {GLOBAL_THRESHOLD:>10}% {status}")
-
-        if global_coverage < GLOBAL_THRESHOLD:
-            all_passed = False
 
     print()
 
@@ -105,7 +100,7 @@ def main():
     coverage_xml = workspace_root / "coverage.xml"
 
     coverage_by_file = parse_coverage_xml(coverage_xml)
-    all_passed = validate_gates(coverage_by_file)
+    validate_gates(coverage_by_file)
 
     # Always exit with success (informational reporting only)
     # Regressions caught by global coverage gate (--cov-fail-under=80)
