@@ -41,22 +41,40 @@ async def async_setup_entry(
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[CoverEntity] = []
 
+    _add_virtual_covers(coordinator, entry.entry_id, entities)
+    _add_wtp_covers(coordinator, entry.entry_id, entities)
+    _add_sbus_covers(coordinator, entry.entry_id, entities)
+
+    async_add_entities(entities)
+
+
+def _add_virtual_covers(
+    coordinator: SinumCoordinator, entry_id: str, entities: list[CoverEntity]
+) -> None:
     for device_id, device in coordinator.virtual_devices.items():
         dev_type = device.get("type")
         if dev_type == VTYPE_BLIND:
-            entities.append(SinumBlindCover(coordinator, device_id, entry.entry_id))
+            entities.append(SinumBlindCover(coordinator, device_id, entry_id))
         elif dev_type == VTYPE_GATE:
-            entities.append(SinumGateCover(coordinator, device_id, entry.entry_id))
+            entities.append(SinumGateCover(coordinator, device_id, entry_id))
 
+
+def _add_wtp_covers(
+    coordinator: SinumCoordinator, entry_id: str, entities: list[CoverEntity]
+) -> None:
     for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == WTYPE_BLIND_CONTROLLER:
-            entities.append(SinumWtpBlindCover(coordinator, device_id, entry.entry_id))
+        if device.get("type") != WTYPE_BLIND_CONTROLLER:
+            continue
+        entities.append(SinumWtpBlindCover(coordinator, device_id, entry_id))
 
+
+def _add_sbus_covers(
+    coordinator: SinumCoordinator, entry_id: str, entities: list[CoverEntity]
+) -> None:
     for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_BLIND_CONTROLLER:
-            entities.append(SinumSbusBlindCover(coordinator, device_id, entry.entry_id))
-
-    async_add_entities(entities)
+        if device.get("type") != STYPE_BLIND_CONTROLLER:
+            continue
+        entities.append(SinumSbusBlindCover(coordinator, device_id, entry_id))
 
 
 def _label(device: dict[str, Any]) -> str:
@@ -75,6 +93,16 @@ def _device_info(
         model=model,
         suggested_area=device.get("_area") or None,
     )
+
+
+async def _restore_cover_from_last_state(entity: Any, restore_tilt: bool) -> None:
+    last = await entity.async_get_last_state()
+    if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return
+    if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
+        entity._attr_current_cover_position = int(v)
+    if restore_tilt and (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
+        entity._attr_current_cover_tilt_position = int(v)
 
 
 class SinumBlindCover(
@@ -110,13 +138,7 @@ class SinumBlindCover(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
-            self._attr_current_cover_position = int(v)
-        if (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
-            self._attr_current_cover_tilt_position = int(v)
+        await _restore_cover_from_last_state(self, restore_tilt=True)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -448,13 +470,7 @@ class SinumSbusBlindCover(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
-            self._attr_current_cover_position = int(v)
-        if (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
-            self._attr_current_cover_tilt_position = int(v)
+        await _restore_cover_from_last_state(self, restore_tilt=True)
 
     @property
     def _device(self) -> dict[str, Any]:
