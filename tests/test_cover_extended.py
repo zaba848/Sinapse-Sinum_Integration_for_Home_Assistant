@@ -265,6 +265,14 @@ class TestSinumWtpBlindCover:
         entity = _make_wtp_blind(current=65)
         assert entity.current_cover_position == 65
 
+    def test_current_cover_position_fallback_when_device_missing(self):
+        coord = _make_coordinator(wtp_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        entity._attr_current_cover_position = 37
+
+        assert entity.current_cover_position == 37
+
     def test_device_class(self):
         entity = _make_wtp_blind()
         assert entity._attr_device_class == CoverDeviceClass.BLIND
@@ -584,6 +592,19 @@ class TestRestorePaths:
         assert entity._attr_current_cover_position is None
 
     @pytest.mark.asyncio
+    async def test_blind_cover_skips_restore_when_device_present(self):
+        coord = _make_coordinator(virtual_devices={13: _blind_device(pos=64)})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumBlindCover(coord, 13, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.async_get_last_state = AsyncMock()
+
+        await entity.async_added_to_hass()
+
+        entity.async_get_last_state.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_gate_restores_closed_state_from_last_state(self):
         """Lines 231-237: gate cover restores _restored_closed from HA state."""
         coord = _make_coordinator(virtual_devices={})
@@ -600,6 +621,35 @@ class TestRestorePaths:
         await entity.async_added_to_hass()
 
         assert entity._restored_closed is True
+
+    @pytest.mark.asyncio
+    async def test_gate_skips_restore_when_device_present(self):
+        coord = _make_coordinator(virtual_devices={14: _gate_device(state="open")})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumGateCover(coord, 14, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.async_get_last_state = AsyncMock()
+
+        await entity.async_added_to_hass()
+
+        entity.async_get_last_state.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_gate_skips_restore_when_unavailable(self):
+        coord = _make_coordinator(virtual_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumGateCover(coord, 14, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "unavailable"
+        entity.async_get_last_state = AsyncMock(return_value=last)
+
+        await entity.async_added_to_hass()
+
+        assert entity._restored_closed is None
 
     @pytest.mark.asyncio
     async def test_gate_is_closed_uses_restored_state_when_no_device(self):
@@ -630,6 +680,35 @@ class TestRestorePaths:
         assert entity._attr_current_cover_position == 75
 
     @pytest.mark.asyncio
+    async def test_wtp_blind_skips_restore_when_device_present(self):
+        coord = _make_coordinator(wtp_devices={25: _wtp_blind_device(current=75, target=75)})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.async_get_last_state = AsyncMock()
+
+        await entity.async_added_to_hass()
+
+        entity.async_get_last_state.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_wtp_blind_skips_restore_when_unavailable(self):
+        coord = _make_coordinator(wtp_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumWtpBlindCover(coord, 25, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "unavailable"
+        entity.async_get_last_state = AsyncMock(return_value=last)
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position is None
+
+    @pytest.mark.asyncio
     async def test_sbus_blind_restores_position_and_tilt_from_last_state(self):
         """Lines 448-457: SBUS blind restores position + tilt from HA state."""
         coord = _make_coordinator(sbus_devices={})
@@ -649,6 +728,36 @@ class TestRestorePaths:
 
         assert entity._attr_current_cover_position == 50
         assert entity._attr_current_cover_tilt_position == 45
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_skips_restore_when_device_present(self):
+        coord = _make_coordinator(sbus_devices={30: {"id": 30, "current_opening": 50}})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.async_get_last_state = AsyncMock()
+
+        await entity.async_added_to_hass()
+
+        entity.async_get_last_state.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sbus_blind_skips_restore_when_unavailable(self):
+        coord = _make_coordinator(sbus_devices={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumSbusBlindCover(coord, 30, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        last = MagicMock()
+        last.state = "unavailable"
+        entity.async_get_last_state = AsyncMock(return_value=last)
+
+        await entity.async_added_to_hass()
+
+        assert entity._attr_current_cover_position is None
+        assert entity._attr_current_cover_tilt_position is None
 
     @pytest.mark.asyncio
     async def test_sbus_position_fallback_when_no_device(self):

@@ -18,6 +18,7 @@ from custom_components.sinum.sensor import (
     WTP_SENSORS,
     SinumSensor,
     SinumTemperatureRegulatorSensor,
+    _add_schedule_sensors,
 )
 
 FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json").read_text())
@@ -335,3 +336,18 @@ class TestEnergyCenterStatusSensor:
         )
         # Should not raise
         await entity.async_update()
+
+
+class TestScheduleSensorBuilder:
+    def test_add_schedule_sensors_adds_thermal_entities(self):
+        coordinator = MagicMock()
+        coordinator.schedules = [
+            {"id": 10, "type": "thermal", "name": "Thermal 1", "target_temp": 22.5}
+        ]
+        entities = []
+
+        _add_schedule_sensors(coordinator, entities, "entry")
+
+        names = [type(entity).__name__ for entity in entities]
+        assert "SinumScheduleTargetTempSensor" in names
+        assert "SinumScheduleFallbackTempSensor" in names
