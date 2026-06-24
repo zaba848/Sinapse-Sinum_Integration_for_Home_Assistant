@@ -31,7 +31,7 @@
 ## How It Works
 
 ```
-Sinum Hub (EH-01)
+Sinum Hub 
     │
     │  REST API (HTTP/JSON)
     │  POST/PATCH /api/v1/devices/{bus}/{id}
