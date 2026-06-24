@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.const import (
     ATTR_ENTRY_ID,
@@ -530,3 +531,87 @@ class TestUpdateScheduleService:
         client_a.patch_schedule.assert_not_awaited()
         client_b.patch_schedule.assert_awaited_once_with(7, {"name": "Evening"})
         assert coordinator_b.schedules[0]["name"] == "Evening"
+
+
+class TestInitHelpers:
+    def test_select_coordinator_returns_only_loaded_hub(self, hass):
+        from custom_components.sinum import _coordinators, _select_coordinator
+
+        coordinator = MagicMock()
+        _coordinators(hass)["entry_a"] = coordinator
+
+        assert _select_coordinator(hass, None) is coordinator
+
+    def test_select_coordinator_raises_for_missing_entry(self, hass):
+        from custom_components.sinum import _select_coordinator
+
+        with pytest.raises(HomeAssistantError, match="not loaded"):
+            _select_coordinator(hass, "missing")
+
+    def test_select_coordinator_raises_when_no_hubs_loaded(self, hass):
+        from custom_components.sinum import _select_coordinator
+
+        with pytest.raises(HomeAssistantError, match="No Sinum hubs are loaded"):
+            _select_coordinator(hass, None)
+
+    def test_merge_schedule_ignores_empty_payload(self):
+        from custom_components.sinum import _merge_schedule
+
+        coordinator = MagicMock()
+        coordinator.schedules = [{"id": 1, "name": "Morning"}]
+
+        _merge_schedule(coordinator, 1, {})
+
+        assert coordinator.schedules == [{"id": 1, "name": "Morning"}]
+
+    def test_merge_schedule_appends_missing_schedule(self):
+        from custom_components.sinum import _merge_schedule
+
+        coordinator = MagicMock()
+        coordinator.schedules = [{"id": 1, "name": "Morning"}]
+
+        _merge_schedule(coordinator, 2, {"name": "Evening"})
+
+        assert coordinator.schedules[-1] == {"id": 2, "name": "Evening"}
+
+    def test_sync_entry_title_noop_when_hub_name_missing(self, hass):
+        from custom_components.sinum import _sync_entry_title
+
+        entry = MagicMock()
+        entry.entry_id = "entry_a"
+        entry.title = "Sinum (10.0.0.1)"
+        coordinator = MagicMock()
+        coordinator.hub_info = {}
+
+        with patch.object(hass.config_entries, "async_update_entry") as mock_update:
+            _sync_entry_title(hass, entry, coordinator)
+
+        mock_update.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unload_entry_removes_services_for_last_hub(self):
+        from custom_components.sinum import (
+            DATA_COORDINATORS,
+            DATA_NOTIFICATION_CLIENTS,
+            SERVICE_SEND_NOTIFICATION,
+            SERVICE_UPDATE_SCHEDULE,
+            async_unload_entry,
+        )
+
+        hass = MagicMock()
+        hass.data = {DOMAIN: {}}
+        hass.services = MagicMock()
+        hass.services.has_service.return_value = True
+        hass.services.async_remove = MagicMock()
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        entry = MagicMock()
+        entry.entry_id = "last_entry"
+        hass.data.setdefault(DOMAIN, {})[DATA_COORDINATORS] = {"last_entry": MagicMock()}
+        hass.data.setdefault(DOMAIN, {})[DATA_NOTIFICATION_CLIENTS] = {"last_entry": MagicMock()}
+
+        result = await async_unload_entry(hass, entry)
+
+        assert result is True
+        hass.services.async_remove.assert_any_call(DOMAIN, SERVICE_SEND_NOTIFICATION)
+        hass.services.async_remove.assert_any_call(DOMAIN, SERVICE_UPDATE_SCHEDULE)
