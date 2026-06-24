@@ -8,6 +8,8 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 - CI quality gates strengthened: single-pass coverage report generation with `coverage.xml` and pip cache in `ci.yml`.
 - `tests.yml` now runs **Functional Smoke Tests** (critical behavior paths) instead of duplicating the full suite.
 - Hardware validation process formalized in `HARDWARE_TEST_PLAN.md` with a release checklist and explicit CC + smoke + manual hardware gate.
+- `validate.yml` no longer skips HACS validation on push/PR due to repository visibility checks.
+- Added a documented hardware smoke test result (2026-06-24) for WTP and SBUS hubs.
 
 ## [0.2.6] — 2026-06-24
 

@@ -6,6 +6,19 @@ HA:       http://homeassistant.local:8123 (token HA)
 
 ---
 
+## Smoke test sprzętowy (2026-06-24)
+
+Read-only test API wykonany na obu hubach (logowanie + odczyt endpointów krytycznych):
+
+| Hub | Login | `/api/v1/info` | `/api/v1/devices/wtp` | `/api/v1/devices/sbus` | `/api/v1/devices/virtual` |
+|---|---|---|---|---|---|
+| `10.0.61.132` (WTP) | 200 | 200 | 200 | 200 | 200 |
+| `10.0.62.167` (SBUS) | 200 | 200 | 200 | 200 | 200 |
+
+Wniosek: łączność i autoryzacja działają, kluczowe endpointy zwracają poprawne odpowiedzi.
+
+---
+
 ## Bramka wydania (CC + sprzęt)
 
 Ten projekt traktuje testy jako walidację funkcji, nie "liczbę testów".
