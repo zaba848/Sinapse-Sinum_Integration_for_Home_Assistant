@@ -506,41 +506,41 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
         return payload
 
+    async def _apply_sbus_color(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Run Lua color commands and return optimistic state; no-op if no color kwargs."""
+        has_color = ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
+        if not has_color:
+            return {}
+        lua_lines, optimistic = self._sbus_lua_commands(**kwargs)
+        try:
+            await self._run_lua("\n".join(lua_lines))
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot control RGB: {err}") from err
+        return optimistic
+
+    async def _patch_on(self, store: dict[int, dict[str, Any]], rest_payload: dict[str, Any]) -> None:
+        try:
+            if self._bus == "wtp":
+                updated = await self.coordinator.client.patch_wtp_device(self._device_id, rest_payload)
+            else:
+                updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": True})
+            store[self._device_id].update(updated or {})
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         store = (
             self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
         )
         optimistic: dict[str, Any] = {"state": True}
-        has_color_kwargs = ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
+        if self._bus == "sbus":
+            optimistic.update(await self._apply_sbus_color(kwargs))
         mode = str(self._device.get("color_mode", "")).lower()
-        # WTP REST PATCH cannot override the schedule in temperature/animation mode.
-        wtp_managed = self._bus == "wtp" and mode in ("temperature", "animation")
-
-        if self._bus == "sbus" and has_color_kwargs:
-            lua_lines, sbus_optimistic = self._sbus_lua_commands(**kwargs)
-            optimistic.update(sbus_optimistic)
-            try:
-                await self._run_lua("\n".join(lua_lines))
-            except Exception as err:
-                raise HomeAssistantError(f"Cannot control RGB: {err}") from err
-
         rest_payload: dict[str, Any] = {"state": True}
-        if self._bus == "wtp" and not wtp_managed:
+        # WTP REST PATCH cannot override the schedule in temperature/animation mode
+        if self._bus == "wtp" and mode not in ("temperature", "animation"):
             rest_payload.update(self._wtp_color_payload(**kwargs))
-
-        try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, rest_payload
-                )
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": True}
-                )
-            store[self._device_id].update(updated or {})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn on: {err}") from err
-
+        await self._patch_on(store, rest_payload)
         store[self._device_id].update(optimistic)
         self.async_write_ha_state()
 

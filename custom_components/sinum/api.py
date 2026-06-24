@@ -71,6 +71,28 @@ def _dict_list(items: Any) -> list[dict[str, Any]]:
     return [item for item in items if isinstance(item, dict)]
 
 
+def _extract_by_keys(result: dict[str, Any], keys: tuple[str, ...]) -> list[dict[str, Any]] | None:
+    for key in keys:
+        value = result.get(key)
+        if isinstance(value, list):
+            return _dict_list(value)
+        if isinstance(value, dict):
+            nested = _list_result(value)
+            if nested:
+                return nested
+    return None
+
+
+def _flatten_values(result: dict[str, Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for value in result.values():
+        if isinstance(value, list):
+            out.extend(_dict_list(value))
+        elif isinstance(value, dict) and "id" in value:
+            out.append(value)
+    return out
+
+
 def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
     """Normalize Sinum list responses across firmware variants.
 
@@ -82,26 +104,12 @@ def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
         return _dict_list(result)
     if not isinstance(result, dict):
         return []
-
-    for key in (*preferred_keys, "items", "devices", "results", "data"):
-        value = result.get(key)
-        if isinstance(value, list):
-            return _dict_list(value)
-        if isinstance(value, dict):
-            nested = _list_result(value)
-            if nested:
-                return nested
-
+    extracted = _extract_by_keys(result, (*preferred_keys, "items", "devices", "results", "data"))
+    if extracted is not None:
+        return extracted
     if "id" in result:
         return [result]
-
-    flattened: list[dict[str, Any]] = []
-    for value in result.values():
-        if isinstance(value, list):
-            flattened.extend(_dict_list(value))
-        elif isinstance(value, dict) and "id" in value:
-            flattened.append(value)
-    return flattened
+    return _flatten_values(result)
 
 
 class SinumAuthError(Exception):

@@ -119,18 +119,25 @@ def _modes_from_declared(declared: list[str]) -> list[HVACMode]:
     return modes
 
 
+def _append_if_supported(modes: list[HVACMode], mode: HVACMode, condition: bool) -> None:
+    if condition and mode not in modes:
+        modes.append(mode)
+
+
+def _infer_current_mode(device: dict[str, Any], modes: list[HVACMode]) -> None:
+    current = device.get("mode") or device.get("work_mode")
+    if not current or current in ("off", ""):
+        return
+    ha_mode = _MODE_TO_HVAC.get(current)
+    _append_if_supported(modes, ha_mode, ha_mode is not None)
+
+
 def _infer_modes(device: dict[str, Any]) -> list[HVACMode]:
     """Infer HVAC mode list from temperature field presence when hub lists no modes."""
     modes: list[HVACMode] = [HVACMode.OFF]
-    if device.get("target_temperature_heating_minimum") is not None:
-        modes.append(HVACMode.HEAT)
-    if device.get("target_temperature_cooling_minimum") is not None and HVACMode.COOL not in modes:
-        modes.append(HVACMode.COOL)
-    current = device.get("mode") or device.get("work_mode")
-    if current and current not in ("off", ""):
-        ha_mode = _MODE_TO_HVAC.get(current)
-        if ha_mode and ha_mode not in modes:
-            modes.append(ha_mode)
+    _append_if_supported(modes, HVACMode.HEAT, device.get("target_temperature_heating_minimum") is not None)
+    _append_if_supported(modes, HVACMode.COOL, device.get("target_temperature_cooling_minimum") is not None)
+    _infer_current_mode(device, modes)
     if len(modes) == 1:
         modes.append(HVACMode.HEAT)
     return modes
@@ -250,26 +257,16 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         decode = self.coordinator.client.decode_temperature
-        attrs: dict[str, Any] = {}
-        if d.get("humidity") is not None:
-            attrs["humidity"] = decode(d["humidity"])
-        if d.get("dew_point") is not None:
-            attrs["dew_point"] = decode(d["dew_point"])
-        if d.get("floor_temperature") is not None:
-            attrs["floor_temperature"] = decode(d["floor_temperature"])
-        if d.get("target_temperature_heating") is not None:
-            attrs["target_temperature_heating"] = decode(d["target_temperature_heating"])
-        if d.get("target_temperature_cooling") is not None:
-            attrs["target_temperature_cooling"] = decode(d["target_temperature_cooling"])
+        _temp_keys = ("humidity", "dew_point", "floor_temperature", "target_temperature_heating", "target_temperature_cooling")
+        attrs: dict[str, Any] = {k: decode(d[k]) for k in _temp_keys if d.get(k) is not None}
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]
             attrs["target_temperature_mode"] = (
                 ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
             )
-        if "is_window_open" in d:
-            attrs["is_window_open"] = d["is_window_open"]
-        if "schedule_id" in d:
-            attrs["schedule_id"] = d["schedule_id"]
+        for key in ("is_window_open", "schedule_id"):
+            if key in d:
+                attrs[key] = d[key]
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
