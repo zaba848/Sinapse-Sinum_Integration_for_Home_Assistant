@@ -87,18 +87,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         errors: dict[str, str] = {}
         if user_input is not None:
             token = user_input[CONF_API_TOKEN].strip()
-            client = self._make_client(api_token=token)
-            hub_name: str | None = None
-            try:
-                hub_info = await client.get_hub_info()
-                hub_name = hub_info.get("name") or hub_info.get("hostname")
-            except SinumAuthError:
-                errors["base"] = "invalid_auth"
-            except SinumConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected error connecting to Sinum")
-                errors["base"] = "unknown"
+            hub_name, error = await self._hub_name_from_token(token)
+            if error:
+                errors["base"] = error
             else:
                 return await self._create_entry(
                     {
@@ -122,22 +113,12 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            client = self._make_client(
-                username=user_input[CONF_USERNAME],
-                password=user_input[CONF_PASSWORD],
+            hub_name, error = await self._hub_name_from_password(
+                user_input[CONF_USERNAME],
+                user_input[CONF_PASSWORD],
             )
-            hub_name: str | None = None
-            try:
-                await client.login()
-                hub_info = await client.get_hub_info()
-                hub_name = hub_info.get("name") or hub_info.get("hostname")
-            except SinumAuthError:
-                errors["base"] = "invalid_auth"
-            except SinumConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected error connecting to Sinum")
-                errors["base"] = "unknown"
+            if error:
+                errors["base"] = error
             else:
                 return await self._create_entry(
                     {
@@ -172,6 +153,53 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     def _make_client(self, **kwargs: Any) -> SinumClient:
         session = async_get_clientsession(self.hass, verify_ssl=False)
         return SinumClient(self._host, session, **kwargs)
+
+    @staticmethod
+    def _map_auth_exception(exc: Exception) -> str:
+        if isinstance(exc, SinumAuthError):
+            return "invalid_auth"
+        if isinstance(exc, SinumConnectionError):
+            return "cannot_connect"
+        _LOGGER.exception("Unexpected error connecting to Sinum")
+        return "unknown"
+
+    @staticmethod
+    def _hub_name_from_info(hub_info: dict[str, Any]) -> str | None:
+        return hub_info.get("name") or hub_info.get("hostname")
+
+    async def _hub_name_from_token(self, token: str) -> tuple[str | None, str | None]:
+        client = self._make_client(api_token=token)
+        try:
+            hub_info = await client.get_hub_info()
+        except Exception as exc:
+            return None, self._map_auth_exception(exc)
+        return self._hub_name_from_info(hub_info), None
+
+    async def _hub_name_from_password(
+        self, username: str, password: str
+    ) -> tuple[str | None, str | None]:
+        client = self._make_client(username=username, password=password)
+        try:
+            await client.login()
+            hub_info = await client.get_hub_info()
+        except Exception as exc:
+            return None, self._map_auth_exception(exc)
+        return self._hub_name_from_info(hub_info), None
+
+    def _reauth_client(self, auth_mode: str, user_input: dict[str, Any]) -> SinumClient:
+        if auth_mode == AUTH_MODE_TOKEN:
+            return self._make_client(api_token=user_input[CONF_API_TOKEN])
+        return self._make_client(
+            username=user_input[CONF_USERNAME],
+            password=user_input[CONF_PASSWORD],
+        )
+
+    async def _test_connection_error(self, client: SinumClient) -> str | None:
+        try:
+            await client.test_connection()
+        except Exception as exc:
+            return self._map_auth_exception(exc)
+        return None
 
     # ------------------------------------------------------------ reconfigure
 
@@ -228,19 +256,10 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
 
         if user_input is not None:
             self._host = entry.data[CONF_HOST]
-            if auth_mode == AUTH_MODE_TOKEN:
-                client = self._make_client(api_token=user_input[CONF_API_TOKEN])
-            else:
-                client = self._make_client(
-                    username=user_input[CONF_USERNAME],
-                    password=user_input[CONF_PASSWORD],
-                )
-            try:
-                await client.test_connection()
-            except SinumAuthError:
-                errors["base"] = "invalid_auth"
-            except SinumConnectionError:
-                errors["base"] = "cannot_connect"
+            client = self._reauth_client(auth_mode, user_input)
+            error = await self._test_connection_error(client)
+            if error:
+                errors["base"] = error
             else:
                 return self.async_update_reload_and_abort(entry, data={**entry.data, **user_input})
 
