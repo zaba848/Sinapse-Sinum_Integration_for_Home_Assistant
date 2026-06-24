@@ -23,6 +23,16 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-06-24
+
+### Test Coverage
+- `custom_components/sinum/cover.py`: raised to 100%.
+- `custom_components/sinum/sensor.py`: raised to 100%.
+- Overall integration test coverage reached 100% in the CI coverage profile.
+
+### Quality
+- Added targeted restore-path and thermal schedule tests to lock in edge-case behavior and prevent regressions.
+
 ## [0.3.3] — 2026-06-24
 
 ### Test Coverage
