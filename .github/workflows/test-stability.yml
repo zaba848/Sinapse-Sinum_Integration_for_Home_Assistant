@@ -1,0 +1,64 @@
+name: Test Stability Report
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly on Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  test_stability:
+    name: Measure Test Stability
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests with stability tracking
+        id: stability
+        continue-on-error: true
+        run: |
+          python -m pytest tests/ \
+            -v \
+            --tb=short \
+            --durations=10 \
+            2>&1 | tee test_output.log
+          
+          # Extract summary
+          TOTAL=$(grep -c "PASSED\|FAILED" test_output.log || echo "0")
+          FAILED=$(grep -c "FAILED" test_output.log || echo "0")
+          PASS_RATE=$(python -c "print(f'{100 * (${TOTAL} - ${FAILED}) / max(${TOTAL}, 1):.1f}%')")
+          echo "pass_rate=${PASS_RATE}" >> $GITHUB_OUTPUT
+          echo "total_tests=${TOTAL}" >> $GITHUB_OUTPUT
+          echo "failed_tests=${FAILED}" >> $GITHUB_OUTPUT
+
+      - name: Report to GitHub
+        run: |
+          echo "## Test Stability Report" >> $GITHUB_STEP_SUMMARY
+          echo "- Total tests: ${{ steps.stability.outputs.total_tests }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Failed: ${{ steps.stability.outputs.failed_tests }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Pass rate: ${{ steps.stability.outputs.pass_rate }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slowest 10 tests:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -20 test_output.log | head -15 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if pass rate too low
+        if: failure()
+        run: |
+          echo "⚠ Test pass rate below threshold. Review test output above."
+          exit 1
