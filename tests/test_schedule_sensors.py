@@ -58,3 +58,25 @@ class TestSinumScheduleSensors:
         assert attrs["schedule_id"] == 7
         assert attrs["schedule_name"] == "Updated Schedule"
         assert attrs["modes"] == ["cooling"]
+
+    def test_active_period_day_entries_accept_dict_configuration_format(self):
+        """Line 120: relay-style dict schedule format is normalized via configuration key."""
+        from custom_components.sinum.sensor import SinumScheduleActivePeriodSensor
+
+        schedule = {
+            "id": 8,
+            "name": "Relay Schedule",
+            "weekly_program": {
+                "monday": {
+                    "configuration": [
+                        {"time_from": "06:00", "time_to": "08:00"},
+                        "bad-entry",
+                    ]
+                }
+            },
+        }
+        entries = SinumScheduleActivePeriodSensor._day_entries(
+            schedule["weekly_program"]["monday"]
+        )
+
+        assert entries == [{"time_from": "06:00", "time_to": "08:00"}]
