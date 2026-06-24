@@ -5,9 +5,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.sinum.binary_sensor import SinumBinarySensor, _TARGET_REACHED_SBUS, _TARGET_REACHED_WTP
-from custom_components.sinum.switch import SinumDhwSwitch
+from custom_components.sinum.binary_sensor import (
+    _TARGET_REACHED_SBUS,
+    _TARGET_REACHED_WTP,
+    SinumBinarySensor,
+)
 from custom_components.sinum.sensor import SBUS_SENSORS, SinumSensor
+from custom_components.sinum.switch import SinumDhwSwitch
 
 
 def _make_coordinator(*, wtp=None, sbus=None, virtual=None):

@@ -6,14 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.sinum.const import DOMAIN
 from custom_components.sinum.device_trigger import (
     TRIGGER_TYPE_PRESSED,
     async_attach_trigger,
     async_get_triggers,
     async_validate_trigger_config,
 )
-from custom_components.sinum.const import DOMAIN
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.sinum.button import SinumSceneButton, async_setup_entry
 from custom_components.sinum.api import SinumConnectionError
+from custom_components.sinum.button import SinumSceneButton, async_setup_entry
 
 
 def _make_coordinator(scenes=None):

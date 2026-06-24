@@ -92,7 +92,7 @@ class TestLoraRelaySwitch:
 
 class TestLoraSensors:
     def test_temperature_sensor_native_value(self):
-        from custom_components.sinum.sensor import SinumSensor, LORA_SENSORS
+        from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -101,7 +101,7 @@ class TestLoraSensors:
         assert entity.native_value == pytest.approx(21.5)
 
     def test_battery_sensor_native_value(self):
-        from custom_components.sinum.sensor import SinumSensor, LORA_SENSORS
+        from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -110,7 +110,7 @@ class TestLoraSensors:
         assert entity.native_value == 85
 
     def test_signal_sensor_native_value(self):
-        from custom_components.sinum.sensor import SinumSensor, LORA_SENSORS
+        from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -119,7 +119,7 @@ class TestLoraSensors:
         assert entity.native_value == 72
 
     def test_humidity_sensor_native_value(self):
-        from custom_components.sinum.sensor import SinumSensor, LORA_SENSORS
+        from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
         device = dict(FIXTURES["lora_humidity_sensor"])
         device["_device_name"] = "LoRa Humidity"
         coordinator = _make_coordinator(lora={71: device})
@@ -129,7 +129,7 @@ class TestLoraSensors:
         assert entity.native_value == pytest.approx(6.5)
 
     def test_lora_sensor_unique_id(self):
-        from custom_components.sinum.sensor import SinumSensor, LORA_SENSORS
+        from custom_components.sinum.sensor import LORA_SENSORS, SinumSensor
         device = dict(FIXTURES["lora_temp_sensor"])
         device["_device_name"] = "LoRa Temp"
         coordinator = _make_coordinator(lora={70: device})
@@ -142,7 +142,10 @@ class TestLoraSensors:
 
 class TestLoraBinarySensors:
     def test_opening_sensor_is_on_when_open(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, LORA_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            LORA_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         device = dict(FIXTURES["lora_opening_sensor"])
         device["_device_name"] = "LoRa Door"
         coordinator = _make_coordinator(lora={72: device})
@@ -151,7 +154,10 @@ class TestLoraBinarySensors:
         assert entity.is_on is True
 
     def test_opening_sensor_is_off_when_closed(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, LORA_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            LORA_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         device = {"id": 72, "type": "opening_sensor", "state": "closed", "_device_name": "LoRa Door"}
         coordinator = _make_coordinator(lora={72: device})
         desc = next(d for d in LORA_BINARY_SENSOR_TYPES if d.key == "opening")
@@ -177,7 +183,10 @@ class TestLoraBinarySensors:
         assert added[0]._source == "lora"
 
     def test_lora_binary_sensor_unique_id(self):
-        from custom_components.sinum.binary_sensor import SinumBinarySensor, LORA_BINARY_SENSOR_TYPES
+        from custom_components.sinum.binary_sensor import (
+            LORA_BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
         device = dict(FIXTURES["lora_opening_sensor"])
         device["_device_name"] = "LoRa Door"
         coordinator = _make_coordinator(lora={72: device})
@@ -244,8 +253,9 @@ class TestSbusBlindCover:
         assert entity.supported_features & CoverEntityFeature.SET_TILT_POSITION
 
     def test_no_tilt_feature_when_no_tilt_keys(self):
-        from custom_components.sinum.cover import SinumSbusBlindCover
         from homeassistant.components.cover import CoverEntityFeature
+
+        from custom_components.sinum.cover import SinumSbusBlindCover
         device = {"id": 60, "type": "blind_controller", "current_opening": 50, "_device_name": "Blind"}
         coordinator = _make_coordinator(sbus={60: device})
         entity = SinumSbusBlindCover(coordinator, 60, "test_entry")
@@ -403,7 +413,7 @@ class TestAlarmArmDisarm:
 
 class TestSbusEnergyMeterSensors:
     def _make_sensor(self, key):
-        from custom_components.sinum.sensor import SinumSensor, SBUS_SENSORS
+        from custom_components.sinum.sensor import SBUS_SENSORS, SinumSensor
         device = dict(FIXTURES["sbus_energy_meter"])
         device["_device_name"] = "SBUS Energy"
         coordinator = _make_coordinator(sbus={61: device})
@@ -440,7 +450,7 @@ class TestSbusEnergyMeterSensors:
 
 class TestWtpBatterySignalSensors:
     def _make_sensor(self, key):
-        from custom_components.sinum.sensor import SinumSensor, WTP_SENSORS
+        from custom_components.sinum.sensor import WTP_SENSORS, SinumSensor
         device = {"id": 20, "type": "temperature_sensor", "battery": 75, "signal": 88, "_device_name": "WTP Dev"}
         coordinator = _make_coordinator(wtp={20: device})
         desc = next((d for d in WTP_SENSORS if d.key == key), None)
@@ -463,6 +473,7 @@ class TestWtpBatterySignalSensors:
 class TestLoraCoordinatorIntegration:
     def _make_coordinator_obj(self, mock_client):
         from unittest.mock import patch
+
         from homeassistant.helpers.frame import report_usage  # noqa: F401
         hass = MagicMock()
         hass.loop = MagicMock()

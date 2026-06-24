@@ -278,7 +278,6 @@ class TestSbusIlluminanceSensor:
 class TestVirtualDimmerRgbIntegrator:
     def test_integrator_type_creates_light_entity(self):
         """dimmer_rgb_integrator virtual type should be recognized as a light device."""
-        from custom_components.sinum.const import VTYPE_DIMMER_RGB_INTEGRATOR
         from custom_components.sinum.light import SinumDimmerLight
 
         device = dict(FIXTURES["virtual_dimmer_rgb_integrator"])

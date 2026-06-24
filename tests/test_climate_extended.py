@@ -44,7 +44,6 @@ from custom_components.sinum.const import (
     WTYPE_FAN_COIL_V2,
 )
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers (same pattern as test_climate_fixes.py)
 # ---------------------------------------------------------------------------

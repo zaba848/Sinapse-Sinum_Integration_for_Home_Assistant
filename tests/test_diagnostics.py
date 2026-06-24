@@ -5,11 +5,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.sinum.const import CONF_API_TOKEN, CONF_PASSWORD
 from custom_components.sinum.diagnostics import (
     _sanitize_device,
     async_get_config_entry_diagnostics,
 )
-from custom_components.sinum.const import CONF_API_TOKEN, CONF_PASSWORD
 
 
 def _make_entry(data: dict, runtime_data=None) -> MagicMock:

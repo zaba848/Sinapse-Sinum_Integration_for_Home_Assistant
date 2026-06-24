@@ -1,7 +1,7 @@
 """Tests for binary_sensor async_setup_entry and parent device sensors."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 

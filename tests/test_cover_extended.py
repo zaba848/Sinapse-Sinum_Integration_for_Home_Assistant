@@ -6,13 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.components.cover import CoverDeviceClass
 
-from custom_components.sinum.cover import (
-    SinumBlindCover,
-    SinumGateCover,
-    SinumSbusBlindCover,
-    SinumWtpBlindCover,
-    async_setup_entry,
-)
 from custom_components.sinum.const import (
     GATE_STATE_CLOSED,
     GATE_STATE_CLOSING,
@@ -21,6 +14,13 @@ from custom_components.sinum.const import (
     VTYPE_BLIND,
     VTYPE_GATE,
     WTYPE_BLIND_CONTROLLER,
+)
+from custom_components.sinum.cover import (
+    SinumBlindCover,
+    SinumGateCover,
+    SinumSbusBlindCover,
+    SinumWtpBlindCover,
+    async_setup_entry,
 )
 
 
@@ -668,8 +668,8 @@ class TestCoverErrorPaths:
     @pytest.mark.asyncio
     async def test_blind_set_tilt_raises_on_error(self):
         """Lines 205-206: async_set_cover_tilt_position raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
         from homeassistant.components.cover import ATTR_TILT_POSITION
+        from homeassistant.exceptions import HomeAssistantError
 
         entity = _make_blind()
         entity.coordinator.client.patch_virtual_device = AsyncMock(
@@ -699,8 +699,8 @@ class TestCoverErrorPaths:
     @pytest.mark.asyncio
     async def test_wtp_blind_set_position_raises_on_error(self):
         """Lines 398-399: WTP set_position raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
         from homeassistant.components.cover import ATTR_POSITION
+        from homeassistant.exceptions import HomeAssistantError
 
         coord = _make_coordinator(wtp_devices={25: {"id": 25, "type": WTYPE_BLIND_CONTROLLER}})
         coord.client = MagicMock()
@@ -735,8 +735,8 @@ class TestCoverErrorPaths:
     @pytest.mark.asyncio
     async def test_sbus_blind_set_position_raises_on_error(self):
         """Lines 544-545: SBUS set_position raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
         from homeassistant.components.cover import ATTR_POSITION
+        from homeassistant.exceptions import HomeAssistantError
 
         entity = _make_sbus_blind()
         entity.coordinator.client.patch_sbus_device = AsyncMock(side_effect=Exception("err"))

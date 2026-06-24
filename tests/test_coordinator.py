@@ -3,14 +3,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from custom_components.sinum.api import SinumConnectionError
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.sinum.api import SinumConnectionError
 from custom_components.sinum.coordinator import (
     SinumCoordinator,
     _collect_device_ids,
@@ -138,7 +136,6 @@ class TestSinumCoordinator:
     @pytest.mark.asyncio
     async def test_update_uses_cached_rooms_on_408(self, mock_client):
         """When rooms returns 408 but cache exists, coordinator continues with cached rooms."""
-        from homeassistant.helpers.update_coordinator import UpdateFailed
         coordinator = self._make_coordinator(mock_client)
         # Populate cache on first successful call
         with patch.object(coordinator, "async_set_updated_data"):

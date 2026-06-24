@@ -14,7 +14,6 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.api import SinumConnectionError
 
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
