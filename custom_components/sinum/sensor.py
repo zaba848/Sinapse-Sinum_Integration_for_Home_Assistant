@@ -52,13 +52,39 @@ def _add_virtual_sensors(
     for device_id, device in coordinator.virtual_devices.items():
         if device.get("type") == VTYPE_THERMOSTAT_OUTPUT_GROUP:
             entities.append(SinumThermostatOutputGroupSensor(coordinator, device_id, entry_id))
-        for desc in VIRTUAL_SENSORS:
-            if desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+        _append_sinum_sensors(coordinator, entities, entry_id, device_id, device, VIRTUAL_SENSORS)
 
 
 _WTP_REGULATOR_SENSORS = tuple(d for d in WTP_SENSORS if d.source == "wtp_regulator")
 _WTP_NORMAL_SENSORS = tuple(d for d in WTP_SENSORS if d.source == "wtp")
+
+
+def _append_sinum_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+    device_id: int,
+    device: dict,
+    descriptions,
+) -> None:
+    for desc in descriptions:
+        if desc.api_key not in device:
+            continue
+        entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+
+
+def _append_regulator_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[SensorEntity],
+    entry_id: str,
+    device_id: int,
+    device: dict,
+    descriptions,
+) -> None:
+    for desc in descriptions:
+        if desc.api_key not in device:
+            continue
+        entities.append(SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id))
 
 
 def _add_wtp_sensors(
@@ -68,14 +94,22 @@ def _add_wtp_sensors(
 ) -> None:
     for device_id, device in coordinator.wtp_devices.items():
         if device.get("type") == "temperature_regulator":
-            for desc in _WTP_REGULATOR_SENSORS:
-                if desc.api_key in device:
-                    entities.append(
-                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id)
-                    )
-        for desc in _WTP_NORMAL_SENSORS:
-            if desc.api_key in device:
-                entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
+            _append_regulator_sensors(
+                coordinator,
+                entities,
+                entry_id,
+                device_id,
+                device,
+                _WTP_REGULATOR_SENSORS,
+            )
+        _append_sinum_sensors(
+            coordinator,
+            entities,
+            entry_id,
+            device_id,
+            device,
+            _WTP_NORMAL_SENSORS,
+        )
         if device.get("type") == WTYPE_BUTTON:
             entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "wtp"))
 
@@ -87,17 +121,18 @@ def _add_sbus_sensors(
 ) -> None:
     for device_id, device in coordinator.sbus_devices.items():
         if device.get("type") == "temperature_regulator":
-            for desc in SBUS_REGULATOR_SENSORS:
-                if desc.api_key in device:
-                    entities.append(
-                        SinumTemperatureRegulatorSensor(coordinator, device_id, desc, entry_id)
-                    )
-        else:
-            for desc in SBUS_SENSORS:
-                if desc.api_key in device:
-                    entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
-            if device.get("type") == STYPE_BUTTON:
-                entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "sbus"))
+            _append_regulator_sensors(
+                coordinator,
+                entities,
+                entry_id,
+                device_id,
+                device,
+                SBUS_REGULATOR_SENSORS,
+            )
+            continue
+        _append_sinum_sensors(coordinator, entities, entry_id, device_id, device, SBUS_SENSORS)
+        if device.get("type") == STYPE_BUTTON:
+            entities.append(SinumButtonSensor(coordinator, device_id, entry_id, "sbus"))
 
 
 def _add_lora_sensors(

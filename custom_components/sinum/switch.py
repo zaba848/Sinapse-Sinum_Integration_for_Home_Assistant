@@ -23,38 +23,106 @@ from .const import (
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
+def _virtual_switch_entity(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    dev_type = device.get("type")
+    if dev_type == VTYPE_HEAT_PUMP_MANAGER:
+        return _heat_pump_dhw_switch(coordinator, device_id, entry_id, device)
+    factories = {
+        VTYPE_RELAY: SinumRelaySwitch,
+        VTYPE_WICKET: SinumWicketSwitch,
+    }
+    factory = factories.get(dev_type)
+    if factory is None:
+        return None
+    return factory(coordinator, device_id, entry_id)
+
+
+def _heat_pump_dhw_switch(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    dhw = device.get("dhw_control")
+    if not (isinstance(dhw, dict) and "enabled" in dhw):
+        return None
+    return SinumDhwSwitch(coordinator, device_id, entry_id)
+
+
+def _wtp_switch_entity(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    if device.get("type") != WTYPE_RELAY:
+        return None
+    return SinumBusRelaySwitch(coordinator, device_id, entry_id, "wtp")
+
+
+def _sbus_switch_entity(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    dev_type = device.get("type")
+    if dev_type == STYPE_COMMON_VALVE:
+        return SinumCommonValveSwitch(coordinator, device_id, entry_id)
+    if dev_type != STYPE_RELAY:
+        return None
+    if "managed_by_thermostat" in device.get("labels", []):
+        return None
+    return SinumBusRelaySwitch(coordinator, device_id, entry_id, "sbus")
+
+
+def _lora_switch_entity(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    if device.get("type") != LTYPE_RELAY:
+        return None
+    return SinumBusRelaySwitch(coordinator, device_id, entry_id, "lora")
+
+
+def _bus_switch_entity(
+    coordinator: SinumCoordinator,
+    device_id: int,
+    entry_id: str,
+    bus: str,
+    device: dict[str, Any],
+) -> SwitchEntity | None:
+    handlers = {
+        "wtp": _wtp_switch_entity,
+        "sbus": _sbus_switch_entity,
+        "lora": _lora_switch_entity,
+    }
+    handler = handlers.get(bus)
+    if handler is None:
+        return None
+    return handler(coordinator, device_id, entry_id, device)
+
+
+def _add_bus_entities_for_store(
+    coordinator: SinumCoordinator,
+    entities: list[SwitchEntity],
+    entry_id: str,
+    bus: str,
+    store: dict[int, dict[str, Any]],
+) -> None:
+    for device_id, device in store.items():
+        entity = _bus_switch_entity(coordinator, device_id, entry_id, bus, device)
+        if entity is not None:
+            entities.append(entity)
+
+
 def _add_virtual_switches(
     coordinator: SinumCoordinator, entities: list[SwitchEntity], entry_id: str
 ) -> None:
     for device_id, device in coordinator.virtual_devices.items():
-        dev_type = device.get("type")
-        if dev_type == VTYPE_RELAY:
-            entities.append(SinumRelaySwitch(coordinator, device_id, entry_id))
-        elif dev_type == VTYPE_WICKET:
-            entities.append(SinumWicketSwitch(coordinator, device_id, entry_id))
-        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
-            dhw = device.get("dhw_control")
-            if isinstance(dhw, dict) and "enabled" in dhw:
-                entities.append(SinumDhwSwitch(coordinator, device_id, entry_id))
+        entity = _virtual_switch_entity(coordinator, device_id, entry_id, device)
+        if entity is not None:
+            entities.append(entity)
 
 
 def _add_bus_switches(
     coordinator: SinumCoordinator, entities: list[SwitchEntity], entry_id: str
 ) -> None:
-    for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == WTYPE_RELAY:
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "wtp"))
-
-    for device_id, device in coordinator.sbus_devices.items():
-        dev_type = device.get("type")
-        if dev_type == STYPE_RELAY and "managed_by_thermostat" not in device.get("labels", []):
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "sbus"))
-        elif dev_type == STYPE_COMMON_VALVE:
-            entities.append(SinumCommonValveSwitch(coordinator, device_id, entry_id))
-
-    for device_id, device in coordinator.lora_devices.items():
-        if device.get("type") == LTYPE_RELAY:
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "lora"))
+    _add_bus_entities_for_store(coordinator, entities, entry_id, "wtp", coordinator.wtp_devices)
+    _add_bus_entities_for_store(coordinator, entities, entry_id, "sbus", coordinator.sbus_devices)
+    _add_bus_entities_for_store(coordinator, entities, entry_id, "lora", coordinator.lora_devices)
 
 
 async def async_setup_entry(
@@ -349,6 +417,26 @@ class SinumDhwSwitch(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
             return False
         return bool(dhw.get("enabled"))
 
+    @staticmethod
+    def _copy_decoded_temperature(
+        attrs: dict[str, Any],
+        source: dict[str, Any],
+        source_key: str,
+        target_key: str,
+        decode: Any,
+    ) -> None:
+        if source_key not in source:
+            return
+        attrs[target_key] = decode(source[source_key])
+
+    @staticmethod
+    def _copy_if_present(
+        attrs: dict[str, Any], source: dict[str, Any], source_key: str, target_key: str
+    ) -> None:
+        if source_key not in source:
+            return
+        attrs[target_key] = source[source_key]
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         dhw = self._device.get("dhw_control")
@@ -356,12 +444,15 @@ class SinumDhwSwitch(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
             return {}
         attrs: dict[str, Any] = {}
         decode = self.coordinator.client.decode_temperature
-        if "state" in dhw:
-            attrs["dhw_active"] = dhw["state"]
-        if "temperature" in dhw:
-            attrs["dhw_temperature_c"] = decode(dhw["temperature"])
-        if "target_temperature" in dhw:
-            attrs["dhw_target_c"] = decode(dhw["target_temperature"])
+        self._copy_if_present(attrs, dhw, "state", "dhw_active")
+        self._copy_decoded_temperature(attrs, dhw, "temperature", "dhw_temperature_c", decode)
+        self._copy_decoded_temperature(
+            attrs,
+            dhw,
+            "target_temperature",
+            "dhw_target_c",
+            decode,
+        )
         if "hysteresis" in dhw:
             attrs["hysteresis"] = dhw["hysteresis"] / 10
         return attrs
