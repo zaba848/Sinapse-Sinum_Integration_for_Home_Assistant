@@ -153,6 +153,99 @@ def _available_hvac_modes(device: dict[str, Any]) -> list[HVACMode]:
     return _infer_modes(device)
 
 
+def _active_mode_bounds(device: dict[str, Any], mode: HVACMode) -> tuple[Any, Any]:
+    if mode == HVACMode.HEAT:
+        return (
+            device.get("target_temperature_heating_minimum"),
+            device.get("target_temperature_heating_maximum"),
+        )
+    if mode == HVACMode.COOL:
+        return (
+            device.get("target_temperature_cooling_minimum"),
+            device.get("target_temperature_cooling_maximum"),
+        )
+    return None, None
+
+
+def _scaled_or_default(raw: Any, default: float) -> float:
+    if raw is None:
+        return default
+    return raw / 10
+
+
+def _target_temperature_mode_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return value.get("current") or value.get("mode")
+    return value
+
+
+def _copy_keys_if_present(source: dict[str, Any], target: dict[str, Any], keys: tuple[str, ...]) -> None:
+    for key in keys:
+        if key in source:
+            target[key] = source[key]
+
+
+def _state_action_from_text(state: str, current_mode: HVACMode) -> HVACAction:
+    if "heating" in state:
+        return HVACAction.HEATING
+    if "cooling" in state:
+        return HVACAction.COOLING
+    if current_mode == HVACMode.OFF:
+        return HVACAction.OFF
+    return HVACAction.IDLE
+
+
+def _fan_coil_extra_attrs(device: dict[str, Any]) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    _copy_keys_if_present(device, attrs, ("fan_operation_mode", "schedule_id"))
+    if device.get("mode_mutable") is not None:
+        attrs["mode_mutable"] = device["mode_mutable"]
+    if "target_temperature_mode" in device:
+        attrs["target_temperature_mode"] = _target_temperature_mode_value(
+            device["target_temperature_mode"]
+        )
+    _add_fan_gear_attr(device, attrs)
+    _add_working_state_attr(device, attrs)
+    return attrs
+
+
+def _add_fan_gear_attr(device: dict[str, Any], attrs: dict[str, Any]) -> None:
+    manual_gear = device.get("fan", {}).get("manual_fan_gear")
+    if manual_gear:
+        attrs["manual_fan_gear"] = manual_gear
+
+
+def _add_working_state_attr(device: dict[str, Any], attrs: dict[str, Any]) -> None:
+    working_state = device.get("working_state")
+    if working_state:
+        attrs["working_state"] = working_state
+
+
+def _heat_pump_target_temp_attrs(device: dict[str, Any], decode: Any) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    tt = device.get("target_temperature")
+    if not isinstance(tt, dict):
+        return attrs
+    for key in ("heating", "cooling", "automatic"):
+        value = tt.get(key)
+        if value is not None:
+            attrs[f"target_temperature_{key}"] = decode(value)
+    return attrs
+
+
+def _heat_pump_dhw_attrs(device: dict[str, Any], decode: Any) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    dhw = device.get("dhw_control")
+    if not isinstance(dhw, dict):
+        return attrs
+    target = dhw.get("target_temperature")
+    if target is not None:
+        attrs["dhw_target_temperature"] = decode(target)
+    if "state" in dhw:
+        attrs["dhw_state"] = dhw["state"]
+    return attrs
+
+
 class SinumThermostat(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], ClimateEntity
 ):
@@ -224,40 +317,18 @@ class SinumThermostat(
     @property
     def min_temp(self) -> float:
         d = self._device
-        mode = self.hvac_mode
-        if mode == HVACMode.HEAT:
-            mn = d.get("target_temperature_heating_minimum")
-            mx = d.get("target_temperature_heating_maximum")
-            if mn is not None and mx is not None:
-                return mn / 10
-        elif mode == HVACMode.COOL:
-            mn = d.get("target_temperature_cooling_minimum")
-            mx = d.get("target_temperature_cooling_maximum")
-            if mn is not None and mx is not None:
-                return mn / 10
-        raw_min = d.get("target_temperature_minimum")
-        if raw_min is not None:
-            return raw_min / 10
-        return TEMP_MIN
+        mn, mx = _active_mode_bounds(d, self.hvac_mode)
+        if mn is not None and mx is not None:
+            return mn / 10
+        return _scaled_or_default(d.get("target_temperature_minimum"), TEMP_MIN)
 
     @property
     def max_temp(self) -> float:
         d = self._device
-        mode = self.hvac_mode
-        if mode == HVACMode.HEAT:
-            mn = d.get("target_temperature_heating_minimum")
-            mx = d.get("target_temperature_heating_maximum")
-            if mn is not None and mx is not None:
-                return mx / 10
-        elif mode == HVACMode.COOL:
-            mn = d.get("target_temperature_cooling_minimum")
-            mx = d.get("target_temperature_cooling_maximum")
-            if mn is not None and mx is not None:
-                return mx / 10
-        raw_max = d.get("target_temperature_maximum")
-        if raw_max is not None:
-            return raw_max / 10
-        return TEMP_MAX
+        mn, mx = _active_mode_bounds(d, self.hvac_mode)
+        if mn is not None and mx is not None:
+            return mx / 10
+        return _scaled_or_default(d.get("target_temperature_maximum"), TEMP_MAX)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -272,13 +343,10 @@ class SinumThermostat(
         )
         attrs: dict[str, Any] = {k: decode(d[k]) for k in _temp_keys if d.get(k) is not None}
         if "target_temperature_mode" in d:
-            ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = (
-                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = _target_temperature_mode_value(
+                d["target_temperature_mode"]
             )
-        for key in ("is_window_open", "schedule_id"):
-            if key in d:
-                attrs[key] = d[key]
+        _copy_keys_if_present(d, attrs, ("is_window_open", "schedule_id"))
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -457,17 +525,10 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
     @property
     def hvac_action(self) -> HVACAction:
         working_state = self._device.get("working_state")
-        if working_state and working_state in _WORKING_STATE_TO_ACTION:
-            return _WORKING_STATE_TO_ACTION[working_state]
-        # Fallback: infer from state field
-        state = str(self._device.get("state", ""))
-        if "heating" in state:
-            return HVACAction.HEATING
-        if "cooling" in state:
-            return HVACAction.COOLING
-        if self.hvac_mode == HVACMode.OFF:
-            return HVACAction.OFF
-        return HVACAction.IDLE
+        mapped = _WORKING_STATE_TO_ACTION.get(working_state)
+        if mapped is not None:
+            return mapped
+        return _state_action_from_text(str(self._device.get("state", "")), self.hvac_mode)
 
     @property
     def fan_mode(self) -> str | None:
@@ -477,25 +538,7 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        d = self._device
-        attrs: dict[str, Any] = {}
-        if fan_op := d.get("fan_operation_mode"):
-            attrs["fan_operation_mode"] = fan_op
-        if sched := d.get("schedule_id"):
-            attrs["schedule_id"] = sched
-        if d.get("mode_mutable") is not None:
-            attrs["mode_mutable"] = d["mode_mutable"]
-        if "target_temperature_mode" in d:
-            ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = (
-                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
-            )
-        manual_gear = d.get("fan", {}).get("manual_fan_gear")
-        if manual_gear:
-            attrs["manual_fan_gear"] = manual_gear
-        if working_state := d.get("working_state"):
-            attrs["working_state"] = working_state
-        return attrs
+        return _fan_coil_extra_attrs(self._device)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         gear = _FAN_MODE_TO_GEAR.get(fan_mode)
@@ -554,27 +597,16 @@ class SinumTemperatureRegulatorClimate(
 
     @property
     def hvac_action(self) -> HVACAction:
-        state = str(self._device.get("state", ""))
-        if "heating" in state:
-            return HVACAction.HEATING
-        if "cooling" in state:
-            return HVACAction.COOLING
-        if self.hvac_mode == HVACMode.OFF:
-            return HVACAction.OFF
-        return HVACAction.IDLE
+        return _state_action_from_text(str(self._device.get("state", "")), self.hvac_mode)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         attrs: dict[str, Any] = {}
-        if "mode_mutable" in d:
-            attrs["mode_mutable"] = d["mode_mutable"]
-        if "parent_id" in d:
-            attrs["parent_id"] = d["parent_id"]
+        _copy_keys_if_present(d, attrs, ("mode_mutable", "parent_id"))
         if "target_temperature_mode" in d:
-            ttm = d["target_temperature_mode"]
-            attrs["target_temperature_mode"] = (
-                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = _target_temperature_mode_value(
+                d["target_temperature_mode"]
             )
         return attrs
 
@@ -690,21 +722,9 @@ class SinumHeatPumpManagerClimate(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
-        attrs: dict[str, Any] = {}
-        tt = d.get("target_temperature")
-        if isinstance(tt, dict):
-            decode = self.coordinator.client.decode_temperature
-            for k in ("heating", "cooling", "automatic"):
-                if tt.get(k) is not None:
-                    attrs[f"target_temperature_{k}"] = decode(tt[k])
-        dhw = d.get("dhw_control")
-        if isinstance(dhw, dict):
-            if dhw.get("target_temperature") is not None:
-                attrs["dhw_target_temperature"] = self.coordinator.client.decode_temperature(
-                    dhw["target_temperature"]
-                )
-            if "state" in dhw:
-                attrs["dhw_state"] = dhw["state"]
+        decode = self.coordinator.client.decode_temperature
+        attrs = _heat_pump_target_temp_attrs(d, decode)
+        attrs.update(_heat_pump_dhw_attrs(d, decode))
         return attrs
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -715,10 +735,11 @@ class SinumHeatPumpManagerClimate(
             max(self.min_temp, min(self.max_temp, temperature))
         )
         tt = self._device.get("target_temperature")
-        if isinstance(tt, dict):
-            payload: dict[str, Any] = {"target_temperature": {"current": raw}}
-        else:
-            payload = {"target_temperature": raw}
+        payload: dict[str, Any] = (
+            {"target_temperature": {"current": raw}}
+            if isinstance(tt, dict)
+            else {"target_temperature": raw}
+        )
         try:
             updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:

@@ -46,6 +46,25 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
 
+    def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
+        if hub_info is not None:
+            self.hub_info = hub_info
+        elif not self.hub_info:
+            raise UpdateFailed("Cannot reach Sinum hub: hub info unavailable")
+        if lua_info:
+            self.hub_info.update(lua_info)
+
+    def _apply_rooms_and_floors(self, rooms: Any, floors_list: Any) -> None:
+        if rooms is not None:
+            self.rooms = rooms
+        if floors_list is not None:
+            self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
+
+    def _apply_optional_metadata(self, values: dict[str, Any]) -> None:
+        for attr, value in values.items():
+            if value is not None:
+                setattr(self, attr, value)
+
     def _apply_metadata_results(
         self,
         hub_info: Any,
@@ -59,28 +78,17 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         variables: Any,
     ) -> list[dict[str, Any]]:
         """Apply parallel metadata fetch results; returns effective rooms list."""
-        if hub_info is not None:
-            self.hub_info = hub_info
-        elif not self.hub_info:
-            raise UpdateFailed("Cannot reach Sinum hub: hub info unavailable")
-        if lua_info:
-            self.hub_info.update(lua_info)
-
-        if rooms is not None:
-            self.rooms = rooms
-
-        if floors_list is not None:
-            self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
-
-        for attr, value in (
-            ("parent_devices", parent_devices),
-            ("scenes", scenes),
-            ("schedules", schedules),
-            ("automations", automations),
-            ("variables", variables),
-        ):
-            if value is not None:
-                setattr(self, attr, value)
+        self._apply_hub_metadata(hub_info, lua_info)
+        self._apply_rooms_and_floors(rooms, floors_list)
+        self._apply_optional_metadata(
+            {
+                "parent_devices": parent_devices,
+                "scenes": scenes,
+                "schedules": schedules,
+                "automations": automations,
+                "variables": variables,
+            }
+        )
 
         return self.rooms
 
@@ -191,6 +199,35 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             devices[device_id] = device
         return devices
 
+    async def _bulk_collection(
+        self, list_getter: Any, label: str
+    ) -> tuple[list[Any], bool]:
+        try:
+            return await list_getter(), True
+        except Exception as err:
+            _LOGGER.debug("Failed to fetch %s device collection: %s", label, err)
+            return [], False
+
+    async def _fallback_devices(
+        self,
+        item_getter: Any,
+        fallback_ids: list[int],
+        rooms: list[dict[str, Any]],
+        label: str,
+    ) -> dict[int, dict[str, Any]]:
+        devices: dict[int, dict[str, Any]] = {}
+        for device_id in fallback_ids:
+            try:
+                device = await item_getter(device_id)
+                if not isinstance(device, dict):
+                    continue
+                device.setdefault("class", _source_from_label(label))
+                _inject_room_keys(device, device_id, rooms, self.floors)
+                devices[device_id] = device
+            except SinumConnectionError as err:
+                _LOGGER.warning("Failed to fetch %s device %s: %s", label, device_id, err)
+        return devices
+
     async def _fetch_device_collection(
         self,
         label: str,
@@ -207,13 +244,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The per-device fallback is only used when the bulk endpoint succeeds
         but returns an empty list (older firmware without a bulk endpoint).
         """
-        bulk_ok = False
-        try:
-            collection = await list_getter()
-            bulk_ok = True
-        except Exception as err:
-            _LOGGER.debug("Failed to fetch %s device collection: %s", label, err)
-            collection = []
+        collection, bulk_ok = await self._bulk_collection(list_getter, label)
 
         if collection:
             return self._process_bulk_devices(collection, label, rooms)
@@ -223,18 +254,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return cached
 
         # Bulk succeeded but returned empty list → old firmware without bulk endpoint
-        devices: dict[int, dict[str, Any]] = {}
-        for device_id in fallback_ids:
-            try:
-                device = await item_getter(device_id)
-                if not isinstance(device, dict):
-                    continue
-                device.setdefault("class", _source_from_label(label))
-                _inject_room_keys(device, device_id, rooms, self.floors)
-                devices[device_id] = device
-            except SinumConnectionError as err:
-                _LOGGER.warning("Failed to fetch %s device %s: %s", label, device_id, err)
-        return devices
+        return await self._fallback_devices(item_getter, fallback_ids, rooms, label)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -264,23 +284,8 @@ def _collect_device_ids(
     buckets: list[list[int]] = [[], [], [], []]
     seen: set[tuple[str, int]] = set()
 
-    for room in rooms:
-        if not isinstance(room, dict):
-            continue
-        for device in room.get("devices", []):
-            if not isinstance(device, dict):
-                continue
-            cls = _device_class(device)
-            dev_id = _device_id_as_int(device.get("id"))
-            if dev_id is None:
-                continue
-            key = (cls, dev_id)
-            if key in seen:
-                continue
-            seen.add(key)
-            bucket = _CLASS_BUCKET_INDEX.get(cls)
-            if bucket is not None:
-                buckets[bucket].append(dev_id)
+    for device in _iter_room_devices(rooms):
+        _add_device_to_bucket(device, seen, buckets)
 
     return buckets[0], buckets[1], buckets[2], buckets[3]
 
@@ -295,14 +300,9 @@ def _device_id_as_int(value: Any) -> int | None:
 def _device_class(device: dict[str, Any]) -> str:
     raw = device.get("class") or device.get("source") or device.get("bus") or ""
     cls = str(raw).lower()
-    if cls.startswith("virtual"):
-        return "virtual"
-    if cls.startswith("wtp"):
-        return "wtp"
-    if cls.startswith("sbus"):
-        return "sbus"
-    if cls.startswith("lora"):
-        return "lora"
+    for prefix in ("virtual", "wtp", "sbus", "lora"):
+        if cls.startswith(prefix):
+            return prefix
     return cls
 
 
@@ -333,16 +333,48 @@ def _find_room_containing_device(
     rooms: list[dict[str, Any]], device_id: int, device_class: str
 ) -> tuple[dict[str, Any] | None, str]:
     """Return (room, device_name_in_room) or (None, '') if not found."""
-    for room in rooms:
-        if not isinstance(room, dict):
-            continue
-        for dev in room.get("devices", []):
-            if not isinstance(dev, dict):
-                continue
-            dev_id = _device_id_as_int(dev.get("id"))
-            if dev_id == device_id and _device_class(dev) == device_class:
-                return room, (dev.get("name") or "")
+    for room, dev in _iter_room_device_pairs(rooms):
+        dev_id = _device_id_as_int(dev.get("id"))
+        if dev_id == device_id and _device_class(dev) == device_class:
+            return room, (dev.get("name") or "")
     return None, ""
+
+
+def _inject_room_from_explicit_id(
+    device: dict[str, Any],
+    rooms: list[dict[str, Any]],
+    floors: dict[int, dict[str, Any]],
+) -> bool:
+    room_id = device.get("room_id")
+    if room_id is None:
+        return False
+    room = _find_room_by_id(rooms, room_id)
+    if room is None:
+        return False
+    _apply_room_keys(device, room, floors)
+    return True
+
+
+def _inject_room_from_lookup(
+    device: dict[str, Any],
+    device_id: int,
+    rooms: list[dict[str, Any]],
+    floors: dict[int, dict[str, Any]],
+) -> bool:
+    room, dev_name = _find_room_containing_device(rooms, device_id, _device_class(device))
+    if room is None:
+        return False
+    if dev_name:
+        device["_device_name"] = dev_name
+    _apply_room_keys(device, room, floors)
+    return True
+
+
+def _inject_room_defaults(device: dict[str, Any], device_id: int) -> None:
+    device.setdefault("_room", "")
+    device.setdefault("_device_name", device.get("name", str(device_id)))
+    device.setdefault("_floor_name", "")
+    device.setdefault("_area", "")
 
 
 def _inject_room_keys(
@@ -353,24 +385,12 @@ def _inject_room_keys(
 ) -> None:
     """Inject _id, _room, _device_name, _floor_name, _area into device dict."""
     device["_id"] = device_id
-    room_id = device.get("room_id")
-    if room_id is not None:
-        room = _find_room_by_id(rooms, room_id)
-        if room is not None:
-            _apply_room_keys(device, room, floors)
-            return
-
-    room, dev_name = _find_room_containing_device(rooms, device_id, _device_class(device))
-    if room is not None:
-        if dev_name:
-            device["_device_name"] = dev_name
-        _apply_room_keys(device, room, floors)
+    if _inject_room_from_explicit_id(device, rooms, floors):
+        return
+    if _inject_room_from_lookup(device, device_id, rooms, floors):
         return
 
-    device.setdefault("_room", "")
-    device.setdefault("_device_name", device.get("name", str(device_id)))
-    device.setdefault("_floor_name", "")
-    device.setdefault("_area", "")
+    _inject_room_defaults(device, device_id)
 
 
 def _apply_room_keys(
@@ -393,27 +413,79 @@ def _apply_room_keys(
 
 
 def _room_name_for_device(rooms: list[dict[str, Any]], device_id: int) -> str:
-    for room in rooms:
-        if not isinstance(room, dict):
-            continue
-        for device in room.get("devices", []):
-            if not isinstance(device, dict):
-                continue
-            if _device_id_as_int(device.get("id")) == device_id:
-                return room.get("name", "")
+    for room, device in _iter_room_device_pairs(rooms):
+        if _device_id_as_int(device.get("id")) == device_id:
+            return room.get("name", "")
     return ""
 
 
 def _device_name_in_room(rooms: list[dict[str, Any]], device_id: int) -> str:
-    for room in rooms:
-        if not isinstance(room, dict):
-            continue
-        for device in room.get("devices", []):
-            if not isinstance(device, dict):
-                continue
-            if _device_id_as_int(device.get("id")) == device_id:
-                return device.get("name", str(device_id))
+    for _room, device in _iter_room_device_pairs(rooms):
+        if _device_id_as_int(device.get("id")) == device_id:
+            return device.get("name", str(device_id))
     return str(device_id)
+
+
+def _iter_room_devices(rooms: list[dict[str, Any]]):
+    for room in rooms:
+        yield from _room_devices(room)
+
+
+def _iter_room_device_pairs(rooms: list[dict[str, Any]]):
+    for room in rooms:
+        for device in _room_devices(room):
+            yield room, device
+
+
+def _room_devices(room: Any):
+    if not isinstance(room, dict):
+        return ()
+    devices = room.get("devices", [])
+    if not isinstance(devices, list):
+        return ()
+    return (device for device in devices if isinstance(device, dict))
+
+
+def _parent_id(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _add_device_to_bucket(
+    device: dict[str, Any],
+    seen: set[tuple[str, int]],
+    buckets: list[list[int]],
+) -> None:
+    cls = _device_class(device)
+    dev_id = _device_id_as_int(device.get("id"))
+    if dev_id is None:
+        return
+    key = (cls, dev_id)
+    if key in seen:
+        return
+    seen.add(key)
+    bucket = _CLASS_BUCKET_INDEX.get(cls)
+    if bucket is not None:
+        buckets[bucket].append(dev_id)
+
+
+def _inject_parent_model_for_device(
+    device: dict[str, Any],
+    bus_map: dict[int, str],
+    class_map: dict[int, str],
+) -> None:
+    pid = _parent_id(device.get("parent_id"))
+    if pid is None:
+        return
+    model = bus_map.get(pid)
+    if model:
+        device["_parent_model"] = model
+    cls = class_map.get(pid)
+    if cls:
+        device["_parent_class"] = cls
+        device["_parent_id"] = pid
 
 
 def _build_parent_maps(
@@ -450,16 +522,7 @@ def _inject_parent_models(
     if not bus_map and not class_map:
         return
     for device in devices.values():
-        pid = device.get("parent_id")
-        if pid is not None:
-            pid = int(pid)
-            model = bus_map.get(pid)
-            if model:
-                device["_parent_model"] = model
-            cls = class_map.get(pid)
-            if cls:
-                device["_parent_class"] = cls
-                device["_parent_id"] = pid
+        _inject_parent_model_for_device(device, bus_map, class_map)
 
 
 class SinumDeviceAvailableMixin:
