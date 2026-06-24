@@ -278,6 +278,13 @@ class TestAutomationStatusSensor:
         assert attrs["name"] == "auto1"
         assert attrs["tags"] == ["heat"]
 
+    def test_automation_property_falls_back_to_initial_when_runtime_list_missing_entry(self):
+        """Line 387: _automation returns the initial payload when coordinator list no longer contains id."""
+        entity = self._make({"id": 1, "state": "idle"})
+        entity.coordinator.automations = [{"id": 2, "state": "running"}]
+
+        assert entity._automation == {"id": 1, "state": "idle"}
+
 
 class TestEnergyCenterStatusSensor:
     """Lines 434, 440-443: SinumEnergyCenterStatusSensor extra attrs + async_update."""

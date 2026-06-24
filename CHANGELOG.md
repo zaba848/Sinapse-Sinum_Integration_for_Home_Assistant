@@ -23,6 +23,20 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-06-24
+
+### Test Coverage
+- `custom_components/sinum/__init__.py`: raised to 100%.
+- `custom_components/sinum/coordinator.py`: raised to 100%.
+- `custom_components/sinum/light.py`: raised to 100%.
+- `custom_components/sinum/number.py`: raised to 100%.
+- `custom_components/sinum/sensor_schedule.py`: raised to 100%.
+- `custom_components/sinum/sensor_virtual.py`: raised to 100%.
+- `custom_components/sinum/switch.py`: raised to 100%.
+
+### Quality
+- Finalized the integration test sweep so the remaining uncovered runtime modules are now at or near full coverage.
+
 ## [0.3.2] — 2026-06-24
 
 ### Added
