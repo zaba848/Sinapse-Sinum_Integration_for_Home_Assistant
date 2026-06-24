@@ -4,8 +4,8 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1013%20passing-brightgreen.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-0.2.3-blue.svg)](custom_components/sinum/manifest.json)
+[![Tests](https://img.shields.io/badge/tests-1036%20passing-brightgreen.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -505,7 +505,7 @@ pip install -r requirements-dev.txt
 ### Running tests
 
 ```bash
-pytest tests/                                       # 987 tests, ~4 s
+pytest tests/                                       # 1036 tests, ~4 s
 pytest -v tests/test_api.py                         # single file, verbose
 pytest --cov=custom_components/sinum tests/         # coverage report
 ```
@@ -531,7 +531,8 @@ custom_components/sinum/
   │
   ├── climate.py               Thermostats, fan coils, regulators, heat pump manager
   ├── sensor.py                Sensor platform entry point
-  ├── sensor_bus.py            WTP / SBUS / LoRa sensors (SinumSensor + descriptors)
+  ├── sensor_bus.py            WTP / SBUS / LoRa sensor entity classes (SinumSensor etc.)
+  ├── sensor_bus_descriptions.py  Sensor description data (SinumSensorDescription + *_SENSORS tuples)
   ├── sensor_virtual.py        Virtual, weather, energy, hub diagnostic sensors
   ├── sensor_schedule.py       Thermal schedule sensors
   ├── binary_sensor.py         Flood, motion, opening, valve state, connectivity
@@ -560,7 +561,7 @@ lua_scripts/
 tests/
   ├── fixtures/sinum_devices.json   Sample hub API payloads used by tests
   ├── conftest.py
-  └── test_*.py                987 tests across all platforms and device types
+  └── test_*.py                1036 tests across all platforms and device types
 ```
 
 ### Key classes
@@ -578,7 +579,7 @@ tests/
 4. On per-device failure: logs warning, skips that device
 5. Injects room name, floor name, parent hardware model into each device dict
 
-**`SinumSensorDescription`** (sensor_bus.py) — dataclass extending `SensorEntityDescription`. Extra fields:
+**`SinumSensorDescription`** (`sensor_bus_descriptions.py`) — dataclass extending `SensorEntityDescription`. Extra fields:
 - `source`: which bus (`"wtp"`, `"sbus"`, `"lora"`)
 - `api_key`: key in the raw device dict
 - `scale`: raw value multiplier (e.g. `0.1` for °C × 10)
@@ -590,10 +591,10 @@ tests/
 
 ### 1. Sensor on an existing bus (WTP / SBUS / LoRa)
 
-Add a `SinumSensorDescription` entry to the relevant list in `sensor_bus.py`:
+Add a `SinumSensorDescription` entry to the relevant tuple in `sensor_bus_descriptions.py`:
 
 ```python
-# In WTP_SENSORS list (sensor_bus.py)
+# In WTP_SENSORS tuple (sensor_bus_descriptions.py)
 SinumSensorDescription(
     key="pm2_5",                           # unique key within the device type
     api_key="pm2_5",                       # field name in the raw hub JSON
@@ -608,7 +609,7 @@ SinumSensorDescription(
 ),
 ```
 
-No other changes needed — `sensor.py` iterates `WTP_SENSORS` / `SBUS_SENSORS` / `LORA_SENSORS` and creates entities automatically.
+No other changes needed — `sensor.py` imports `WTP_SENSORS` / `SBUS_SENSORS` / `LORA_SENSORS` from `sensor_bus_descriptions.py` (via re-export in `sensor_bus.py`) and creates entities automatically.
 
 ### 2. New entity platform for an existing device type
 
@@ -696,7 +697,7 @@ Integration is tested against two live hubs in production:
 
 **tablica-wtp** — WTP-heavy installation: 108 WTP relays, 18 blind controllers, 15 temperature regulators, 28 buttons, temperature/humidity/CO₂/IAQ/pressure/light/motion/flood sensors, 1 fan coil, 1 energy meter.
 
-**sinum-tablica-sbus-1** — SBUS-heavy installation: 83 virtual thermostats, 51 SBUS temperature regulators, 69 SBUS relays, 38 SBUS dimmers, 6 SBUS RGB controllers, 30 SBUS buttons, 134 SBUS temperature sensors, 46 SBUS humidity sensors, 1 heat pump manager. Total: 1473+ HA entities.
+**sinum-tablica-sbus-1** — SBUS-heavy installation: 83 virtual thermostats, 51 SBUS temperature regulators, 69 SBUS relays, 38 SBUS dimmers, 6 SBUS RGB controllers, 30 SBUS buttons, 134 SBUS temperature sensors, 46 SBUS humidity sensors, 1 heat pump manager. Total: 1497 HA entities (verified 2026-06-24).
 
 > Both hubs run alpha firmware. The `/api/v1/rooms` and bus-list endpoints occasionally return HTTP 408 (bus timeout). The integration handles this gracefully by serving cached state until the next successful poll.
 
