@@ -111,7 +111,9 @@ def _add_lora_sensors(
                 entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
 
 
-async def _try_add_weather_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
+async def _try_add_weather_sensors(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
     try:
         weather = await coordinator.client.get_weather()
         for desc in WEATHER_SENSORS:
@@ -121,7 +123,9 @@ async def _try_add_weather_sensors(coordinator: SinumCoordinator, entities: list
         _LOGGER.debug("Weather endpoint not available on this hub")
 
 
-async def _try_add_energy_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
+async def _try_add_energy_sensors(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
     try:
         energy = await coordinator.client.get_energy()
         for desc in ENERGY_SENSORS:
@@ -131,7 +135,9 @@ async def _try_add_energy_sensors(coordinator: SinumCoordinator, entities: list[
         _LOGGER.debug("Energy endpoint not available on this hub")
 
 
-async def _try_add_energy_center_sensor(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
+async def _try_add_energy_center_sensor(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
     try:
         ec = await coordinator.client.get_energy_center_summary()
         entities.append(SinumEnergyCenterStatusSensor(coordinator.client, ec, entry_id))
@@ -139,7 +145,9 @@ async def _try_add_energy_center_sensor(coordinator: SinumCoordinator, entities:
         _LOGGER.debug("Energy Center endpoints not available on this hub")
 
 
-def _add_hub_sensors(coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str) -> None:
+def _add_hub_sensors(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
     if not coordinator.hub_info:
         return
     entities.append(SinumHubUptimeSensor(coordinator, entry_id))

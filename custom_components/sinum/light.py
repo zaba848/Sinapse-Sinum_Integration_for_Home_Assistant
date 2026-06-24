@@ -508,7 +508,9 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
 
     async def _apply_sbus_color(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Run Lua color commands and return optimistic state; no-op if no color kwargs."""
-        has_color = ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
+        has_color = (
+            ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
+        )
         if not has_color:
             return {}
         lua_lines, optimistic = self._sbus_lua_commands(**kwargs)
@@ -518,12 +520,18 @@ class SinumBusRgbLight(CoordinatorEntity[SinumCoordinator], LightEntity):
             raise HomeAssistantError(f"Cannot control RGB: {err}") from err
         return optimistic
 
-    async def _patch_on(self, store: dict[int, dict[str, Any]], rest_payload: dict[str, Any]) -> None:
+    async def _patch_on(
+        self, store: dict[int, dict[str, Any]], rest_payload: dict[str, Any]
+    ) -> None:
         try:
             if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(self._device_id, rest_payload)
+                updated = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, rest_payload
+                )
             else:
-                updated = await self.coordinator.client.patch_sbus_device(self._device_id, {"state": True})
+                updated = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": True}
+                )
             store[self._device_id].update(updated or {})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err

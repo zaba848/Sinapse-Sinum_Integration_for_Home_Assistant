@@ -135,8 +135,12 @@ def _infer_current_mode(device: dict[str, Any], modes: list[HVACMode]) -> None:
 def _infer_modes(device: dict[str, Any]) -> list[HVACMode]:
     """Infer HVAC mode list from temperature field presence when hub lists no modes."""
     modes: list[HVACMode] = [HVACMode.OFF]
-    _append_if_supported(modes, HVACMode.HEAT, device.get("target_temperature_heating_minimum") is not None)
-    _append_if_supported(modes, HVACMode.COOL, device.get("target_temperature_cooling_minimum") is not None)
+    _append_if_supported(
+        modes, HVACMode.HEAT, device.get("target_temperature_heating_minimum") is not None
+    )
+    _append_if_supported(
+        modes, HVACMode.COOL, device.get("target_temperature_cooling_minimum") is not None
+    )
     _infer_current_mode(device, modes)
     if len(modes) == 1:
         modes.append(HVACMode.HEAT)
@@ -257,7 +261,13 @@ class SinumThermostat(CoordinatorEntity[SinumCoordinator], ClimateEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         decode = self.coordinator.client.decode_temperature
-        _temp_keys = ("humidity", "dew_point", "floor_temperature", "target_temperature_heating", "target_temperature_cooling")
+        _temp_keys = (
+            "humidity",
+            "dew_point",
+            "floor_temperature",
+            "target_temperature_heating",
+            "target_temperature_cooling",
+        )
         attrs: dict[str, Any] = {k: decode(d[k]) for k in _temp_keys if d.get(k) is not None}
         if "target_temperature_mode" in d:
             ttm = d["target_temperature_mode"]

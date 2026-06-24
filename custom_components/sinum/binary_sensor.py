@@ -181,10 +181,14 @@ def _add_sensors_for_bus(
         dev_type = device.get("type", "")
         if description := type_map.get(dev_type):
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
-        if target_reached_desc and dev_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
-                entities.append(
-                    SinumBinarySensor(coordinator, device_id, target_reached_desc, entry_id)
-                )
+        if (
+            target_reached_desc
+            and dev_type == WTYPE_TEMPERATURE_REGULATOR
+            and "target_temperature_reached" in device
+        ):
+            entities.append(
+                SinumBinarySensor(coordinator, device_id, target_reached_desc, entry_id)
+            )
 
 
 def _add_bus_binary_sensors(
@@ -193,16 +197,28 @@ def _add_bus_binary_sensors(
     entry_id: str,
 ) -> None:
     _add_sensors_for_bus(
-        coordinator.wtp_devices, _WTP_TYPE_TO_DESCRIPTION, _TARGET_REACHED_WTP,
-        coordinator, entities, entry_id,
+        coordinator.wtp_devices,
+        _WTP_TYPE_TO_DESCRIPTION,
+        _TARGET_REACHED_WTP,
+        coordinator,
+        entities,
+        entry_id,
     )
     _add_sensors_for_bus(
-        coordinator.sbus_devices, _SBUS_TYPE_TO_DESCRIPTION, _TARGET_REACHED_SBUS,
-        coordinator, entities, entry_id,
+        coordinator.sbus_devices,
+        _SBUS_TYPE_TO_DESCRIPTION,
+        _TARGET_REACHED_SBUS,
+        coordinator,
+        entities,
+        entry_id,
     )
     _add_sensors_for_bus(
-        coordinator.lora_devices, _LORA_TYPE_TO_DESCRIPTION, None,
-        coordinator, entities, entry_id,
+        coordinator.lora_devices,
+        _LORA_TYPE_TO_DESCRIPTION,
+        None,
+        coordinator,
+        entities,
+        entry_id,
     )
 
 
