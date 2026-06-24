@@ -18,6 +18,9 @@ from custom_components.sinum.coordinator import (
     _device_id_as_int,
     _device_name_in_room,
     _find_room_containing_device,
+    _inject_parent_model_for_device,
+    _parent_id,
+    _room_devices,
     _room_name_for_device,
     _source_from_label,
     _unique_ids,
@@ -106,6 +109,18 @@ class TestCoordinatorHelpers:
         assert _source_from_label("LoRa") == "lora"
         assert _source_from_label("WTP") == "wtp"
         assert _unique_ids([1, 2, 1, 3, 2]) == [1, 2, 3]
+
+    def test_room_devices_returns_empty_for_non_list_devices(self):
+        assert tuple(_room_devices({"devices": "bad"})) == ()
+
+    def test_parent_id_returns_none_for_invalid_value(self):
+        assert _parent_id("abc") is None
+
+    def test_inject_parent_model_for_device_skips_missing_parent_id(self):
+        device = {"id": 1}
+        _inject_parent_model_for_device(device, {7: "Hub X"}, {7: "wtp_parent_device"})
+        assert "_parent_model" not in device
+        assert "_parent_id" not in device
 
     def test_via_device_for_returns_parent_tuple(self):
         assert via_device_for({"_parent_class": "wtp_parent_device", "_parent_id": 5}, "entry") == (

@@ -213,3 +213,23 @@ class TestSinumButtonSensorDisabledByDefault:
         with patch("homeassistant.helpers.frame.report_usage", return_value=None):
             entity = SinumButtonSensor(coordinator, 51, "test_entry", "wtp")
         assert entity.entity_registry_enabled_default is False
+
+
+class TestEventSetupFiltering:
+    @pytest.mark.asyncio
+    async def test_setup_skips_non_button_devices(self):
+        coordinator = _make_coordinator(
+            wtp_devices={1: {"id": 1, "type": "relay"}},
+            sbus_devices={2: {"id": 2, "type": "temperature_sensor"}},
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(
+                MagicMock(), entry, lambda entities, **_: added.extend(entities)
+            )
+
+        assert added == []

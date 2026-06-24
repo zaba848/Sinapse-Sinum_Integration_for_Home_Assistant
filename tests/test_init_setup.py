@@ -588,6 +588,19 @@ class TestInitHelpers:
 
         mock_update.assert_not_called()
 
+    def test_remove_domain_services_noop_when_other_coordinators_exist(self, hass):
+        from custom_components.sinum import (
+            _coordinators,
+            _remove_domain_services_if_no_coordinators,
+        )
+
+        _coordinators(hass)["entry_a"] = MagicMock()
+        hass.services = MagicMock()
+
+        _remove_domain_services_if_no_coordinators(hass)
+
+        hass.services.async_remove.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_unload_entry_removes_services_for_last_hub(self):
         from custom_components.sinum import (
@@ -615,3 +628,15 @@ class TestInitHelpers:
         assert result is True
         hass.services.async_remove.assert_any_call(DOMAIN, SERVICE_SEND_NOTIFICATION)
         hass.services.async_remove.assert_any_call(DOMAIN, SERVICE_UPDATE_SCHEDULE)
+
+    @pytest.mark.asyncio
+    async def test_unload_entry_returns_false_when_platform_unload_fails(self, hass):
+        from custom_components.sinum import async_unload_entry
+
+        entry = MagicMock()
+        entry.entry_id = "entry_fail"
+
+        with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
+            result = await async_unload_entry(hass, entry)
+
+        assert result is False
