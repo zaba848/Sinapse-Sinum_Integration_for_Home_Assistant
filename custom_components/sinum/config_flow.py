@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
+from urllib.parse import urlsplit
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -26,6 +29,37 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+_PROBE_RETRIES = 2
+_PROBE_RETRY_DELAY = 0.5
+T = TypeVar("T")
+
+
+def _normalize_host_input(value: str) -> str:
+    """Normalize host input from GUI and reject malformed endpoint strings."""
+    raw = value.strip()
+    if not raw:
+        raise ValueError("empty host")
+
+    parsed = urlsplit(raw)
+    if parsed.scheme:
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("unsupported scheme")
+        if not parsed.netloc:
+            raise ValueError("missing host")
+        if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+            raise ValueError("path/query/fragment not allowed")
+        host = parsed.netloc
+    else:
+        if any(ch in raw for ch in "/?#"):
+            raise ValueError("path/query/fragment not allowed")
+        host = raw
+
+    host = host.strip().strip("/")
+    if not host or " " in host:
+        raise ValueError("invalid host")
+    return host
+
 
 STEP_AUTH_SCHEMA = vol.Schema(
     {
@@ -67,11 +101,15 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            self._host = user_input[CONF_HOST].strip()
-            self._auth_mode = user_input[CONF_AUTH_MODE]
-            if self._auth_mode == AUTH_MODE_TOKEN:
-                return await self.async_step_token()
-            return await self.async_step_password()
+            try:
+                self._host = _normalize_host_input(user_input[CONF_HOST])
+            except ValueError:
+                errors["base"] = "invalid_host"
+            else:
+                self._auth_mode = user_input[CONF_AUTH_MODE]
+                if self._auth_mode == AUTH_MODE_TOKEN:
+                    return await self.async_step_token()
+                return await self.async_step_password()
 
         return self.async_show_form(
             step_id="user",
@@ -154,6 +192,20 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         session = async_get_clientsession(self.hass, verify_ssl=False)
         return SinumClient(self._host, session, **kwargs)
 
+    async def _run_probe_with_retry(self, operation: Callable[[], Awaitable[T]]) -> T:
+        last_error: Exception | None = None
+        for attempt in range(1, _PROBE_RETRIES + 1):
+            try:
+                return await operation()
+            except SinumAuthError:
+                raise
+            except SinumConnectionError as err:
+                last_error = err
+                if attempt == _PROBE_RETRIES:
+                    raise
+                await asyncio.sleep(_PROBE_RETRY_DELAY)
+        raise SinumConnectionError(str(last_error) if last_error else "probe failed")
+
     @staticmethod
     def _map_auth_exception(exc: Exception) -> str:
         if isinstance(exc, SinumAuthError):
@@ -170,7 +222,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     async def _hub_name_from_token(self, token: str) -> tuple[str | None, str | None]:
         client = self._make_client(api_token=token)
         try:
-            hub_info = await client.get_hub_info()
+            hub_info = await self._run_probe_with_retry(client.get_hub_info)
         except Exception as exc:
             return None, self._map_auth_exception(exc)
         return self._hub_name_from_info(hub_info), None
@@ -180,8 +232,18 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> tuple[str | None, str | None]:
         client = self._make_client(username=username, password=password)
         try:
-            await client.login()
-            hub_info = await client.get_hub_info()
+            await self._run_probe_with_retry(client.login)
+        except Exception as exc:
+            return None, self._map_auth_exception(exc)
+
+        try:
+            hub_info = await self._run_probe_with_retry(client.get_hub_info)
+        except SinumConnectionError:
+            # Fallback: login was accepted but /info may be temporarily busy.
+            _LOGGER.warning(
+                "Hub info unavailable after successful login, using host as fallback title"
+            )
+            return None, None
         except Exception as exc:
             return None, self._map_auth_exception(exc)
         return self._hub_name_from_info(hub_info), None
@@ -211,11 +273,15 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            self._host = user_input[CONF_HOST].strip()
-            self._auth_mode = user_input[CONF_AUTH_MODE]
-            if self._auth_mode == AUTH_MODE_TOKEN:
-                return await self.async_step_token()
-            return await self.async_step_password()
+            try:
+                self._host = _normalize_host_input(user_input[CONF_HOST])
+            except ValueError:
+                errors["base"] = "invalid_host"
+            else:
+                self._auth_mode = user_input[CONF_AUTH_MODE]
+                if self._auth_mode == AUTH_MODE_TOKEN:
+                    return await self.async_step_token()
+                return await self.async_step_password()
         self._host = entry.data.get(CONF_HOST, "")
         self._auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_TOKEN)
         return self.async_show_form(

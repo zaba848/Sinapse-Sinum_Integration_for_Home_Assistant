@@ -53,6 +53,7 @@
     "error": {
       "cannot_connect": "Nie można połączyć się z centralą. Sprawdź adres IP i dostępność w sieci.",
       "invalid_auth": "Nieprawidłowy token lub dane logowania.",
+      "invalid_host": "Nieprawidłowy host. Podaj tylko adres IP lub nazwę hosta (bez ścieżki).",
       "unknown": "Wystąpił nieoczekiwany błąd."
     },
     "abort": {

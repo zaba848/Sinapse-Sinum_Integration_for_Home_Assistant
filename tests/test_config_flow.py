@@ -670,3 +670,85 @@ class TestReauthPasswordMode:
             result = await flow.async_step_reauth_confirm({"api_token": "tok", "scan_interval": 30})
 
         assert result["errors"]["base"] == "cannot_connect"
+
+
+class TestConfigFlowFailsafeAndFallback:
+    @pytest.mark.asyncio
+    async def test_user_step_rejects_invalid_host_with_path(self, hass, mock_aiohttp_session):
+        from custom_components.sinum.config_flow import SinumConfigFlow
+
+        flow = SinumConfigFlow()
+        flow.hass = hass
+        flow.context = {}
+
+        result = await flow.async_step_user(
+            {"host": "http://10.0.0.1/api", "auth_mode": AUTH_MODE_TOKEN}
+        )
+
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "invalid_host"
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_rejects_invalid_host(self, hass, mock_aiohttp_session):
+        from custom_components.sinum.config_flow import SinumConfigFlow
+
+        flow = SinumConfigFlow()
+        flow.hass = hass
+        flow.context = {}
+
+        mock_entry = MagicMock()
+        mock_entry.data = {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+        flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+
+        result = await flow.async_step_reconfigure(
+            {"host": "10.0.61.132/path", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+        )
+
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "invalid_host"
+
+    @pytest.mark.asyncio
+    async def test_probe_retry_succeeds_after_transient_connection_error(
+        self, hass, mock_aiohttp_session
+    ):
+        from custom_components.sinum.config_flow import SinumConfigFlow
+
+        flow = SinumConfigFlow()
+        flow.hass = hass
+
+        calls = {"count": 0}
+
+        async def _op():
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise SinumConnectionError("temporary")
+            return "ok"
+
+        result = await flow._run_probe_with_retry(_op)
+
+        assert result == "ok"
+        assert calls["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_password_flow_falls_back_when_hub_info_unavailable_after_login(
+        self, hass, mock_aiohttp_session
+    ):
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.login = AsyncMock(return_value=None)
+            client.get_hub_info = AsyncMock(side_effect=SinumConnectionError("busy"))
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow.context = {}
+            flow._host = "10.0.61.132"
+
+            result = await flow.async_step_password(
+                {"username": "admin", "password": "secret", "scan_interval": 30}
+            )
+
+        assert result["type"] == "create_entry"
+        assert result["title"] == "Sinum (10.0.61.132)"
