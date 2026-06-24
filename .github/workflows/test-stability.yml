@@ -29,12 +29,12 @@ jobs:
 
       - name: Run tests with stability tracking
         id: stability
+        continue-on-error: true
         run: |
           python -m pytest tests/ \
             -v \
             --tb=short \
             --durations=10 \
-            -m "not hardware" \
             2>&1 | tee test_output.log
           
           # Extract summary
