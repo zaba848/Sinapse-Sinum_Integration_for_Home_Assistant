@@ -10,6 +10,11 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 - Hardware validation process formalized in `HARDWARE_TEST_PLAN.md` with a release checklist and explicit CC + smoke + manual hardware gate.
 - `validate.yml` no longer skips HACS validation on push/PR due to repository visibility checks.
 - Added a documented hardware smoke test result (2026-06-24) for WTP and SBUS hubs.
+- `SECURITY.md` replaced template content with an actionable vulnerability handling policy for current release lines.
+- `codeql.yml` now always executes CodeQL in public-repo mode (no soft skip fallback).
+
+### Added
+- New `dependency-review.yml` workflow for pull requests to detect risky dependency changes.
 
 ## [0.2.6] — 2026-06-24
 
