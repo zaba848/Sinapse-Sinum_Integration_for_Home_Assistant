@@ -34,10 +34,14 @@ select = [
     "B",      # flake8-bugbear
     "SIM",    # flake8-simplify
     "I",      # isort
+    "C901",   # mccabe complexity
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8  # all current code passes; prevents regression above CC=8
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]
