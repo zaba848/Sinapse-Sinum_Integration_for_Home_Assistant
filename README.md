@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/tests-1036%20passing-brightgreen.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -103,7 +103,7 @@ SinumCoordinator (coordinator.py)
 ### HACS (recommended)
 
 1. **HACS → Integrations → ⋮ → Custom repositories**
-2. Add `https://github.com/zaba848/Sinum_HomeAsistant_connector` → category **Integration**
+2. Add `https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant` → category **Integration**
 3. Find and install **Sinum (Sinapse)**
 4. Restart Home Assistant
 
@@ -495,8 +495,8 @@ Payloads without a `source` field are treated as virtual devices.
 ### Setup
 
 ```bash
-git clone https://github.com/zaba848/Sinum_HomeAsistant_connector
-cd Sinum_HomeAsistant_connector
+git clone https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant
+cd sinapse-sinum-integration-for-home-assistant
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements-dev.txt

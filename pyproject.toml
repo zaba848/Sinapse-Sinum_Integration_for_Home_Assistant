@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sinapse-homeassistant-sinum"
-version = "0.2.0"
-description = "Home Assistant integration for Sinum EH-01 home automation hub"
+version = "0.2.6"
+description = "Sinapse - Sinum Integration for Home Assistant"
 readme = "README.md"
 license = {text = "Proprietary"}
 authors = [{name = "Tomasz Panek", email = "zaba9214@gmail.com"}]
