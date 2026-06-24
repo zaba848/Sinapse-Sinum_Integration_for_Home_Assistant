@@ -11,9 +11,16 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from custom_components.sinum.api import SinumConnectionError
 from custom_components.sinum.coordinator import (
     SinumCoordinator,
+    SinumDeviceAvailableMixin,
     _collect_device_ids,
+    _device_class,
+    _device_id_as_int,
     _device_name_in_room,
+    _find_room_containing_device,
     _room_name_for_device,
+    _source_from_label,
+    _unique_ids,
+    via_device_for,
 )
 
 FIXTURES = json.loads(
@@ -37,6 +44,17 @@ class TestCollectDeviceIds:
         assert sbus_ids == []
         assert lora_ids == []
 
+    def test_skips_non_dict_rooms_and_devices(self):
+        rooms = [
+            "bad-room",
+            {"devices": ["bad-device", {"id": "abc", "class": "wtp"}, {"id": 5, "class": "wtp"}]},
+        ]
+        virtual_ids, wtp_ids, sbus_ids, lora_ids = _collect_device_ids(rooms)
+        assert virtual_ids == []
+        assert wtp_ids == [5]
+        assert sbus_ids == []
+        assert lora_ids == []
+
 
 class TestRoomHelpers:
     def test_room_name_for_device(self):
@@ -50,6 +68,78 @@ class TestRoomHelpers:
         assert _device_name_in_room(rooms, 10) == "Thermostat"
         assert _device_name_in_room(rooms, 12) == "Relay"
         assert _device_name_in_room(rooms, 999) == "999"
+
+    def test_find_room_containing_device_skips_non_dict_values(self):
+        rooms = [
+            "bad-room",
+            {"name": "Kitchen", "devices": ["bad-device", {"id": 12, "class": "virtual", "name": "Relay"}]},
+        ]
+        room, dev_name = _find_room_containing_device(rooms, 12, "virtual")
+        assert room["name"] == "Kitchen"
+        assert dev_name == "Relay"
+
+    def test_room_helpers_skip_non_dict_values(self):
+        rooms = [
+            "bad-room",
+            {"name": "Hall", "devices": ["bad-device", {"id": 7, "name": "Door"}]},
+        ]
+        assert _room_name_for_device(rooms, 7) == "Hall"
+        assert _device_name_in_room(rooms, 7) == "Door"
+
+
+class TestCoordinatorHelpers:
+    def test_device_id_as_int_handles_invalid_values(self):
+        assert _device_id_as_int("12") == 12
+        assert _device_id_as_int(None) is None
+        assert _device_id_as_int("abc") is None
+
+    def test_device_class_normalizes_prefixes(self):
+        assert _device_class({"class": "virtual_device"}) == "virtual"
+        assert _device_class({"class": "wtp_parent_device"}) == "wtp"
+        assert _device_class({"source": "sbus_line"}) == "sbus"
+        assert _device_class({"bus": "lora_net"}) == "lora"
+        assert _device_class({"class": "custom_bus"}) == "custom_bus"
+
+    def test_source_from_label_and_unique_ids(self):
+        assert _source_from_label("LoRa") == "lora"
+        assert _source_from_label("WTP") == "wtp"
+        assert _unique_ids([1, 2, 1, 3, 2]) == [1, 2, 3]
+
+    def test_via_device_for_returns_parent_tuple(self):
+        assert via_device_for({"_parent_class": "wtp_parent_device", "_parent_id": 5}, "entry") == (
+            "sinum",
+            "entry_parent_wtp_parent_device_5",
+        )
+        assert via_device_for({}, "entry") is None
+
+    def test_available_mixin_uses_super_available_and_device_presence(self):
+        class _Base:
+            @property
+            def available(self):
+                return True
+
+        class _Entity(SinumDeviceAvailableMixin, _Base):
+            def __init__(self, device):
+                self.__device = device
+
+            @property
+            def _device(self):
+                return self.__device
+
+        assert _Entity({"id": 1}).available is True
+        assert _Entity({}).available is False
+
+    def test_available_mixin_device_property_raises_by_default(self):
+        class _Base:
+            @property
+            def available(self):
+                return True
+
+        class _Entity(SinumDeviceAvailableMixin, _Base):
+            pass
+
+        with pytest.raises(NotImplementedError):
+            _ = _Entity()._device
 
 
 class TestSinumCoordinator:
@@ -241,3 +331,42 @@ class TestSinumCoordinator:
         # Cached data is preserved — entities remain available
         assert 10 in data["virtual"]
         assert coordinator.virtual_devices is data["virtual"]
+
+    def test_process_bulk_devices_skips_invalid_items(self, mock_client):
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.floors = {}
+        rooms = []
+
+        devices = coordinator._process_bulk_devices(["bad", {"id": "x"}, {"id": 2, "name": "Relay"}], "virtual", rooms)
+
+        assert list(devices) == [2]
+        assert devices[2]["class"] == "virtual"
+
+    @pytest.mark.asyncio
+    async def test_fetch_device_collection_skips_non_dict_item_fallback(self, mock_client):
+        coordinator = self._make_coordinator(mock_client)
+
+        list_getter = AsyncMock(return_value=[])
+        item_getter = AsyncMock(side_effect=["bad", {"id": 8, "name": "Sensor"}])
+
+        result = await coordinator._fetch_device_collection(
+            "WTP", list_getter, item_getter, [7, 8], [], {}
+        )
+
+        assert list(result) == [8]
+        assert result[8]["class"] == "wtp"
+
+    def test_inject_parent_models_sets_class_and_parent_id(self, mock_client):
+        from custom_components.sinum.coordinator import _inject_parent_models
+
+        devices = {1: {"id": 1, "parent_id": 77}}
+        _inject_parent_models(
+            devices,
+            "wtp",
+            {"wtp": {77: "Hub X"}},
+            {"wtp": {77: "wtp_parent_device"}},
+        )
+
+        assert devices[1]["_parent_model"] == "Hub X"
+        assert devices[1]["_parent_class"] == "wtp_parent_device"
+        assert devices[1]["_parent_id"] == 77
