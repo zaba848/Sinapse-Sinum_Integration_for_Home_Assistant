@@ -470,7 +470,11 @@ class SinumDeviceAvailableMixin:
     """
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def _device(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @property
+    def available(self) -> bool:
         return super().available and bool(self._device)  # type: ignore[misc]
 
 

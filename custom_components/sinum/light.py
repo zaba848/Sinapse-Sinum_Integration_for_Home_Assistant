@@ -658,7 +658,7 @@ class SinumButtonLight(
             return
         self._attr_is_on = last.state == STATE_ON
         if last.attributes.get(ATTR_HS_COLOR):
-            self._attr_hs_color = tuple(last.attributes[ATTR_HS_COLOR])  # type: ignore[assignment]
+            self._attr_hs_color = tuple(last.attributes[ATTR_HS_COLOR])
 
     @property
     def _device(self) -> dict[str, Any]:

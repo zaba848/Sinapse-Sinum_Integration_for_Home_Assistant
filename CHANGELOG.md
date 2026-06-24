@@ -2,6 +2,28 @@
 
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
+## [0.2.5] — 2026-06-24
+
+### Changed
+- **`sensor_bus.py` split**: sensor descriptions (pure data) extracted to
+  `sensor_bus_descriptions.py`; `sensor_bus.py` now contains only entity classes.
+  Backward-compatible re-export keeps all existing imports unchanged.
+- **`cover.py` RestoreEntity guard**: position/tilt properties now use `if self._device:`
+  pattern (same as `light.py`) — when hub is online, live coordinator data is always
+  authoritative and never falls back to stale restored values.
+- **`SinumDeviceAvailableMixin`**: added `_device` property stub so mypy
+  understands the contract; removed now-redundant `# type: ignore` comments.
+- **`diagnostics.py`**: LoRa devices (`lora_devices`, `lora_count`) included in output.
+- **Translations**: `reconfigure` step and `reconfigure_successful` abort synced to
+  `en.json` and `pl.json` (were only in `strings.json`).
+
+### Added
+- **Device trigger tests** (`tests/test_device_trigger.py`): 16 tests covering all
+  `async_get_triggers`, `async_attach_trigger`, and `async_validate_trigger_config` paths.
+- **`mypy` clean**: all 24 source files pass `mypy --ignore-missing-imports` with 0 errors.
+
+---
+
 ## [0.2.4] — 2026-06-24
 
 ### Added

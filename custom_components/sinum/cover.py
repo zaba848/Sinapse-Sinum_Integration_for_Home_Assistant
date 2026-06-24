@@ -119,16 +119,16 @@ class SinumBlindCover(
 
     @property
     def current_cover_position(self) -> int | None:
-        pos = self._device.get("last_set_target_opening")
-        if pos is not None:
-            return int(pos)
+        if self._device:
+            pos = self._device.get("last_set_target_opening")
+            return int(pos) if pos is not None else None
         return self._attr_current_cover_position
 
     @property
     def current_cover_tilt_position(self) -> int | None:
-        tilt = self._device.get("last_set_target_tilt")
-        if tilt is not None:
-            return int(tilt)
+        if self._device:
+            tilt = self._device.get("last_set_target_tilt")
+            return int(tilt) if tilt is not None else None
         return self._attr_current_cover_tilt_position
 
     @property
@@ -233,9 +233,9 @@ class SinumGateCover(
 
     @property
     def is_closed(self) -> bool | None:
-        state = self._device.get("state")
-        if state is not None:
-            return state == GATE_STATE_CLOSED
+        if self._device:
+            state = self._device.get("state")
+            return state == GATE_STATE_CLOSED if state is not None else None
         return self._restored_closed
 
     @property
@@ -325,9 +325,9 @@ class SinumWtpBlindCover(
 
     @property
     def current_cover_position(self) -> int | None:
-        pos = self._device.get("current_opening")
-        if pos is not None:
-            return int(pos)
+        if self._device:
+            pos = self._device.get("current_opening")
+            return int(pos) if pos is not None else None
         return self._attr_current_cover_position
 
     @property
@@ -453,16 +453,16 @@ class SinumSbusBlindCover(
 
     @property
     def current_cover_position(self) -> int | None:
-        pos = self._device.get("current_opening")
-        if pos is not None:
-            return int(pos)
+        if self._device:
+            pos = self._device.get("current_opening")
+            return int(pos) if pos is not None else None
         return self._attr_current_cover_position
 
     @property
     def current_cover_tilt_position(self) -> int | None:
-        tilt = self._device.get("current_tilt")
-        if tilt is not None:
-            return int(tilt)
+        if self._device:
+            tilt = self._device.get("current_tilt")
+            return int(tilt) if tilt is not None else None
         return self._attr_current_cover_tilt_position
 
     @property
