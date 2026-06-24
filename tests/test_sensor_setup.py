@@ -111,6 +111,54 @@ class TestAsyncSetupEntry:
         assert len(sensors) >= 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("device_type", "api_key", "raw_value", "expected_native"),
+        [
+            ("co2_sensor", "co2", 550, 550),
+            ("pressure_sensor", "pressure", 10123, 1012.3),
+            ("iaq_sensor", "iaq", 42, 42),
+            ("aq_sensor", "air_quality", "good", "good"),
+            ("air_quality_sensor", "pm2p5", 12, 12),
+        ],
+    )
+    async def test_wtp_specific_sensor_types_create_expected_entities(
+        self, device_type, api_key, raw_value, expected_native
+    ):
+        desc = next(
+            (d for d in WTP_SENSORS if d.source == "wtp" and d.api_key == api_key),
+            None,
+        )
+        assert desc is not None
+
+        wtp = {
+            200: {
+                "id": 200,
+                "type": device_type,
+                "name": f"WTP {device_type}",
+                api_key: raw_value,
+            }
+        }
+        coordinator = _make_coordinator(wtp=wtp)
+        entry = _make_entry(coordinator)
+        added = []
+
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+
+        matching = [
+            e
+            for e in added
+            if isinstance(e, SinumSensor)
+            and getattr(e, "_source", None) == "wtp"
+            and e.entity_description.api_key == api_key
+        ]
+
+        assert len(matching) == 1
+        if isinstance(expected_native, float):
+            assert matching[0].native_value == pytest.approx(expected_native)
+        else:
+            assert matching[0].native_value == expected_native
+
+    @pytest.mark.asyncio
     async def test_wtp_regulator_creates_regulator_sensor(self):
         desc = next((d for d in WTP_SENSORS if d.source == "wtp_regulator"), None)
         assert desc is not None
