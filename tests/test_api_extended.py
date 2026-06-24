@@ -723,3 +723,339 @@ class TestReadJsonErrorHandling:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client._refresh_jwt()
         assert result is False
+
+
+class TestLoginStaticToken:
+    """Line 111: login() returns immediately when api_token is set."""
+
+    @pytest.mark.asyncio
+    async def test_login_noop_with_static_token(self, session):
+        client = SinumClient("192.168.1.1", session, api_token="static-tok")
+        # login() should not call session.post at all
+        session.post = AsyncMock()
+        await client.login()
+        session.post.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_read_json_body_raises_connection_error_on_client_error(self, session):
+        """Line 70: resp.read() raises ClientPayloadError → SinumConnectionError."""
+        resp = MagicMock()
+        resp.status = 200
+        resp.read = AsyncMock(side_effect=aiohttp.ClientPayloadError("truncated payload"))
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Failed to read response"),
+        ):
+            await client.get_hub_info()
+
+    @pytest.mark.asyncio
+    async def test_raise_for_422_falls_back_to_status_when_body_unreadable(self, session):
+        """Lines 288-289: _raise_for_422 uses status fallback when _read_json raises."""
+        bad_resp = MagicMock()
+        bad_resp.status = 422
+        bad_resp.read = AsyncMock(return_value=b"not-json")
+        session.request = AsyncMock(return_value=bad_resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Validation error"),
+        ):
+            await client.get_hub_info()
+
+
+class TestSceneApiMethods:
+    """Lines 392-444: scene management endpoint coverage."""
+
+    @pytest.mark.asyncio
+    async def test_get_scene_returns_empty_dict_for_non_dict_result(self, session):
+        """get_scene → fallback {} when result is not a dict."""
+        resp = make_response(200, [{"id": 1}])  # list, not dict
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene(1)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_scene_lua_returns_empty_dict_for_non_dict_result(self, session):
+        resp = make_response(200, [])  # list
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene_lua(5)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_scene_lua_extensions(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "lua": "-- ext"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene_lua_extensions(5)
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_get_scene_schema_returns_empty_dict_for_non_dict_result(self, session):
+        resp = make_response(200, [])
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene_schema(3)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_scene_logs(self, session):
+        resp = make_response(200, {"data": [{"ts": "2026-01-01", "msg": "ok"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene_logs(3)
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_create_scene_returns_id(self, session):
+        resp = make_response(200, {"data": {"id": 42, "name": "test"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            scene_id = await client.create_scene("test", "-- lua")
+        assert scene_id == 42
+
+    @pytest.mark.asyncio
+    async def test_create_scene_raises_on_missing_id(self, session):
+        resp = make_response(200, {"data": {"name": "test"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumConnectionError, match="Scene creation failed"),
+        ):
+            await client.create_scene("test", "-- lua")
+
+    @pytest.mark.asyncio
+    async def test_patch_scene_lua(self, session):
+        resp = make_response(200, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.patch_scene_lua(7, "return true")
+        session.request.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_scene(self, session):
+        resp = make_response(204)
+        resp.read = AsyncMock(return_value=b"")
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.delete_scene(7)
+        session.request.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_find_scene_by_name_returns_none_when_missing(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "other"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.find_scene_by_name("nonexistent")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_find_scene_by_name_returns_id_when_found(self, session):
+        resp = make_response(200, {"data": [{"id": 9, "name": "my-scene"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.find_scene_by_name("my-scene")
+        assert result == 9
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_scene_creates_when_not_found(self, session):
+        """get_or_create_scene calls create_scene when find returns None."""
+        resp_list = make_response(200, {"data": []})
+        resp_create = make_response(200, {"data": {"id": 11, "name": "new-scene"}})
+        session.request = AsyncMock(side_effect=[resp_list, resp_create])
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            scene_id = await client.get_or_create_scene("new-scene")
+        assert scene_id == 11
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_scene_returns_existing(self, session):
+        resp = make_response(200, {"data": [{"id": 5, "name": "existing"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            scene_id = await client.get_or_create_scene("existing")
+        assert scene_id == 5
+
+
+class TestAutomationApiMethods:
+    """Lines 453-491: automation + alarm command endpoint coverage."""
+
+    @pytest.mark.asyncio
+    async def test_get_automation_returns_empty_dict_for_non_dict(self, session):
+        resp = make_response(200, [])
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_automation(1)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_automation_lua_returns_empty_dict_for_non_dict(self, session):
+        resp = make_response(200, [])
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_automation_lua(1)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_automation_lua_extensions(self, session):
+        resp = make_response(200, {"data": [{"id": 1}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_automation_lua_extensions(1)
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_get_automation_logs(self, session):
+        resp = make_response(200, {"data": [{"ts": "2026-01-01"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_automation_logs(2)
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_command_alarm_device(self, session):
+        resp = make_response(200, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.command_alarm_device(3, "arm", {"mode": "full"})
+        session.request.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_lora_devices(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "type": "opening_sensor"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lora_devices()
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_get_lora_device(self, session):
+        resp = make_response(200, {"data": {"id": 1}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lora_device(1)
+        assert result == {"id": 1}
+
+    @pytest.mark.asyncio
+    async def test_patch_lora_device(self, session):
+        resp = make_response(200, {"data": {"id": 1, "state": "open"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_lora_device(1, {"state": "open"})
+        assert result == {"id": 1, "state": "open"}
+
+
+class TestEnergyCenterEndpoints:
+    """Lines 547-576: individual energy center getter coverage."""
+
+    @pytest.fixture
+    def client_ok(self, session):
+        """Client with api_token, session returns a generic 200 with dict result."""
+        resp = make_response(200, {"data": {"value": 42}})
+        session.request = AsyncMock(return_value=resp)
+        return SinumClient("192.168.1.1", session, api_token="tok")
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_associations(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_associations()
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_prices(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_prices()
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_prices_settings(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_prices_settings()
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_prices_sources(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_prices_sources()
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_storage(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_storage()
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_consumption(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_consumption()
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_energy_center_production(self, session, client_ok):
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client_ok.get_energy_center_production()
+        assert isinstance(result, dict)
+
+
+class TestHelperFunctions:
+    """Lines 70, 111, 490-491: helper and _list_result edge-case coverage."""
+
+    def test_dict_list_returns_empty_for_non_list_input(self):
+        """Line 70: _dict_list(non-list) → []."""
+        from custom_components.sinum.api import _dict_list
+
+        assert _dict_list("not-a-list") == []
+        assert _dict_list(None) == []
+        assert _dict_list(42) == []
+
+    def test_list_result_single_id_dict_wrapped_in_list(self):
+        """Line 111: _list_result({'id': 1, ...}) → [{'id': 1, ...}]."""
+        from custom_components.sinum.api import _list_result
+
+        device = {"id": 1, "type": "flood_sensor"}
+        result = _list_result(device)
+        assert result == [device]
+
+    @pytest.mark.asyncio
+    async def test_get_schedule_returns_empty_dict_for_non_dict_result(self, session):
+        """Lines 490-491: get_schedule fallback {} when result is not a dict."""
+        resp = make_response(200, [{"id": 5}])  # list, not dict
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_schedule(5)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_patch_schedule_returns_empty_dict_for_non_dict_result(self, session):
+        """Lines 490-491: patch_schedule fallback {} when result is not a dict."""
+        resp = make_response(200, [])
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_schedule(5, {"active": True})
+        assert result == {}
