@@ -145,63 +145,47 @@ def _build_client(hass: HomeAssistant, entry: SinumConfigEntry) -> SinumClient:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
-    client = _build_client(hass, entry)
-    await client.login()
-
-    opts = {**entry.data, **entry.options}
-    coordinator = SinumCoordinator(
-        hass,
-        client,
-        scan_interval=opts.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-    )
-    await coordinator.async_config_entry_first_refresh()
-    entry.runtime_data = coordinator
-
-    # Sync config entry title with actual hub name (fixes stale IP-based titles)
+def _sync_entry_title(
+    hass: HomeAssistant, entry: SinumConfigEntry, coordinator: SinumCoordinator
+) -> None:
     hub_name = coordinator.hub_info.get("name") or coordinator.hub_info.get("hostname")
-    if hub_name:
-        expected_title = f"Sinum ({hub_name})"
-        if entry.title != expected_title and hass.config_entries.async_get_entry(entry.entry_id):
-            hass.config_entries.async_update_entry(entry, title=expected_title)
+    if not hub_name:
+        return
+    expected = f"Sinum ({hub_name})"
+    if entry.title != expected and hass.config_entries.async_get_entry(entry.entry_id):
+        hass.config_entries.async_update_entry(entry, title=expected)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Start MQTT bridge if enabled
-    if opts.get(CONF_MQTT_ENABLED, False):
-        bridge = SinumMqttBridge(
-            hass,
-            coordinator,
-            topic_prefix=opts.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
-        )
-        if await bridge.async_start():
-            _MQTT_BRIDGES[entry.entry_id] = bridge
-            coordinator.mqtt_bridge = bridge
+async def _start_mqtt_bridge(
+    hass: HomeAssistant,
+    entry: SinumConfigEntry,
+    coordinator: SinumCoordinator,
+    opts: dict[str, Any],
+) -> None:
+    if not opts.get(CONF_MQTT_ENABLED, False):
+        return
+    bridge = SinumMqttBridge(
+        hass,
+        coordinator,
+        topic_prefix=opts.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+    )
+    if await bridge.async_start():
+        _MQTT_BRIDGES[entry.entry_id] = bridge
+        coordinator.mqtt_bridge = bridge
 
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    _notification_clients(hass)[entry.entry_id] = client
-    _coordinators(hass)[entry.entry_id] = coordinator
+def _register_services(hass: HomeAssistant) -> None:
+    """Register HA services; safe to call on every entry load (no-ops if already registered)."""
 
-    # Push notification service. Register once per HA instance; with multiple hubs loaded,
-    # the service broadcasts to all currently loaded Sinum clients.
     async def handle_send_notification(call: ServiceCall) -> None:
         await asyncio.gather(
             *(
-                notification_client.send_notification(
+                client.send_notification(
                     title=call.data[ATTR_NOTIFICATION_TITLE],
                     message=call.data[ATTR_NOTIFICATION_MESSAGE],
                 )
-                for notification_client in _notification_clients(hass).values()
+                for client in _notification_clients(hass).values()
             )
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SEND_NOTIFICATION,
-            handle_send_notification,
-            schema=NOTIFY_SCHEMA,
         )
 
     async def handle_update_schedule(call: ServiceCall) -> None:
@@ -212,13 +196,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
         _merge_schedule(coordinator, schedule_id, updated or payload)
         _publish_schedule_update(coordinator)
 
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
+        hass.services.async_register(
+            DOMAIN, SERVICE_SEND_NOTIFICATION, handle_send_notification, schema=NOTIFY_SCHEMA
+        )
     if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE):
         hass.services.async_register(
-            DOMAIN,
-            SERVICE_UPDATE_SCHEDULE,
-            handle_update_schedule,
-            schema=UPDATE_SCHEDULE_SCHEMA,
+            DOMAIN, SERVICE_UPDATE_SCHEDULE, handle_update_schedule, schema=UPDATE_SCHEDULE_SCHEMA
         )
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
+    client = _build_client(hass, entry)
+    await client.login()
+
+    opts = {**entry.data, **entry.options}
+    coordinator = SinumCoordinator(
+        hass, client, scan_interval=opts.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    )
+    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = coordinator
+
+    _sync_entry_title(hass, entry, coordinator)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _start_mqtt_bridge(hass, entry, coordinator, opts)
+
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    _notification_clients(hass)[entry.entry_id] = client
+    _coordinators(hass)[entry.entry_id] = coordinator
+    _register_services(hass)
 
     return True
 
