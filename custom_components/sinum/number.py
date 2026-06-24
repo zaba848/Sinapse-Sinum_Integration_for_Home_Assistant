@@ -18,32 +18,50 @@ from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device
 _LOGGER = logging.getLogger(__name__)
 
 
+async def _load_variables(coordinator: SinumCoordinator) -> list[dict[str, Any]]:
+    variables = getattr(coordinator, "variables", None)
+    if isinstance(variables, list) and variables:
+        return variables
+
+    cached_variables = variables if isinstance(variables, list) else []
+    try:
+        fetched = await coordinator.client.get_variables()
+        coordinator.variables = fetched
+        return fetched
+    except SinumConnectionError:
+        _LOGGER.debug("Variables endpoint not available on this hub firmware")
+        return cached_variables
+
+
+def _variable_number_entities(
+    coordinator: SinumCoordinator, variables: list[dict[str, Any]], entry_id: str
+) -> list[NumberEntity]:
+    return [
+        SinumVariableNumber(coordinator, var, entry_id)
+        for var in variables
+        if var.get("type") in ("integer", "float", "number")
+    ]
+
+
+def _sbus_number_entities(coordinator: SinumCoordinator, entry_id: str) -> list[NumberEntity]:
+    entities: list[NumberEntity] = []
+    for device_id, device in coordinator.sbus_devices.items():
+        if device.get("type") == STYPE_ANALOG_OUTPUT:
+            entities.append(SinumAnalogOutputNumber(coordinator, device_id, entry_id))
+        elif device.get("type") == STYPE_PWM:
+            entities.append(SinumPwmNumber(coordinator, device_id, entry_id))
+    return entities
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
-    variables = getattr(coordinator, "variables", None)
-    if not isinstance(variables, list) or not variables:
-        cached_variables = variables if isinstance(variables, list) else []
-        try:
-            variables = await coordinator.client.get_variables()
-            coordinator.variables = variables
-        except SinumConnectionError:
-            _LOGGER.debug("Variables endpoint not available on this hub firmware")
-            variables = cached_variables
-
-    entities: list[NumberEntity] = []
-    for var in variables:
-        if var.get("type") in ("integer", "float", "number"):
-            entities.append(SinumVariableNumber(coordinator, var, entry.entry_id))
-
-    for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == STYPE_ANALOG_OUTPUT:
-            entities.append(SinumAnalogOutputNumber(coordinator, device_id, entry.entry_id))
-        elif device.get("type") == STYPE_PWM:
-            entities.append(SinumPwmNumber(coordinator, device_id, entry.entry_id))
+    variables = await _load_variables(coordinator)
+    entities = _variable_number_entities(coordinator, variables, entry.entry_id)
+    entities.extend(_sbus_number_entities(coordinator, entry.entry_id))
 
     async_add_entities(entities)
 

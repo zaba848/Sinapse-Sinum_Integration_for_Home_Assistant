@@ -87,13 +87,8 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
     def _device(self) -> dict[str, Any]:
         return self._get_device_dict(self.coordinator)
 
-    @property
-    def native_value(self) -> float | str | None:
+    def _normalized_numeric_raw(self) -> int | float | None:
         raw = self._device.get(self.entity_description.api_key)
-        if raw is None:
-            return None
-        if self.entity_description.is_text:
-            return str(raw)
         if not isinstance(raw, (int, float)):
             return None
         if raw == _SENTINEL_INT16:
@@ -102,19 +97,30 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
             self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
         ):
             return None
-        return raw * self.entity_description.scale
+        return raw
+
+    @property
+    def native_value(self) -> float | str | None:
+        raw = self._device.get(self.entity_description.api_key)
+        if raw is None:
+            return None
+        if self.entity_description.is_text:
+            return str(raw)
+        normalized = self._normalized_numeric_raw()
+        if normalized is None:
+            return None
+        return normalized * self.entity_description.scale
 
 
 def _model_for_source(source: str) -> str:
-    if source == "virtual":
-        return "Sinum Virtual Device"
-    if source == "sbus":
-        return "Sinum SBUS Sensor"
-    if source in ("wtp_regulator", "sbus_regulator"):
-        return "Sinum Temperature Regulator"
-    if source == "lora":
-        return "Sinum LoRa Sensor"
-    return "Sinum WTP Sensor"
+    models = {
+        "virtual": "Sinum Virtual Device",
+        "sbus": "Sinum SBUS Sensor",
+        "wtp_regulator": "Sinum Temperature Regulator",
+        "sbus_regulator": "Sinum Temperature Regulator",
+        "lora": "Sinum LoRa Sensor",
+    }
+    return models.get(source, "Sinum WTP Sensor")
 
 
 class SinumTemperatureRegulatorSensor(SinumSensor):
@@ -130,23 +136,30 @@ class SinumTemperatureRegulatorSensor(SinumSensor):
         super().__init__(coordinator, device_id, description, entry_id)
         # _source stays as "wtp_regulator" or "sbus_regulator" — _get_device_dict handles both
 
+    @staticmethod
+    def _target_temperature_mode(value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        return value.get("current") or value.get("mode")
+
+    @staticmethod
+    def _copy_if_present(device: dict[str, Any], attrs: dict[str, Any], key: str) -> None:
+        if key in device:
+            attrs[key] = device[key]
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Show regulator mode and control state as attributes."""
         device = self._device
         attrs: dict[str, Any] = {}
 
-        if "system_mode" in device:
-            attrs["system_mode"] = device["system_mode"]
+        self._copy_if_present(device, attrs, "system_mode")
         if "target_temperature_mode" in device:
-            ttm = device["target_temperature_mode"]
-            attrs["target_temperature_mode"] = (
-                ttm.get("current") or ttm.get("mode") if isinstance(ttm, dict) else ttm
+            attrs["target_temperature_mode"] = self._target_temperature_mode(
+                device["target_temperature_mode"]
             )
-        if "mode_mutable" in device:
-            attrs["mode_mutable"] = device["mode_mutable"]
-        if "parent_id" in device:
-            attrs["parent_id"] = device["parent_id"]
+        self._copy_if_present(device, attrs, "mode_mutable")
+        self._copy_if_present(device, attrs, "parent_id")
 
         return attrs
 

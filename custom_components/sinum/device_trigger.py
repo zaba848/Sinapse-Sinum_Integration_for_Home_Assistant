@@ -7,6 +7,7 @@ manually writing event entity trigger configs.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 import voluptuous as vol
@@ -46,6 +47,52 @@ async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict[s
     ]
 
 
+def _event_entity_ids_for_device(hass: HomeAssistant, device_id: str) -> set[str]:
+    ent_reg = er.async_get(hass)
+    return {
+        entry.entity_id
+        for entry in er.async_entries_for_device(ent_reg, device_id)
+        if entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
+    }
+
+
+def _trigger_payload(config: dict[str, Any], new_state: Any) -> dict[str, Any]:
+    return {
+        "trigger": {
+            **config,
+            "description": f"button pressed on {new_state.entity_id}",
+        },
+        "action": new_state.attributes.get("action"),
+        "entity_id": new_state.entity_id,
+    }
+
+
+def _new_state_for_trigger(event: Event, event_entity_ids: set[str]) -> Any | None:
+    new_state = event.data.get("new_state")
+    if new_state is None:
+        return None
+    if new_state.entity_id not in event_entity_ids:
+        return None
+    # Skip the initial state write (entity just added, no real press yet)
+    if event.data.get("old_state") is None:
+        return None
+    return new_state
+
+
+@callback
+def _handle_state_changed_event(
+    hass: HomeAssistant,
+    config: dict[str, Any],
+    action: TriggerActionType,
+    event_entity_ids: set[str],
+    event: Event,
+) -> None:
+    new_state = _new_state_for_trigger(event, event_entity_ids)
+    if new_state is None:
+        return
+    hass.async_run_hass_job(action, _trigger_payload(config, new_state))
+
+
 async def async_attach_trigger(
     hass: HomeAssistant,
     config: dict[str, Any],
@@ -54,37 +101,10 @@ async def async_attach_trigger(
 ) -> CALLBACK_TYPE:
     """Attach a trigger that fires when any Sinum button on the device is pressed."""
     device_id = config[CONF_DEVICE_ID]
-    ent_reg = er.async_get(hass)
-
-    event_entity_ids: set[str] = {
-        entry.entity_id
-        for entry in er.async_entries_for_device(ent_reg, device_id)
-        if entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
-    }
+    event_entity_ids = _event_entity_ids_for_device(hass, device_id)
 
     if not event_entity_ids:
         return lambda: None
 
-    @callback
-    def _state_changed(event: Event) -> None:
-        new_state = event.data.get("new_state")
-        if new_state is None:
-            return
-        if new_state.entity_id not in event_entity_ids:
-            return
-        # Skip the initial state write (entity just added, no real press yet)
-        if event.data.get("old_state") is None:
-            return
-        hass.async_run_hass_job(
-            action,
-            {
-                "trigger": {
-                    **config,
-                    "description": f"button pressed on {new_state.entity_id}",
-                },
-                "action": new_state.attributes.get("action"),
-                "entity_id": new_state.entity_id,
-            },
-        )
-
-    return hass.bus.async_listen("state_changed", _state_changed)
+    state_changed = partial(_handle_state_changed_event, hass, config, action, event_entity_ids)
+    return hass.bus.async_listen("state_changed", state_changed)

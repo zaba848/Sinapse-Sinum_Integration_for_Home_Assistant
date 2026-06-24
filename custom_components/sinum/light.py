@@ -298,22 +298,27 @@ class SinumDimmerLight(
     def color_temp_kelvin(self) -> int | None:
         return self._device.get("white_temperature")
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    def _turn_on_payload(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         payload: dict[str, Any] = {"state": True}
-
         if ATTR_BRIGHTNESS in kwargs:
             payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-
         if ATTR_HS_COLOR in kwargs:
             h, s = kwargs[ATTR_HS_COLOR]
             payload["led_color"] = _hs_to_hex(h, s)
+        self._apply_color_temp_payload(payload, kwargs)
+        return payload
 
-        if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            if self._device.get("led_strip_type", "").lower() == "rgb":
-                payload["led_color"] = _kelvin_to_hex(kelvin)
-            else:
-                payload["white_temperature"] = kelvin
+    def _apply_color_temp_payload(self, payload: dict[str, Any], kwargs: dict[str, Any]) -> None:
+        if ATTR_COLOR_TEMP_KELVIN not in kwargs:
+            return
+        kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+        if self._device.get("led_strip_type", "").lower() == "rgb":
+            payload["led_color"] = _kelvin_to_hex(kelvin)
+            return
+        payload["white_temperature"] = kelvin
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        payload = self._turn_on_payload(kwargs)
 
         try:
             updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
@@ -570,24 +575,31 @@ class SinumBusRgbLight(
 
     def _wtp_color_payload(self, **kwargs: Any) -> dict[str, Any]:
         """Build REST color payload for WTP RGB control."""
-        payload: dict[str, Any] = {}
-        has_hs = ATTR_HS_COLOR in kwargs
-        has_brightness = ATTR_BRIGHTNESS in kwargs
-
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            payload["color"] = _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])
-        elif has_hs and has_brightness:
-            h, s = kwargs[ATTR_HS_COLOR]
-            payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
-        elif has_hs:
-            h, s = kwargs[ATTR_HS_COLOR]
-            payload["color"] = _hs_to_hex(h, s, 1.0)
-        elif has_brightness:
-            current = self._device.get("led_color") or self._device.get("color") or "#ffffff"
-            h, s, _ = _hex_to_hsv(current)
-            payload["color"] = _hs_to_hex(h, s, kwargs[ATTR_BRIGHTNESS] / 255.0)
+            return {"color": _kelvin_to_hex(kwargs[ATTR_COLOR_TEMP_KELVIN])}
 
-        return payload
+        hs_payload = self._wtp_hs_payload(kwargs)
+        if hs_payload is not None:
+            return hs_payload
+
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            return {}
+        return {"color": self._brightness_color(brightness)}
+
+    @staticmethod
+    def _wtp_hs_payload(kwargs: dict[str, Any]) -> dict[str, Any] | None:
+        if ATTR_HS_COLOR not in kwargs:
+            return None
+        h, s = kwargs[ATTR_HS_COLOR]
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        value = 1.0 if brightness is None else brightness / 255.0
+        return {"color": _hs_to_hex(h, s, value)}
+
+    def _brightness_color(self, brightness: int) -> str:
+        current = self._device.get("led_color") or self._device.get("color") or "#ffffff"
+        h, s, _ = _hex_to_hsv(current)
+        return _hs_to_hex(h, s, brightness / 255.0)
 
     async def _apply_sbus_color(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Run Lua color commands and return optimistic state; no-op if no color kwargs."""

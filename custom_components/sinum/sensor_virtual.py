@@ -287,15 +287,23 @@ _OUTPUT_GROUP_KEYS = (
 )
 
 
+def _has_nested_collection(items: dict[str, Any]) -> bool:
+    return any(isinstance(item, (dict, list, tuple, set)) for item in items.values())
+
+
+def _count_dict_items(value: dict[str, Any]) -> int:
+    if not value:
+        return 0
+    if not _has_nested_collection(value):
+        return len(value)
+    return sum(_count_items(item) for item in value.values())
+
+
 def _count_items(value: Any) -> int:
     if value is None:
         return 0
     if isinstance(value, dict):
-        if not value:
-            return 0
-        if any(isinstance(item, (dict, list, tuple, set)) for item in value.values()):
-            return sum(_count_items(item) for item in value.values())
-        return len(value)
+        return _count_dict_items(value)
     if isinstance(value, (list, tuple, set)):
         return len(value)
     return 1
