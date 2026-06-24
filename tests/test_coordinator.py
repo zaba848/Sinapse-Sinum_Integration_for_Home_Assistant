@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.sinum.api import SinumConnectionError
+from homeassistant.helpers.update_coordinator import UpdateFailed
+
 from custom_components.sinum.coordinator import (
     SinumCoordinator,
     _collect_device_ids,
@@ -164,6 +166,58 @@ class TestSinumCoordinator:
             data = await coordinator._async_update_data()
         # Virtual devices failed but coordinator returned empty dict, not exception
         assert data["virtual"] == {}
+
+    def test_apply_metadata_lua_info_merged_into_hub_info(self, mock_client):
+        """lua_info dict is merged into hub_info, adding fields from Lua extension."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {"version": "1.0", "name": "Hub"}
+        coordinator._apply_metadata_results(
+            hub_info=None,  # no fresh hub_info (use cache)
+            lua_info={"wifi": {"signal": -60, "ssid": "MyNet"}},
+            rooms=None, floors_list=None, parent_devices=None,
+            scenes=None, schedules=None, automations=None, variables=None,
+        )
+        assert coordinator.hub_info["wifi"]["ssid"] == "MyNet"
+        assert coordinator.hub_info["version"] == "1.0"
+
+    def test_apply_metadata_raises_when_no_hub_info_and_no_cache(self, mock_client):
+        """First-call failure with empty cache → UpdateFailed (hub unreachable)."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {}
+        with pytest.raises(UpdateFailed):
+            coordinator._apply_metadata_results(
+                hub_info=None, lua_info=None,
+                rooms=None, floors_list=None, parent_devices=None,
+                scenes=None, schedules=None, automations=None, variables=None,
+            )
+
+    def test_apply_metadata_none_values_do_not_overwrite_cache(self, mock_client):
+        """None fetch results must not overwrite existing cached values."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {"name": "cached-hub"}
+        coordinator.scenes = [{"id": 1}]
+        coordinator.schedules = [{"id": 2}]
+        coordinator._apply_metadata_results(
+            hub_info=None, lua_info=None,
+            rooms=None, floors_list=None, parent_devices=None,
+            scenes=None, schedules=None, automations=None, variables=None,
+        )
+        assert coordinator.hub_info["name"] == "cached-hub"
+        assert coordinator.scenes == [{"id": 1}]
+        assert coordinator.schedules == [{"id": 2}]
+
+    def test_apply_metadata_floors_indexed_by_id(self, mock_client):
+        """floors_list → dict keyed by int floor_id for O(1) lookup."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {"name": "Hub"}
+        coordinator._apply_metadata_results(
+            hub_info={"name": "Hub"}, lua_info=None,
+            rooms=[], floors_list=[{"id": "3", "name": "Ground", "level": 0}],
+            parent_devices=None, scenes=None, schedules=None,
+            automations=None, variables=None,
+        )
+        assert 3 in coordinator.floors
+        assert coordinator.floors[3]["name"] == "Ground"
 
     @pytest.mark.asyncio
     async def test_bulk_fetch_failure_returns_cached_data(self, mock_client):
