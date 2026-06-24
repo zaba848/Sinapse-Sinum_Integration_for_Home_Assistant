@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.2.9] — 2026-06-24
+
+### Added
+- Legal hardening in project documentation:
+  - explicit non-affiliation notice in `README.md`
+  - trademark and compliance clauses in `LICENSE`
+  - legal/conduct rules for contributors in `CONTRIBUTING.md`
+
+### Changed
+- Clarified project status as unofficial community integration across user-facing docs.
+
 ## [0.2.8] — 2026-06-24
 
 ### Important Legal & Support Disclaimer
