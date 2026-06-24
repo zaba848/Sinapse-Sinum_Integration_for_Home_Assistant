@@ -169,6 +169,42 @@ _TARGET_REACHED_SBUS = SinumBinarySensorDescription(
 )
 
 
+def _add_bus_binary_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[BinarySensorEntity],
+    entry_id: str,
+) -> None:
+    for device_id, device in coordinator.wtp_devices.items():
+        wtp_type = device.get("type", "")
+        if description := _WTP_TYPE_TO_DESCRIPTION.get(wtp_type):
+            entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
+        if wtp_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
+            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_WTP, entry_id))
+
+    for device_id, device in coordinator.sbus_devices.items():
+        sbus_type = device.get("type", "")
+        if description := _SBUS_TYPE_TO_DESCRIPTION.get(sbus_type):
+            entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
+        if sbus_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
+            entities.append(SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry_id))
+
+    for device_id, device in coordinator.lora_devices.items():
+        lora_type = device.get("type", "")
+        if description := _LORA_TYPE_TO_DESCRIPTION.get(lora_type):
+            entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
+
+
+def _add_parent_binary_sensors(
+    coordinator: SinumCoordinator,
+    entities: list[BinarySensorEntity],
+    entry_id: str,
+) -> None:
+    for parent in coordinator.parent_devices:
+        entities.append(SinumParentOnlineSensor(coordinator, parent, entry_id))
+        if parent.get("has_messages") is not None:
+            entities.append(SinumParentErrorSensor(coordinator, parent, entry_id))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -176,39 +212,8 @@ async def async_setup_entry(
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[BinarySensorEntity] = []
-
-    for device_id, device in coordinator.wtp_devices.items():
-        wtp_type = device.get("type", "")
-        description = _WTP_TYPE_TO_DESCRIPTION.get(wtp_type)
-        if description:
-            entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
-        if wtp_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
-            entities.append(
-                SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_WTP, entry.entry_id)
-            )
-
-    for device_id, device in coordinator.sbus_devices.items():
-        sbus_type = device.get("type", "")
-        description = _SBUS_TYPE_TO_DESCRIPTION.get(sbus_type)
-        if description:
-            entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
-        if sbus_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device:
-            entities.append(
-                SinumBinarySensor(coordinator, device_id, _TARGET_REACHED_SBUS, entry.entry_id)
-            )
-
-    for device_id, device in coordinator.lora_devices.items():
-        lora_type = device.get("type", "")
-        description = _LORA_TYPE_TO_DESCRIPTION.get(lora_type)
-        if description:
-            entities.append(SinumBinarySensor(coordinator, device_id, description, entry.entry_id))
-
-    # Parent device connectivity sensors from REST /api/v1/parent-devices
-    for parent in coordinator.parent_devices:
-        entities.append(SinumParentOnlineSensor(coordinator, parent, entry.entry_id))
-        if parent.get("has_messages") is not None:
-            entities.append(SinumParentErrorSensor(coordinator, parent, entry.entry_id))
-
+    _add_bus_binary_sensors(coordinator, entities, entry.entry_id)
+    _add_parent_binary_sensors(coordinator, entities, entry.entry_id)
     async_add_entities(entities)
 
 

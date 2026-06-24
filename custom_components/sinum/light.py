@@ -35,6 +35,24 @@ from .coordinator import SinumCoordinator, via_device_for
 _LOGGER = logging.getLogger(__name__)
 
 
+def _add_bus_lights(
+    coordinator: SinumCoordinator, entities: list[LightEntity], entry_id: str, bus: str
+) -> None:
+    store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+    dimmer_type = WTYPE_DIMMER if bus == "wtp" else STYPE_DIMMER
+    rgb_type = WTYPE_RGB_CONTROLLER if bus == "wtp" else STYPE_RGB_CONTROLLER
+    button_type = WTYPE_BUTTON if bus == "wtp" else STYPE_BUTTON
+
+    for device_id, device in store.items():
+        dev_type = device.get("type")
+        if dev_type == dimmer_type:
+            entities.append(SinumBusDimmerLight(coordinator, device_id, entry_id, bus))
+        elif dev_type == rgb_type:
+            entities.append(SinumBusRgbLight(coordinator, device_id, entry_id, bus))
+        elif dev_type == button_type and "color" in device:
+            entities.append(SinumButtonLight(coordinator, device_id, entry_id, bus))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -47,23 +65,8 @@ async def async_setup_entry(
         if device.get("type") in (VTYPE_DIMMER_RGB, VTYPE_DIMMER_RGB_INTEGRATOR):
             entities.append(SinumDimmerLight(coordinator, device_id, entry.entry_id))
 
-    for device_id, device in coordinator.wtp_devices.items():
-        dev_type = device.get("type")
-        if dev_type == WTYPE_DIMMER:
-            entities.append(SinumBusDimmerLight(coordinator, device_id, entry.entry_id, "wtp"))
-        elif dev_type == WTYPE_RGB_CONTROLLER:
-            entities.append(SinumBusRgbLight(coordinator, device_id, entry.entry_id, "wtp"))
-        elif dev_type == WTYPE_BUTTON and "color" in device:
-            entities.append(SinumButtonLight(coordinator, device_id, entry.entry_id, "wtp"))
-
-    for device_id, device in coordinator.sbus_devices.items():
-        dev_type = device.get("type")
-        if dev_type == STYPE_DIMMER:
-            entities.append(SinumBusDimmerLight(coordinator, device_id, entry.entry_id, "sbus"))
-        elif dev_type == STYPE_RGB_CONTROLLER:
-            entities.append(SinumBusRgbLight(coordinator, device_id, entry.entry_id, "sbus"))
-        elif dev_type == STYPE_BUTTON and "color" in device:
-            entities.append(SinumButtonLight(coordinator, device_id, entry.entry_id, "sbus"))
+    _add_bus_lights(coordinator, entities, entry.entry_id, "wtp")
+    _add_bus_lights(coordinator, entities, entry.entry_id, "sbus")
 
     async_add_entities(entities)
 

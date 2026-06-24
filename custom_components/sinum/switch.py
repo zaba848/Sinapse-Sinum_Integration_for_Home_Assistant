@@ -23,6 +23,40 @@ from .const import (
 from .coordinator import SinumCoordinator, via_device_for
 
 
+def _add_virtual_switches(
+    coordinator: SinumCoordinator, entities: list[SwitchEntity], entry_id: str
+) -> None:
+    for device_id, device in coordinator.virtual_devices.items():
+        dev_type = device.get("type")
+        if dev_type == VTYPE_RELAY:
+            entities.append(SinumRelaySwitch(coordinator, device_id, entry_id))
+        elif dev_type == VTYPE_WICKET:
+            entities.append(SinumWicketSwitch(coordinator, device_id, entry_id))
+        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
+            dhw = device.get("dhw_control")
+            if isinstance(dhw, dict) and "enabled" in dhw:
+                entities.append(SinumDhwSwitch(coordinator, device_id, entry_id))
+
+
+def _add_bus_switches(
+    coordinator: SinumCoordinator, entities: list[SwitchEntity], entry_id: str
+) -> None:
+    for device_id, device in coordinator.wtp_devices.items():
+        if device.get("type") == WTYPE_RELAY:
+            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "wtp"))
+
+    for device_id, device in coordinator.sbus_devices.items():
+        dev_type = device.get("type")
+        if dev_type == STYPE_RELAY and "managed_by_thermostat" not in device.get("labels", []):
+            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "sbus"))
+        elif dev_type == STYPE_COMMON_VALVE:
+            entities.append(SinumCommonValveSwitch(coordinator, device_id, entry_id))
+
+    for device_id, device in coordinator.lora_devices.items():
+        if device.get("type") == LTYPE_RELAY:
+            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry_id, "lora"))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -30,33 +64,8 @@ async def async_setup_entry(
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
     entities: list[SwitchEntity] = []
-
-    for device_id, device in coordinator.virtual_devices.items():
-        dev_type = device.get("type")
-        if dev_type == VTYPE_RELAY:
-            entities.append(SinumRelaySwitch(coordinator, device_id, entry.entry_id))
-        elif dev_type == VTYPE_WICKET:
-            entities.append(SinumWicketSwitch(coordinator, device_id, entry.entry_id))
-        elif dev_type == VTYPE_HEAT_PUMP_MANAGER:
-            dhw = device.get("dhw_control")
-            if isinstance(dhw, dict) and "enabled" in dhw:
-                entities.append(SinumDhwSwitch(coordinator, device_id, entry.entry_id))
-
-    for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == WTYPE_RELAY:
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "wtp"))
-
-    for device_id, device in coordinator.sbus_devices.items():
-        dev_type = device.get("type")
-        if dev_type == STYPE_RELAY and "managed_by_thermostat" not in device.get("labels", []):
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "sbus"))
-        elif dev_type == STYPE_COMMON_VALVE:
-            entities.append(SinumCommonValveSwitch(coordinator, device_id, entry.entry_id))
-
-    for device_id, device in coordinator.lora_devices.items():
-        if device.get("type") == LTYPE_RELAY:
-            entities.append(SinumBusRelaySwitch(coordinator, device_id, entry.entry_id, "lora"))
-
+    _add_virtual_switches(coordinator, entities, entry.entry_id)
+    _add_bus_switches(coordinator, entities, entry.entry_id)
     async_add_entities(entities)
 
 
