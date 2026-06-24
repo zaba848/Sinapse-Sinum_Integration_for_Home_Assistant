@@ -4,6 +4,8 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.2.7] — 2026-06-24
+
 ### Changed
 - CI quality gates strengthened: single-pass coverage report generation with `coverage.xml` and pip cache in `ci.yml`.
 - `tests.yml` now runs **Functional Smoke Tests** (critical behavior paths) instead of duplicating the full suite.
