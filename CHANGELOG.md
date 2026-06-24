@@ -3,35 +3,16 @@
 All notable changes to the Sinum (Sinapse) Home Assistant integration are documented here.
 
 ---
-
-## Upgrading
-
-### Before You Update
 1. **Backup your Home Assistant configuration**: `config/custom_components/sinum/` directory.
 2. **Check for breaking changes**: Review the release notes below for your version.
-3. **Test in staging first**: If you have a development HA instance, test there first.
 
 ### After You Update
-1. **Reload the integration**: Go to **Settings** → **Devices & Services** → **Sinum** → **Reload**.
-2. **Verify entities**: Check that all entities are still available in **Settings** → **Devices & Services** → **Sinum**.
-3. **Check automations**: If you use Sinum buttons/events in automations, verify they still trigger correctly.
-
 ### Reporting Issues
 - Use [GitHub Issues](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues) for bugs.
 - For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
----
-
-## [Unreleased]
-
-## [0.2.7] — 2026-06-24
-
-### Changed
 - CI quality gates strengthened: single-pass coverage report generation with `coverage.xml` and pip cache in `ci.yml`.
 - `tests.yml` now runs **Functional Smoke Tests** (critical behavior paths) instead of duplicating the full suite.
-- Hardware validation process formalized in `HARDWARE_TEST_PLAN.md` with a release checklist and explicit CC + smoke + manual hardware gate.
-- `validate.yml` no longer skips HACS validation on push/PR due to repository visibility checks.
-- Added a documented hardware smoke test result (2026-06-24) for WTP and SBUS hubs.
 - `SECURITY.md` replaced template content with an actionable vulnerability handling policy for current release lines.
 - `codeql.yml` now always executes CodeQL in public-repo mode (no soft skip fallback).
 
