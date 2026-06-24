@@ -71,15 +71,20 @@ def _dict_list(items: Any) -> list[dict[str, Any]]:
     return [item for item in items if isinstance(item, dict)]
 
 
+def _extract_from_value(value: Any) -> list[dict[str, Any]] | None:
+    if isinstance(value, list):
+        return _dict_list(value)
+    if isinstance(value, dict):
+        nested = _list_result(value)
+        return nested or None
+    return None
+
+
 def _extract_by_keys(result: dict[str, Any], keys: tuple[str, ...]) -> list[dict[str, Any]] | None:
     for key in keys:
-        value = result.get(key)
-        if isinstance(value, list):
-            return _dict_list(value)
-        if isinstance(value, dict):
-            nested = _list_result(value)
-            if nested:
-                return nested
+        extracted = _extract_from_value(result.get(key))
+        if extracted is not None:
+            return extracted
     return None
 
 
@@ -93,6 +98,15 @@ def _flatten_values(result: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def _list_result_from_dict(result: dict[str, Any], preferred_keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    extracted = _extract_by_keys(result, (*preferred_keys, "items", "devices", "results", "data"))
+    if extracted is not None:
+        return extracted
+    if "id" in result:
+        return [result]
+    return _flatten_values(result)
+
+
 def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
     """Normalize Sinum list responses across firmware variants.
 
@@ -104,12 +118,7 @@ def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
         return _dict_list(result)
     if not isinstance(result, dict):
         return []
-    extracted = _extract_by_keys(result, (*preferred_keys, "items", "devices", "results", "data"))
-    if extracted is not None:
-        return extracted
-    if "id" in result:
-        return [result]
-    return _flatten_values(result)
+    return _list_result_from_dict(result, preferred_keys)
 
 
 class SinumAuthError(Exception):
@@ -575,8 +584,9 @@ class SinumClient:
         result = await self._request("GET", API_ENERGY_CENTER_PRODUCTION)
         return result if isinstance(result, dict) else {}
 
-    async def get_energy_center_summary(self) -> dict[str, Any]:
-        keys = [
+    @staticmethod
+    def _energy_center_keys() -> tuple[str, ...]:
+        return (
             "associations",
             "flow_monitor",
             "prices",
@@ -585,8 +595,10 @@ class SinumClient:
             "storage",
             "consumption",
             "production",
-        ]
-        getters = [
+        )
+
+    def _energy_center_getters(self) -> tuple[Any, ...]:
+        return (
             self.get_energy_center_associations,
             self.get_energy_center_flow_monitor,
             self.get_energy_center_prices,
@@ -595,25 +607,33 @@ class SinumClient:
             self.get_energy_center_storage,
             self.get_energy_center_consumption,
             self.get_energy_center_production,
-        ]
+        )
 
-        async def _try(getter: Any) -> Any:
-            try:
-                return await getter()
-            except Exception:
-                return None
+    async def _safe_get_energy_center_value(self, getter: Any) -> Any:
+        try:
+            return await getter()
+        except Exception:
+            return None
 
-        results = await asyncio.gather(*(_try(g) for g in getters))
-        summary: dict[str, Any] = {"available_endpoints": [], "missing_endpoints": []}
-        for key, result in zip(keys, results):
-            if result is not None:
-                summary[key] = result
-                summary["available_endpoints"].append(key)
-            else:
-                summary["missing_endpoints"].append(key)
-        if not summary["available_endpoints"]:
+    @staticmethod
+    def _build_energy_center_summary(keys: tuple[str, ...], results: list[Any]) -> dict[str, Any]:
+        available = {key: result for key, result in zip(keys, results) if result is not None}
+        missing = [key for key, result in zip(keys, results) if result is None]
+        if not available:
             raise SinumConnectionError("Energy Center endpoints unavailable")
-        return summary
+        return {
+            **available,
+            "available_endpoints": list(available.keys()),
+            "missing_endpoints": missing,
+        }
+
+    async def get_energy_center_summary(self) -> dict[str, Any]:
+        keys = self._energy_center_keys()
+        getters = self._energy_center_getters()
+        results = await asyncio.gather(
+            *(self._safe_get_energy_center_value(getter) for getter in getters)
+        )
+        return self._build_energy_center_summary(keys, list(results))
 
     # ----------------------------------------- Lua HTTP server (optional)
     # Only available when sinapse_api.lua is installed on the hub.
