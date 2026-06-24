@@ -53,6 +53,7 @@
     "error": {
       "cannot_connect": "Cannot connect to the hub. Check the IP address and network connectivity.",
       "invalid_auth": "Invalid token or credentials.",
+      "invalid_host": "Invalid host. Provide only an IP address or hostname (without path).",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
