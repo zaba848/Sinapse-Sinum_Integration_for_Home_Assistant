@@ -197,64 +197,103 @@ class SinumClient:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    async def login(self) -> None:
-        """Authenticate with username/password and obtain JWT + refresh token."""
-        if self._api_token:
-            return  # Static token — no login needed
-        if not self._username or not self._password:
-            raise SinumAuthError("No credentials provided")
-        payload = {
-            "username": self._username,
-            "password": self._password,
+    def _require_password_credentials(self) -> None:
+        if self._username and self._password:
+            return
+        raise SinumAuthError("No credentials provided")
+
+    def _login_payload(self) -> dict[str, str]:
+        return {
+            "username": self._username or "",
+            "password": self._password or "",
             "os_info": "HomeAssistant",
             "device_info": "Sinapse",
             "uuid_device": "sinapse-ha-integration",
         }
+
+    async def _post_with_timeout(self, path: str, payload: dict[str, Any]) -> aiohttp.ClientResponse:
+        async with asyncio.timeout(REQUEST_TIMEOUT):
+            return await self._session.post(self._url(path), json=payload, ssl=False)
+
+    @staticmethod
+    def _unwrap_data(body: Any) -> dict[str, Any]:
+        if not isinstance(body, dict):
+            return {}
+        data = body.get("data", body)
+        return data if isinstance(data, dict) else {}
+
+    def _store_auth_tokens(self, data: dict[str, Any], *, allow_refresh_fallback: bool) -> bool:
+        session = data.get(ATTR_SESSION)
+        if session is None:
+            return False
+        self._jwt = str(session)
+        if allow_refresh_fallback:
+            self._refresh_token = data.get(ATTR_REFRESH_TOKEN, self._refresh_token)
+        else:
+            self._refresh_token = data.get(ATTR_REFRESH_TOKEN)
+        return True
+
+    @staticmethod
+    def _validate_login_status(status: int) -> None:
+        if status == 401:
+            raise SinumAuthError("Invalid credentials")
+        if status != 200:
+            raise SinumConnectionError(f"Login failed with status {status}")
+
+    async def _refresh_response_ok(self) -> aiohttp.ClientResponse | None:
         try:
-            async with asyncio.timeout(REQUEST_TIMEOUT):
-                resp = await self._session.post(self._url(API_LOGIN), json=payload, ssl=False)
+            resp = await self._post_with_timeout(
+                API_REFRESH,
+                {ATTR_REFRESH_TOKEN: self._refresh_token},
+            )
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return None
+        if resp.status != 200:
+            return None
+        return resp
+
+    async def _read_refresh_payload(self, resp: aiohttp.ClientResponse) -> dict[str, Any] | None:
+        try:
+            body = await _read_json(resp, "token-refresh")
+        except SinumConnectionError:
+            return None
+        return self._unwrap_data(body)
+
+    def _log_refresh_result(self, refreshed: bool) -> None:
+        if refreshed:
+            _LOGGER.debug("JWT refreshed successfully for %s", self._host)
+
+    async def login(self) -> None:
+        """Authenticate with username/password and obtain JWT + refresh token."""
+        if self._api_token:
+            return  # Static token — no login needed
+        self._require_password_credentials()
+        try:
+            resp = await self._post_with_timeout(API_LOGIN, self._login_payload())
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise SinumConnectionError(f"Cannot connect to {self._host}: {err}") from err
 
-        if resp.status == 401:
-            raise SinumAuthError("Invalid credentials")
-        if resp.status != 200:
-            raise SinumConnectionError(f"Login failed with status {resp.status}")
+        self._validate_login_status(resp.status)
 
         body = await _read_json(resp, "login")
-        data = body.get("data", body)
-        self._jwt = data[ATTR_SESSION]
-        self._refresh_token = data.get(ATTR_REFRESH_TOKEN)
+        self._store_auth_tokens(self._unwrap_data(body), allow_refresh_fallback=False)
         _LOGGER.debug("Login successful for %s", self._host)
 
     async def _refresh_jwt(self) -> bool:
         """Try to renew JWT using the refresh token. Returns True on success."""
         if not self._refresh_token:
             return False
-        try:
-            async with asyncio.timeout(REQUEST_TIMEOUT):
-                resp = await self._session.post(
-                    self._url(API_REFRESH),
-                    json={ATTR_REFRESH_TOKEN: self._refresh_token},
-                    ssl=False,
-                )
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        resp = await self._refresh_response_ok()
+        if resp is None:
             return False
 
-        if resp.status != 200:
+        data = await self._read_refresh_payload(resp)
+        if data is None:
             return False
 
-        try:
-            body = await _read_json(resp, "token-refresh")
-        except SinumConnectionError:
-            return False
-        data = body.get("data", body)
-        if ATTR_SESSION in data:
-            self._jwt = data[ATTR_SESSION]
-            self._refresh_token = data.get(ATTR_REFRESH_TOKEN, self._refresh_token)
-            _LOGGER.debug("JWT refreshed successfully for %s", self._host)
-            return True
-        return False
+        refreshed = self._store_auth_tokens(data, allow_refresh_fallback=True)
+        self._log_refresh_result(refreshed)
+        return refreshed
 
     async def test_connection(self) -> None:
         """Verify connection and auth by fetching hub info."""
