@@ -206,6 +206,23 @@ def _register_services(hass: HomeAssistant) -> None:
         )
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
+    """Migrate old config entry schema to current version."""
+    _LOGGER.debug("Migrating Sinum entry from version %s", entry.version)
+
+    if entry.version > 1:
+        _LOGGER.error("Cannot migrate Sinum config entry: unsupported version %s", entry.version)
+        return False
+
+    # v1: ensure auth_mode is present (early entries created before auth_mode field was added)
+    if CONF_AUTH_MODE not in entry.data:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+        )
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
     client = _build_client(hass, entry)
     await client.login()
