@@ -15,7 +15,6 @@ for the current release line.
 
 Please report vulnerabilities privately.
 
-declined, etc.
 1. Preferred: use GitHub private vulnerability reporting (Security Advisories).
 2. If private reporting is unavailable, open a normal issue only for non-sensitive hardening ideas.
 3. Do not publish exploit details, secrets, credentials, or proof-of-concept payloads in public issues.
