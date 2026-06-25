@@ -68,6 +68,9 @@ API_LORA_DEVICES = "/api/v1/devices/lora"
 API_LORA_DEVICE = "/api/v1/devices/lora/{id}"
 API_MODBUS_DEVICES = "/api/v1/devices/modbus"
 API_MODBUS_DEVICE = "/api/v1/devices/modbus/{id}"
+API_VIDEO_DEVICES = "/api/v1/devices/video"
+API_VIDEO_DEVICE = "/api/v1/devices/video/{id}"
+API_VIDEO_SNAPSHOT = "/api/v1/devices/video/{id}/snapshot"
 API_SCENE_ACTIVATE = "/api/v1/scenes/{id}/activate"
 
 # Lua HTTP server (sinapse_api.lua — optional, provides wifi/signal data)

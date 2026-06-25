@@ -3,11 +3,26 @@
 from __future__ import annotations
 
 import json
+import sys
+import types
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+# turbojpeg is an optional C extension used by the HA camera platform for JPEG
+# re-encoding. It is not available in the CI/test environment; provide a stub so
+# camera-related tests can import homeassistant.components.camera without error.
+if "turbojpeg" not in sys.modules:
+    _tj_stub = types.ModuleType("turbojpeg")
+
+    class _TurboJPEGStub:
+        def __init__(self, *a: object, **kw: object) -> None:
+            pass
+
+    _tj_stub.TurboJPEG = _TurboJPEGStub  # type: ignore[attr-defined]
+    sys.modules["turbojpeg"] = _tj_stub
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "sinum_devices.json"
 

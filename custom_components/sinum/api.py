@@ -35,6 +35,9 @@ from .const import (
     API_MODBUS_DEVICE,
     API_MODBUS_DEVICES,
     API_NOTIFICATIONS,
+    API_VIDEO_DEVICE,
+    API_VIDEO_DEVICES,
+    API_VIDEO_SNAPSHOT,
     API_PARENT_DEVICES,
     API_REFRESH,
     API_ROOMS,
@@ -638,6 +641,27 @@ class SinumClient:
 
     async def get_modbus_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_MODBUS_DEVICE.format(id=device_id))
+
+    # --------------------------------------------------------------- video
+
+    async def get_video_devices(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_VIDEO_DEVICES)
+        return _list_result(result, "video", "devices")
+
+    async def get_video_device(self, device_id: int) -> dict[str, Any]:
+        return await self._request("GET", API_VIDEO_DEVICE.format(id=device_id))
+
+    async def get_video_snapshot(self, device_id: int) -> bytes | None:
+        """Return raw JPEG bytes from hub snapshot proxy, or None if unavailable."""
+        import base64
+        result = await self._request("GET", API_VIDEO_SNAPSHOT.format(id=device_id))
+        payload = (result or {}).get("payload")
+        if not payload:
+            return None
+        try:
+            return base64.b64decode(payload)
+        except Exception:
+            return None
 
     # ---------------------------------------------------------- notifications
 
