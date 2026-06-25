@@ -37,6 +37,8 @@ from .api import SinumConnectionError
 from .const import DOMAIN
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 

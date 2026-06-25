@@ -22,6 +22,8 @@ from .const import (
 )
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
+PARALLEL_UPDATES = 0
+
 
 def _virtual_switch_entity(
     coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]

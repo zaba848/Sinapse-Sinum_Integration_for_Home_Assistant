@@ -86,6 +86,29 @@
     "room_id": 2,
     "class": "virtual"
   },
+  "virtual_gate_closed": {
+    "id": 14,
+    "name": "Garage Gate",
+    "type": "gate",
+    "state": "closed",
+    "room_id": 2,
+    "class": "virtual"
+  },
+  "virtual_gate_opening": {
+    "id": 15,
+    "name": "Garage Gate 2",
+    "type": "gate",
+    "state": "opening",
+    "room_id": 2,
+    "class": "virtual"
+  },
+  "virtual_gate_no_state": {
+    "id": 16,
+    "name": "Garage Gate 3",
+    "type": "gate",
+    "room_id": 2,
+    "class": "virtual"
+  },
   "wtp_temp": {
     "id": 20,
     "name": "Temp Sensor",

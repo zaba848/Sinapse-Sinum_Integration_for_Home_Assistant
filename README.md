@@ -4,9 +4,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1284%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1322%20passing-brightgreen.svg)](tests/)
 [![Stability](https://img.shields.io/badge/stability-weekly%20validated-green.svg)](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/actions/workflows/test-stability.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -734,11 +734,39 @@ Integration is tested against two live hubs in production:
 | **`custom_device` virtual type** | Lua contracts vary per installation; not mapped to HA entities. Use scenes/automations to control them. |
 | **`thermostat_output_group`** | Exposed as a disabled-by-default diagnostic sensor (output count), not as direct control entities. |
 | **WTP RGB in temperature mode** | Hub firmware ignores color values when color-temperature mode is active; only `color_temp_kelvin` works. |
-| **Virtual blind integrators** | Report `state = unknown` and `position = None` when no physical controllers are linked to them (hub configuration issue, not an integration bug). |
+| **Virtual blind integrators** | Report `state = unknown` and `position = None` when no physical controllers are linked to them (hub configuration issue, not an integration bug). Position is tracked from `last_set_target_opening` (HA-issued commands) — manually-operated blinds may show stale position until the next HA command. |
+| **Virtual gate position** | Gate open/close/opening/closing state is read from the hub `state` field. If the firmware does not return `state`, the entity shows "Unknown". Run `scripts/validate_v040_features.py` to survey gate fields on your hub. |
+| **Thermostat without sensor** | Virtual thermostats with no assigned physical temperature sensor return `target_temperature = None` (displayed as "unavailable" in HA) rather than 0.0°C. This is correct behaviour — the hub returns 0 when no sensor is linked. |
 | **Energy Center** | Diagnostics sensors appear only where the hub firmware exposes `/api/v1/energy-center/*` endpoints. |
 | **Schedules** | Read-only sensors + `sinum.update_schedule` service. Full schedule editing UI is not implemented. |
 | **LoRa / SLINK / Video** | Require specific hardware modules. Video streams and SLINK devices are not mapped to HA entities. |
 | **Alpha firmware 408s** | Intermittent on bus polling; the integration retries once then uses cached state. |
+
+## Security Best Practices
+
+The Sinum hub communicates over plain HTTP on the local network. Follow these recommendations to reduce exposure:
+
+### Network isolation
+- Place the hub on a **dedicated IoT VLAN** separated from workstations and internet-facing services.
+- Allow only Home Assistant to reach the hub's IP on port 80. Block direct internet access to the hub.
+- If you expose Home Assistant to the internet (Nabu Casa, reverse proxy), ensure the Sinum hub is **not** reachable from the WAN.
+
+### Authentication
+- Prefer **API Token** authentication over username + password — the token is scoped, doesn't grant shell access, and can be revoked in the Sinum app without changing your password.
+- Use the **least-privilege token**: generate a dedicated token for the HA integration, not your admin credentials.
+- Do not share the API token in bug reports, logs, or GitHub issues. The integration redacts it from diagnostics, but system logs may still capture it.
+
+### TLS (optional)
+- The hub does not natively support HTTPS. If you need encrypted communication, place an **nginx or Caddy reverse proxy** on the same VLAN that terminates TLS and forwards to the hub. Update the `host` field in the integration to the proxy address.
+
+### Secrets management
+- Never store credentials in YAML automations or templates. Use `secrets.yaml` or the HA Secrets manager.
+- The integration stores the API token or password in the HA config entry (encrypted at rest by HA).
+
+### Reauth protection
+- The integration blocks reauth after **5 consecutive failures** for 5 minutes, preventing local brute-force attempts via the HA GUI.
+
+---
 
 ## Rollback Procedure
 

@@ -15,6 +15,8 @@ from .api import SinumConnectionError
 from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 

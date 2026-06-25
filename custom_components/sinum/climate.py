@@ -28,6 +28,8 @@ from .const import (
 )
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 # Sinum thermostat modes → HA HVAC modes

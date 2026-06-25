@@ -32,6 +32,8 @@ from .const import (
 )
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

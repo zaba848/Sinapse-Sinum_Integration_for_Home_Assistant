@@ -12,6 +12,8 @@ from . import SinumConfigEntry
 from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

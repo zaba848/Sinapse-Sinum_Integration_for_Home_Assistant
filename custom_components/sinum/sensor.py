@@ -42,6 +42,8 @@ from .sensor_virtual import (
     SinumWeatherSensor,
 )
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 
