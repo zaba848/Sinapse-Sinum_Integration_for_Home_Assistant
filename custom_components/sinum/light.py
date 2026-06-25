@@ -499,10 +499,22 @@ class SinumBusRgbLight(
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
+        if self._bus == "sbus":
+            # SBUS rgb_controllers always support HS via Lua, regardless of
+            # whether the hub currently reports led_color in the device dict.
+            modes = {ColorMode.HS}
+            if _supports_color_temperature(self._device):
+                modes.add(ColorMode.COLOR_TEMP)
+            return modes
         return _supported_color_modes(self._device)
 
     @property
     def color_mode(self) -> ColorMode:
+        if self._bus == "sbus":
+            mode = str(self._device.get("color_mode", "")).lower()
+            if mode in {"temperature", "color_temp", "white_temperature"}:
+                return ColorMode.COLOR_TEMP
+            return ColorMode.HS
         return _color_mode(self._device)
 
     @property

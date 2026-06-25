@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 from urllib.parse import urlsplit
@@ -32,7 +33,33 @@ _LOGGER = logging.getLogger(__name__)
 
 _PROBE_RETRIES = 2
 _PROBE_RETRY_DELAY = 0.5
+_REAUTH_MAX_FAILS = 5
+_REAUTH_COOLDOWN_SEC = 300  # 5 minutes after 5 bad attempts
 T = TypeVar("T")
+
+
+def _reauth_store_key(entry_id: str) -> str:
+    return f"sinum_reauth_{entry_id}"
+
+
+def _reauth_cooldown_remaining(hass: Any, entry_id: str) -> float:
+    """Return seconds remaining in cooldown, 0 if not blocked."""
+    store: dict[str, Any] = hass.data.get(_reauth_store_key(entry_id), {})
+    return max(0.0, store.get("blocked_until", 0.0) - time.monotonic())
+
+
+def _reauth_record_failure(hass: Any, entry_id: str) -> None:
+    key = _reauth_store_key(entry_id)
+    store: dict[str, Any] = hass.data.get(key, {"fails": 0, "blocked_until": 0.0})
+    store["fails"] = store["fails"] + 1
+    if store["fails"] >= _REAUTH_MAX_FAILS:
+        store["blocked_until"] = time.monotonic() + _REAUTH_COOLDOWN_SEC
+        _LOGGER.warning("Sinum reauth blocked after %d failures for entry %s", store["fails"], entry_id)
+    hass.data[key] = store
+
+
+def _reauth_reset(hass: Any, entry_id: str) -> None:
+    hass.data.pop(_reauth_store_key(entry_id), None)
 
 
 def _normalize_host_input(value: str) -> str:
@@ -320,13 +347,25 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_PASSWORD)
         schema = STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
 
+        remaining = _reauth_cooldown_remaining(self.hass, entry.entry_id)
+        if remaining > 0:
+            minutes = max(1, int(remaining // 60) + 1)
+            return self.async_show_form(
+                step_id="reauth_confirm",
+                data_schema=schema,
+                errors={"base": "too_many_attempts"},
+                description_placeholders={"minutes": str(minutes)},
+            )
+
         if user_input is not None:
             self._host = entry.data[CONF_HOST]
             client = self._reauth_client(auth_mode, user_input)
             error = await self._test_connection_error(client)
             if error:
+                _reauth_record_failure(self.hass, entry.entry_id)
                 errors["base"] = error
             else:
+                _reauth_reset(self.hass, entry.entry_id)
                 return self.async_update_reload_and_abort(entry, data={**entry.data, **user_input})
 
         return self.async_show_form(

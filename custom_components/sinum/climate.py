@@ -294,7 +294,7 @@ class SinumThermostat(
     @property
     def target_temperature(self) -> float | None:
         raw = self._device.get("target_temperature")
-        if raw is None:
+        if not raw:
             return None
         return self.coordinator.client.decode_temperature(raw)
 
@@ -417,7 +417,7 @@ class _BusClimateMixin:
     @property
     def target_temperature(self) -> float | None:
         raw = self._device.get("target_temperature")
-        if raw is None:
+        if not raw:
             return None
         return raw / 10
 

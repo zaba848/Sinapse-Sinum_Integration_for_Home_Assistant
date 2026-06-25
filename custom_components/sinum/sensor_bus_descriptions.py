@@ -350,6 +350,8 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:pulse",
         suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     SinumSensorDescription(
         key="pwm_frequency",
@@ -359,6 +361,8 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="Hz",
         suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     SinumSensorDescription(
         key="valve_temperature",
