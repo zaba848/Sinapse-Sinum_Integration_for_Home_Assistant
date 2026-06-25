@@ -18,7 +18,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import SinumClient
+from .api import SinumClient, SinumNotSupportedError
 from .const import (
     ATTR_ENTRY_ID,
     ATTR_NOTIFICATION_MESSAGE,
@@ -193,15 +193,18 @@ def _register_services(hass: HomeAssistant) -> None:
     """Register HA services; safe to call on every entry load (no-ops if already registered)."""
 
     async def handle_send_notification(call: ServiceCall) -> None:
-        await asyncio.gather(
-            *(
-                client.send_notification(
+        async def _send(client: SinumClient) -> None:
+            try:
+                await client.send_notification(
                     title=call.data[ATTR_NOTIFICATION_TITLE],
                     message=call.data[ATTR_NOTIFICATION_MESSAGE],
                 )
-                for client in _notification_clients(hass).values()
-            )
-        )
+            except SinumNotSupportedError as err:
+                raise HomeAssistantError(
+                    "This Sinum hub model does not support push notifications"
+                ) from err
+
+        await asyncio.gather(*(_send(c) for c in _notification_clients(hass).values()))
 
     async def handle_update_schedule(call: ServiceCall) -> None:
         coordinator = _select_coordinator(hass, call.data.get(ATTR_ENTRY_ID))

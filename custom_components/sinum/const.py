@@ -62,6 +62,8 @@ API_ALARM_DEVICE = "/api/v1/devices/alarm-system/{id}"
 API_ALARM_COMMAND = "/api/v1/devices/alarm-system/{id}/command/{command}"
 API_LORA_DEVICES = "/api/v1/devices/lora"
 API_LORA_DEVICE = "/api/v1/devices/lora/{id}"
+API_MODBUS_DEVICES = "/api/v1/devices/modbus"
+API_MODBUS_DEVICE = "/api/v1/devices/modbus/{id}"
 API_SCENE_ACTIVATE = "/api/v1/scenes/{id}/activate"
 
 # Lua HTTP server (sinapse_api.lua — optional, provides wifi/signal data)

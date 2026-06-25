@@ -578,5 +578,68 @@
     "type": "relay",
     "state": true,
     "class": "lora"
+  },
+  "modbus_energy_meter": {
+    "class": "modbus",
+    "color": "#0072c3",
+    "delayed_actions": [],
+    "energy_consumed_total": 12345678,
+    "energy_fed_total": 987654,
+    "icon": "",
+    "id": 18,
+    "labels": [],
+    "messages": [],
+    "name": "Energy meter 18",
+    "number_of_long_power_failures": 2,
+    "number_of_power_failures": 5,
+    "p1_meter_no_communication_time": 0,
+    "p1_version_id": 50,
+    "parent_id": 11,
+    "parsing_errors": 0,
+    "phase_1": {
+      "active_power": 1200,
+      "current": 5,
+      "number_of_voltage_sags": 0,
+      "number_of_voltage_swells": 0,
+      "voltage": 230
+    },
+    "phase_2": {
+      "active_power": 800,
+      "current": 3,
+      "number_of_voltage_sags": 0,
+      "number_of_voltage_swells": 0,
+      "voltage": 231
+    },
+    "phase_3": {
+      "active_power": 600,
+      "current": 2,
+      "number_of_voltage_sags": 1,
+      "number_of_voltage_swells": 0,
+      "voltage": 229
+    },
+    "power_from_grid": 2600,
+    "power_to_grid": 0,
+    "purpose": "general",
+    "room_id": null,
+    "software_version": "1.0.0",
+    "status": "online",
+    "supervised_properties": [],
+    "supervisors": [],
+    "tags": [],
+    "tariff_1": {
+      "energy_consumed_total": 6000000,
+      "energy_fed_total": 500000
+    },
+    "tariff_2": {
+      "energy_consumed_total": 6345678,
+      "energy_fed_total": 487654
+    },
+    "tariff_indicator": 1,
+    "total_active_power": 2600,
+    "type": "energy_meter",
+    "uses_energy_of_building": false,
+    "variant": "p1",
+    "visible": true,
+    "voice_assistant_device_type": "not_set"
   }
 }

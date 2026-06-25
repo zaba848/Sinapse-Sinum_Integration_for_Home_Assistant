@@ -205,6 +205,27 @@
       },
       "energy_consumed_yesterday": {
         "name": "Energia wczoraj"
+      },
+      "power_from_grid": {
+        "name": "Moc pobrana z sieci"
+      },
+      "power_to_grid": {
+        "name": "Moc oddana do sieci"
+      },
+      "energy_fed_total": {
+        "name": "Energia oddana do sieci"
+      },
+      "phase_voltage": {
+        "name": "Napięcie fazowe"
+      },
+      "phase_current": {
+        "name": "Prąd fazowy"
+      },
+      "phase_active_power": {
+        "name": "Moc czynna fazy"
+      },
+      "tariff_indicator": {
+        "name": "Wskaźnik taryfy"
       }
     },
     "binary_sensor": {

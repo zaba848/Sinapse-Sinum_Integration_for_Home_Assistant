@@ -205,6 +205,27 @@
       },
       "energy_consumed_yesterday": {
         "name": "Energy yesterday"
+      },
+      "power_from_grid": {
+        "name": "Power from grid"
+      },
+      "power_to_grid": {
+        "name": "Power to grid"
+      },
+      "energy_fed_total": {
+        "name": "Energy fed to grid"
+      },
+      "phase_voltage": {
+        "name": "Phase voltage"
+      },
+      "phase_current": {
+        "name": "Phase current"
+      },
+      "phase_active_power": {
+        "name": "Phase active power"
+      },
+      "tariff_indicator": {
+        "name": "Tariff indicator"
       }
     },
     "binary_sensor": {

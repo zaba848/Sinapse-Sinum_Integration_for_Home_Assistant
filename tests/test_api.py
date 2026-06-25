@@ -13,6 +13,7 @@ from custom_components.sinum.api import (
     SinumAuthError,
     SinumClient,
     SinumConnectionError,
+    SinumNotSupportedError,
 )
 
 
@@ -118,7 +119,7 @@ class TestApiRequests:
 
         with (
             patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
-            pytest.raises(SinumConnectionError, match="API error 404"),
+            pytest.raises(SinumNotSupportedError, match="Endpoint not found"),
         ):
             await client.get_energy()
 

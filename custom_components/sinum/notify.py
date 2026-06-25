@@ -6,11 +6,13 @@ from typing import Any
 
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from .api import SinumNotSupportedError
 from .const import DOMAIN
 from .coordinator import SinumCoordinator
 
@@ -46,7 +48,12 @@ class SinumNotifyEntity(CoordinatorEntity[SinumCoordinator], NotifyEntity):
     async def async_send_message(
         self, message: str, title: str | None = None, **kwargs: Any
     ) -> None:
-        await self.coordinator.client.send_notification(
-            title=title or "Sinum",
-            message=message,
-        )
+        try:
+            await self.coordinator.client.send_notification(
+                title=title or "Sinum",
+                message=message,
+            )
+        except SinumNotSupportedError as err:
+            raise HomeAssistantError(
+                "This Sinum hub model does not support push notifications"
+            ) from err

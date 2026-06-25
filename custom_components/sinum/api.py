@@ -32,6 +32,8 @@ from .const import (
     API_LORA_DEVICE,
     API_LORA_DEVICES,
     API_LUA_INFO,
+    API_MODBUS_DEVICE,
+    API_MODBUS_DEVICES,
     API_NOTIFICATIONS,
     API_PARENT_DEVICES,
     API_REFRESH,
@@ -129,6 +131,10 @@ class SinumAuthError(Exception):
 
 class SinumConnectionError(Exception):
     pass
+
+
+class SinumNotSupportedError(Exception):
+    """Raised when the hub firmware does not support a given endpoint (HTTP 404)."""
 
 
 async def _read_json(resp: aiohttp.ClientResponse, path: str) -> dict[str, Any]:
@@ -394,6 +400,8 @@ class SinumClient:
     def _raise_if_unexpected_status(resp: aiohttp.ClientResponse, path: str) -> None:
         if resp.status in (200, 201, 204):
             return
+        if resp.status == 404:
+            raise SinumNotSupportedError(f"Endpoint not found on this hub: {path}")
         raise SinumConnectionError(f"API error {resp.status} for {path}")
 
     async def _unwrap_response_body(self, resp: aiohttp.ClientResponse, path: str) -> Any:
@@ -621,6 +629,15 @@ class SinumClient:
 
     async def patch_lora_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request("PATCH", API_LORA_DEVICE.format(id=device_id), json=payload)
+
+    # ---------------------------------------------------------- Modbus devices
+
+    async def get_modbus_devices(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_MODBUS_DEVICES)
+        return _list_result(result, "modbus", "devices")
+
+    async def get_modbus_device(self, device_id: int) -> dict[str, Any]:
+        return await self._request("GET", API_MODBUS_DEVICE.format(id=device_id))
 
     # ---------------------------------------------------------- notifications
 

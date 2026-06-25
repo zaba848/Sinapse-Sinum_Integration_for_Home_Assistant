@@ -35,6 +35,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.wtp_devices: dict[int, dict[str, Any]] = {}
         self.sbus_devices: dict[int, dict[str, Any]] = {}
         self.lora_devices: dict[int, dict[str, Any]] = {}
+        self.modbus_devices: dict[int, dict[str, Any]] = {}
         self.rooms: list[dict[str, Any]] = []
         self.floors: dict[int, dict[str, Any]] = {}  # floor_id → {id, name, level}
         self.hub_info: dict[str, Any] = {}  # from /api/v1/info
@@ -120,7 +121,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         # ── Group 2: device collections — all fetched in parallel ─────────────
-        virtual, wtp, sbus, lora, alarm_list = await asyncio.gather(
+        virtual, wtp, sbus, lora, alarm_list, modbus_list = await asyncio.gather(
             self._fetch_device_collection(
                 "virtual",
                 self.client.get_virtual_devices,
@@ -154,6 +155,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.lora_devices,
             ),
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
+            _safe_fetch(self.client.get_modbus_devices, "modbus devices", default=None),
         )
 
         self.virtual_devices = virtual
@@ -163,6 +165,8 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if alarm_list:
             self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
+        if modbus_list:
+            self.modbus_devices = {int(d["id"]): d for d in modbus_list if "id" in d}
 
         # ── Enrich child devices with parent hardware model and class ─────────
         parent_maps, parent_class_maps = _build_parent_maps(self.parent_devices)
@@ -175,6 +179,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "wtp": wtp,
             "sbus": sbus,
             "lora": lora,
+            "modbus": self.modbus_devices,
             "scenes": self.scenes,
             "schedules": self.schedules,
             "automations": self.automations,

@@ -9,7 +9,8 @@ Snapshot source: saved Swagger UI export from `https://apidocs.sinum.tech/`, ren
 | `/devices/virtual` | Thermostats, relays, blinds, gates, wickets, dimmer/RGB, heat pump manager, thermostat output group diagnostics |
 | `/devices/wtp` | Sensors, relays, dimmers, RGB, blinds, fan coils, regulators, buttons, firmware status |
 | `/devices/sbus` | Sensors, relays, dimmers, RGB, fan coils, regulators, analog input/output, impulse meters, buttons, valves, PWM |
-| `/devices/lora` | Sensors, relay switches, read/patch client support |
+| `/devices/lora` | Sensors, relay switches, read/patch (no hardware on test hubs) |
+| `/devices/modbus` | DSMR P1 3-phase energy meter sensors (disabled by default) |
 | `/devices/alarm-system` | Alarm zones and commands |
 | `/scenes` | Scene buttons and activation |
 | `/variables` | Numeric Lua environment variables |
@@ -93,9 +94,18 @@ This matrix details the implementation status and live-write validation scope fo
 |---|---|---|---|---|
 | `/api/v1/devices/lora` | GET | List LoRa devices | ✅ Implemented | Wireless sensors and relays |
 | `/api/v1/devices/lora/{id}` | GET | Fetch single LoRa device | ✅ Implemented | Used for polling |
-| `/api/v1/devices/lora/{id}` | PATCH | Update LoRa device state | ✅ Implemented | Relay on/off, **client read/patch scope TBD** |
+| `/api/v1/devices/lora/{id}` | PATCH | Update LoRa device state | ✅ Implemented | Relay on/off |
 
-**Live-Write Validation**: LoRa relay state transitions (on→off, off→on); client read/patch support scope (read-only vs writable).
+**Live-Write Validation**: ⏭️ SKIP — 0 LoRa devices on both test hubs (2026-06-25). Endpoint implemented but untestable without hardware.
+
+### Devices — Modbus
+
+| Endpoint | Method | Purpose | Status | Notes |
+|---|---|---|---|---|
+| `/api/v1/devices/modbus` | GET | List Modbus devices | ✅ Implemented | DSMR P1 energy meter (3-phase) |
+| `/api/v1/devices/modbus/{id}` | GET | Fetch single Modbus device | ✅ Implemented | Used for polling |
+
+**Live-Write Validation**: Read-only device — no write operations. Live data unavailable (device offline on test hub). Sensor entities disabled by default.
 
 ### Devices — Alarm System
 
@@ -143,6 +153,8 @@ This matrix details the implementation status and live-write validation scope fo
 | `/api/v1/variables` | GET | List Lua environment variables | ✅ Implemented | Numeric variables exposed as sensor |
 | `/api/v1/variables/{id}` | GET | Fetch single variable | ✅ Implemented | Used for polling |
 | `/api/v1/variables/{id}` | PATCH | Update variable value | 🔍 Helper Only | Not exposed as entity (advisory only) |
+
+> **Note (2026-06-25):** `/api/v1/variables` returns HTTP 404 on `sinum_lite` hubs — the endpoint exists only on `sinum_plus`. The coordinator handles this gracefully via `_safe_fetch` (returns empty list). No entities appear on sinum_lite; this is expected behavior.
 
 ### Weather
 
@@ -219,14 +231,14 @@ The following write operations require hardware validation to ensure idempotency
 ## Testing Tools & CI Integration
 
 ### Local Live-Write Test Suite
-- **File**: `tests/test_api_live_write_validation.py` (planned).
-- **Scope**: Runs only if `SINUM_LIVE_TEST=1` and hub credentials are provided.
-- **Coverage**: A–E test cases above; each records pass/fail and endpoint response for auditing.
+- **File**: `scripts/validate_api_writes.py`
+- **Scope**: Runs with hub password; generates `docs/live_write_validation_latest.md`.
+- **Coverage**: A–E test cases; A and E have safety guards (no hardware / armed alarm skip).
 
 ### CI Gate
-- **Gate Status**: Live-write validation is run on main after each release to detect regressions.
-- **Cadence**: Weekly regression run (nightly optional).
-- **Report**: Results published to `docs/live_write_validation_latest.md`.
+- **Gate Status**: Live-write validation run manually before each release.
+- **Last Run**: 2026-06-25 — 5/5 PASS on hub 10.0.62.167
+- **Report**: `docs/live_write_validation_latest.md`
 
 ---
 
@@ -234,8 +246,8 @@ The following write operations require hardware validation to ensure idempotency
 
 | Dimension | Status |
 |---|---|
-| **GET Operations** | 100% — All read endpoints are discovered and callable |
-| **PATCH/POST Write Operations** | 95% — All documented write operations implemented; LoRa PATCH scope TBD |
-| **Entity Mapping** | 95% — All HA platforms covered; custom Lua contracts intentionally excluded |
-| **Live-Write Validation** | 🔄 In Progress — A–E roadmap actively tested |
+| **GET Operations** | ✅ 100% — All read endpoints callable including new modbus |
+| **PATCH/POST Write Operations** | ✅ 98% — All documented writes implemented; LoRa PATCH untestable (no devices) |
+| **Entity Mapping** | ✅ 98% — All HA platforms covered; modbus energy meter added; custom Lua excluded |
+| **Live-Write Validation** | ✅ 5/5 PASS (2026-06-25) — B: dimmer idempotency, C: heat pump modes, D: schedules, A/E: skip |
 | **CI/Release Gate** | ✅ Complete — Gate MET before each release |

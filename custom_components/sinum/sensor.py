@@ -28,6 +28,7 @@ from .sensor_schedule import (
     SinumScheduleSensor,
     SinumScheduleTargetTempSensor,
 )
+from .sensor_modbus import build_modbus_sensor_entities
 from .sensor_virtual import (
     ENERGY_SENSORS,
     VIRTUAL_SENSORS,
@@ -239,6 +240,7 @@ async def async_setup_entry(
     _add_wtp_sensors(coordinator, entities, entry.entry_id)
     _add_sbus_sensors(coordinator, entities, entry.entry_id)
     _add_lora_sensors(coordinator, entities, entry.entry_id)
+    entities.extend(build_modbus_sensor_entities(coordinator, entry.entry_id))
     await _add_optional_sensors(coordinator, entities, entry.entry_id)
     _add_schedule_sensors(coordinator, entities, entry.entry_id)
     _add_automation_sensors(coordinator, entities, entry.entry_id)
