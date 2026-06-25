@@ -22,8 +22,12 @@ from .const import (
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
+    CONF_MQTT_CLIENT_ID,
     CONF_MQTT_ENABLED,
+    CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
+    DEFAULT_MQTT_CLIENT_ID,
+    DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -381,20 +385,10 @@ class SinumOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: Any) -> None:
         self._entry = config_entry
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        current_interval = self._entry.options.get(
-            CONF_SCAN_INTERVAL,
-            self._entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-        )
-        current_mqtt = self._entry.options.get(
-            CONF_MQTT_ENABLED,
-            self._entry.data.get(CONF_MQTT_ENABLED, False),
-        )
-        current_mqtt_prefix = self._entry.options.get(
-            CONF_MQTT_TOPIC_PREFIX,
-            self._entry.data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
-        )
+    def _opt(self, key: str, default: object) -> object:
+        return self._entry.options.get(key, self._entry.data.get(key, default))
 
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             if CONF_MQTT_TOPIC_PREFIX in user_input:
                 user_input[CONF_MQTT_TOPIC_PREFIX] = _mqtt_topic_prefix(
@@ -404,14 +398,26 @@ class SinumOptionsFlow(OptionsFlow):
 
         schema = vol.Schema(
             {
-                vol.Optional(CONF_SCAN_INTERVAL, default=current_interval): vol.All(
-                    int, vol.Range(min=10, max=300)
-                ),
-                vol.Optional(CONF_MQTT_ENABLED, default=current_mqtt): bool,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                ): vol.All(int, vol.Range(min=10, max=300)),
+                vol.Optional(
+                    CONF_MQTT_ENABLED,
+                    default=self._opt(CONF_MQTT_ENABLED, False),
+                ): bool,
                 vol.Optional(
                     CONF_MQTT_TOPIC_PREFIX,
-                    default=current_mqtt_prefix,
+                    default=self._opt(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
                 ): _mqtt_topic_prefix,
+                vol.Optional(
+                    CONF_MQTT_SCENE_ID,
+                    default=self._opt(CONF_MQTT_SCENE_ID, DEFAULT_MQTT_SCENE_ID),
+                ): vol.All(int, vol.Range(min=1)),
+                vol.Optional(
+                    CONF_MQTT_CLIENT_ID,
+                    default=self._opt(CONF_MQTT_CLIENT_ID, DEFAULT_MQTT_CLIENT_ID),
+                ): vol.All(int, vol.Range(min=1)),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

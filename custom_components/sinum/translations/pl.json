@@ -69,11 +69,15 @@
         "data": {
           "scan_interval": "Interwał odświeżania (sekundy)",
           "mqtt_enabled": "Włącz transport MQTT (real-time)",
-          "mqtt_topic_prefix": "Prefiks topiców MQTT"
+          "mqtt_topic_prefix": "Prefiks topiców MQTT",
+          "mqtt_scene_id": "ID sceny mostu MQTT",
+          "mqtt_client_id": "ID klienta MQTT (na centrali)"
         },
         "data_description": {
-          "mqtt_enabled": "Wymaga skryptu Lua na centrali i działającego brokera MQTT w Home Assistant.",
-          "mqtt_topic_prefix": "Musi odpowiadać TOPIC_PREFIX w mqtt_bridge.lua. Dla wielu central użyj unikalnego prefiksu, np. sinum/tablica-wtp."
+          "mqtt_enabled": "Wymaga skryptu Lua wgranego na centralę i działającego brokera MQTT w Home Assistant.",
+          "mqtt_topic_prefix": "Musi odpowiadać TOPIC_PREFIX wstrzykniętemu do skryptu mostu. Dla wielu central użyj unikalnego prefiksu, np. sinum/tablica-wtp.",
+          "mqtt_scene_id": "ID sceny na centrali zawierającej skrypt Lua mostu MQTT. Wgraj przez Narzędzia → Usługi → sinum.upload_mqtt_bridge.",
+          "mqtt_client_id": "Indeks klienta MQTT skonfigurowanego w web UI centrali Sinum (Ustawienia → Klienci MQTT). Tam ustaw adres brokera na IP Home Assistant."
         }
       }
     }

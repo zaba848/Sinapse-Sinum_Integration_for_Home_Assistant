@@ -9,6 +9,8 @@ CONF_AUTH_MODE = "auth_mode"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_MQTT_ENABLED = "mqtt_enabled"
 CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
+CONF_MQTT_SCENE_ID = "mqtt_scene_id"
+CONF_MQTT_CLIENT_ID = "mqtt_client_id"
 
 # Auth modes
 AUTH_MODE_TOKEN = "token"
@@ -16,6 +18,8 @@ AUTH_MODE_PASSWORD = "password"
 
 DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_MQTT_TOPIC_PREFIX = "sinum"
+DEFAULT_MQTT_SCENE_ID = 1
+DEFAULT_MQTT_CLIENT_ID = 1
 
 # REST API — all paths include /api/v1 prefix
 API_LOGIN = "/api/v1/login"
@@ -166,3 +170,7 @@ SERVICE_UPDATE_SCHEDULE = "update_schedule"
 ATTR_ENTRY_ID = "entry_id"
 ATTR_SCHEDULE_ID = "schedule_id"
 ATTR_PAYLOAD = "payload"
+SERVICE_UPLOAD_MQTT_BRIDGE = "upload_mqtt_bridge"
+ATTR_MQTT_SCENE_ID = "scene_id"
+ATTR_MQTT_CLIENT_ID = "mqtt_client_id"
+ATTR_MQTT_DRY_RUN = "dry_run"

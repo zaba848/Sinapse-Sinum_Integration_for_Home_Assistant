@@ -44,3 +44,53 @@ update_schedule:
         name: "Morning"
       selector:
         object:
+
+upload_mqtt_bridge:
+  name: Upload MQTT bridge
+  description: >
+    Uploads the Sinum MQTT bridge Lua script to a scene on the hub.
+    The scene must already exist (create it in the Sinum web UI under Scenes).
+    After upload, activate the scene once from the Sinum UI — it will then run
+    automatically on every hub event.
+    Prerequisites: configure the MQTT broker IP in the Sinum hub web UI under
+    Settings → MQTT Clients, using your Home Assistant host IP as the broker address.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Required when more than one Sinum hub is loaded.
+      required: false
+      selector:
+        text:
+    scene_id:
+      name: Scene ID
+      description: >
+        ID of the scene to upload the Lua script to.
+        Defaults to the value configured in integration options (default 1).
+        You can find the scene ID in the Sinum hub web UI under Scenes.
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    mqtt_client_id:
+      name: MQTT client ID
+      description: >
+        MQTT client index on the hub (1-based). Matches the client configured
+        in the Sinum hub web UI under Settings → MQTT Clients.
+        Defaults to the value configured in integration options (default 1).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    dry_run:
+      name: Dry run
+      description: >
+        If true, generates the Lua code and logs it (INFO level) without
+        actually writing to the hub. Useful for verifying the output before upload.
+      required: false
+      default: false
+      selector:
+        boolean:

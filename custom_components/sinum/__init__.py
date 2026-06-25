@@ -21,6 +21,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import SinumClient, SinumNotSupportedError
 from .const import (
     ATTR_ENTRY_ID,
+    ATTR_MQTT_CLIENT_ID,
+    ATTR_MQTT_DRY_RUN,
+    ATTR_MQTT_SCENE_ID,
     ATTR_NOTIFICATION_MESSAGE,
     ATTR_NOTIFICATION_TITLE,
     ATTR_PAYLOAD,
@@ -28,14 +31,20 @@ from .const import (
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
+    CONF_MQTT_CLIENT_ID,
     CONF_MQTT_ENABLED,
+    CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
+    DEFAULT_MQTT_CLIENT_ID,
+    DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_SEND_NOTIFICATION,
     SERVICE_UPDATE_SCHEDULE,
+    SERVICE_UPLOAD_MQTT_BRIDGE,
 )
+from .lua_mqtt_bridge import render as _render_mqtt_bridge_lua
 from .coordinator import SinumCoordinator
 from .mqtt import SinumMqttBridge
 
@@ -71,6 +80,15 @@ UPDATE_SCHEDULE_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ENTRY_ID): cv.string,
         vol.Required(ATTR_SCHEDULE_ID): cv.positive_int,
         vol.Required(ATTR_PAYLOAD): dict,
+    }
+)
+
+UPLOAD_MQTT_BRIDGE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_MQTT_SCENE_ID): cv.positive_int,
+        vol.Optional(ATTR_MQTT_CLIENT_ID): cv.positive_int,
+        vol.Optional(ATTR_MQTT_DRY_RUN, default=False): cv.boolean,
     }
 )
 
@@ -214,6 +232,37 @@ def _register_services(hass: HomeAssistant) -> None:
         _merge_schedule(coordinator, schedule_id, updated or payload)
         _publish_schedule_update(coordinator)
 
+    async def handle_upload_mqtt_bridge(call: ServiceCall) -> None:
+        coordinator = _select_coordinator(hass, call.data.get(ATTR_ENTRY_ID))
+        opts = coordinator.config_entry.options
+        data = coordinator.config_entry.data
+
+        scene_id = call.data.get(
+            ATTR_MQTT_SCENE_ID,
+            opts.get(CONF_MQTT_SCENE_ID, data.get(CONF_MQTT_SCENE_ID, DEFAULT_MQTT_SCENE_ID)),
+        )
+        client_id = call.data.get(
+            ATTR_MQTT_CLIENT_ID,
+            opts.get(CONF_MQTT_CLIENT_ID, data.get(CONF_MQTT_CLIENT_ID, DEFAULT_MQTT_CLIENT_ID)),
+        )
+        topic_prefix = opts.get(
+            CONF_MQTT_TOPIC_PREFIX,
+            data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+        )
+        lua_code = _render_mqtt_bridge_lua(topic_prefix=topic_prefix, client_id=int(client_id))
+        dry_run = call.data.get(ATTR_MQTT_DRY_RUN, False)
+        if dry_run:
+            _LOGGER.info(
+                "sinum.upload_mqtt_bridge dry_run: scene=%d client=%d prefix=%s lua_len=%d",
+                scene_id, client_id, topic_prefix, len(lua_code),
+            )
+            return
+        await coordinator.client.patch_scene_lua(int(scene_id), lua_code)
+        _LOGGER.info(
+            "Uploaded MQTT bridge Lua to scene %d (client_id=%d prefix=%s)",
+            scene_id, client_id, topic_prefix,
+        )
+
     _register_service_if_missing(
         hass,
         SERVICE_SEND_NOTIFICATION,
@@ -225,6 +274,12 @@ def _register_services(hass: HomeAssistant) -> None:
         SERVICE_UPDATE_SCHEDULE,
         handle_update_schedule,
         UPDATE_SCHEDULE_SCHEMA,
+    )
+    _register_service_if_missing(
+        hass,
+        SERVICE_UPLOAD_MQTT_BRIDGE,
+        handle_upload_mqtt_bridge,
+        UPLOAD_MQTT_BRIDGE_SCHEMA,
     )
 
 
@@ -242,10 +297,9 @@ def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:
 def _remove_domain_services_if_no_coordinators(hass: HomeAssistant) -> None:
     if _coordinators(hass):
         return
-    if hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION):
-        hass.services.async_remove(DOMAIN, SERVICE_SEND_NOTIFICATION)
-    if hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE):
-        hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SCHEDULE)
+    for svc in (SERVICE_SEND_NOTIFICATION, SERVICE_UPDATE_SCHEDULE, SERVICE_UPLOAD_MQTT_BRIDGE):
+        if hass.services.has_service(DOMAIN, svc):
+            hass.services.async_remove(DOMAIN, svc)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:

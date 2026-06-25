@@ -69,11 +69,15 @@
         "data": {
           "scan_interval": "Polling interval (seconds)",
           "mqtt_enabled": "Enable MQTT real-time transport",
-          "mqtt_topic_prefix": "MQTT topic prefix"
+          "mqtt_topic_prefix": "MQTT topic prefix",
+          "mqtt_scene_id": "MQTT bridge scene ID",
+          "mqtt_client_id": "MQTT client ID (on hub)"
         },
         "data_description": {
           "mqtt_enabled": "Requires the Lua bridge script on the hub and a working MQTT broker in Home Assistant.",
-          "mqtt_topic_prefix": "Must match TOPIC_PREFIX in mqtt_bridge.lua. Use a unique prefix per hub, for example sinum/tablica-wtp."
+          "mqtt_topic_prefix": "Must match TOPIC_PREFIX in the uploaded mqtt_bridge.lua. Use a unique prefix per hub, e.g. sinum/tablica-wtp.",
+          "mqtt_scene_id": "ID of the scene where the MQTT bridge Lua script will be uploaded. Create an empty Lua scene in the Sinum hub web UI first, then use the sinum.upload_mqtt_bridge service.",
+          "mqtt_client_id": "MQTT client index (1-based) configured in the Sinum hub under Settings → MQTT Clients. The broker address must be set to your Home Assistant IP in the hub web UI."
         }
       }
     }
