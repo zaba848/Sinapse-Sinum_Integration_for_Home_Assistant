@@ -23,6 +23,20 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.3.9] — 2026-06-25
+
+### Hardening — Onboarding & Connection Resilience
+- **Host validation**: Config flow now rejects invalid host formats (e.g., URLs with path, query, or fragment).
+- **Retry logic**: Connection probes during onboarding automatically retry on transient errors.
+- **Fallback mode**: If hub info retrieval is temporarily unavailable after successful login, onboarding proceeds with a graceful fallback using hub name from host.
+- **User-facing error messages**: New `invalid_host` error translation in EN/PL.
+- **Test coverage**: Comprehensive test suite for failsafe/fallback paths and retry logic.
+
+### Quality
+- Live hardware validation: Both hubs (WTP, SBUS) verified ✅ — all key API endpoints responsive (200).
+- 100% line coverage maintained across config_flow, API client, and retry helpers.
+- All CI/Lint/CodeQL/HACS workflows passing.
+
 ## [0.3.8] — 2026-06-24
 
 ### Test Coverage
