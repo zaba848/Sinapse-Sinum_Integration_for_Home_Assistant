@@ -49,9 +49,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "_apply_sbus_color": 5,
         "async_turn_off": 5,
     },
-    "number.py": {
-        "__init__": 5,
-    },
 }
 
 

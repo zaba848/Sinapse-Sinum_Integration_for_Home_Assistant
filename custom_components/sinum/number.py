@@ -73,6 +73,13 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+def _ensure_variable_cached(coordinator: SinumCoordinator, variable_id: int, variable: dict) -> None:
+    if not isinstance(getattr(coordinator, "variables", None), list):
+        coordinator.variables = []
+    if not any(item.get("id") == variable_id for item in coordinator.variables):
+        coordinator.variables.append(variable)
+
+
 class SinumVariableNumber(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], NumberEntity
 ):
@@ -86,10 +93,7 @@ class SinumVariableNumber(
     ) -> None:
         super().__init__(coordinator)
         self._variable_id: int = variable["id"]
-        if not isinstance(getattr(coordinator, "variables", None), list):
-            coordinator.variables = []
-        if not any(item.get("id") == self._variable_id for item in coordinator.variables):
-            coordinator.variables.append(variable)
+        _ensure_variable_cached(coordinator, self._variable_id, variable)
         self._attr_name = variable.get("name", f"Variable {self._variable_id}")
         self._attr_unique_id = f"{entry_id}_variable_{self._variable_id}"
         self._attr_native_min_value = float(variable.get("min", -999999))
@@ -146,6 +150,18 @@ def _hub_model(hub_info: dict[str, Any]) -> str:
     return hub_info.get("model") or model_map.get(hub_info.get("device_type", "")) or "Sinum EH-01"
 
 
+def _analog_output_device_info(device: dict, entry_id: str, device_id: int) -> DeviceInfo:
+    name = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+        name=name,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or "Sinum SBUS Analog Output",
+        suggested_area=device.get("_area") or None,
+        via_device=via_device_for(device, entry_id),
+    )
+
+
 class SinumAnalogOutputNumber(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], NumberEntity
 ):
@@ -161,19 +177,11 @@ class SinumAnalogOutputNumber(
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
         device = coordinator.sbus_devices.get(device_id, {})
-        name = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_native_min_value = float(device.get("value_minimum", 0))
         self._attr_native_max_value = float(device.get("value_maximum", 10000))
         self._attr_native_step = 1.0
         self._attr_native_unit_of_measurement = device.get("unit") or None
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
-            name=name,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or "Sinum SBUS Analog Output",
-            suggested_area=device.get("_area") or None,
-            via_device=via_device_for(device, entry_id),
-        )
+        self._attr_device_info = _analog_output_device_info(device, entry_id, device_id)
 
     @property
     def _device(self) -> dict[str, Any]:
