@@ -23,6 +23,13 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-06-26
+
+### Documentation
+- Refreshed setup screenshots for language consistency (EN/PL split maintained).
+- Re-captured MQTT setup visuals to ensure stable rendering and dark-theme consistency.
+- Updated token and MQTT client ID setup steps with clearer, release-ready screenshots.
+
 ## [0.3.9] — 2026-06-25
 
 ### Hardening — Onboarding & Connection Resilience
