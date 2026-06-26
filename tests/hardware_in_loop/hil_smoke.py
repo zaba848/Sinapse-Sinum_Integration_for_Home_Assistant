@@ -42,7 +42,7 @@ async def check_devices(session, base: str, headers: dict, bus: str) -> bool:
                 print(f"  [---] devices/{bus}: 404 (bus not present)")
                 return True
             data = await r.json(content_type=None)
-            count = len(data) if isinstance(data, list) else len(data.get("devices", []))
+            count = len(data) if isinstance(data, list) else len(data.get("data", data.get("devices", [])))
             print(f"  [OK ] devices/{bus}: {count} devices")
             return r.status < 400
     except Exception as exc:
