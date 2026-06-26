@@ -38,24 +38,24 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
+def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict]:
+    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+
+
+def _bus_types(bus: str) -> tuple[str, str, str]:
+    if bus == "wtp":
+        return WTYPE_DIMMER, WTYPE_RGB_CONTROLLER, WTYPE_BUTTON
+    return STYPE_DIMMER, STYPE_RGB_CONTROLLER, STYPE_BUTTON
+
+
 def _add_bus_lights(
     coordinator: SinumCoordinator, entities: list[LightEntity], entry_id: str, bus: str
 ) -> None:
-    store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-    dimmer_type = WTYPE_DIMMER if bus == "wtp" else STYPE_DIMMER
-    rgb_type = WTYPE_RGB_CONTROLLER if bus == "wtp" else STYPE_RGB_CONTROLLER
-    button_type = WTYPE_BUTTON if bus == "wtp" else STYPE_BUTTON
-
+    store = _bus_store(coordinator, bus)
+    dimmer_type, rgb_type, button_type = _bus_types(bus)
     for device_id, device in store.items():
         entity = _bus_light_entity(
-            coordinator,
-            device_id,
-            entry_id,
-            bus,
-            device,
-            dimmer_type,
-            rgb_type,
-            button_type,
+            coordinator, device_id, entry_id, bus, device, dimmer_type, rgb_type, button_type
         )
         if entity is not None:
             entities.append(entity)

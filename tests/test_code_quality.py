@@ -44,7 +44,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "__init__": 5,
     },
     "light.py": {
-        "_add_bus_lights": 7,
         "_supports_rgb": 6,
         "async_turn_on": 6,
         "_bus_light_entity": 5,
