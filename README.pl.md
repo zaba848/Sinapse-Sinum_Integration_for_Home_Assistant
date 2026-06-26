@@ -133,11 +133,11 @@ Następnie zrestartuj Home Assistant.
 
 Otwórz web UI centrali Sinum w tej samej sieci lokalnej co Home Assistant, na przykład `http://sinum.local` albo adres IP centrali.
 
-![Logowanie do Sinum](docs/images/setup/sinum-01-sign-in.png)
+![Logowanie do Sinum](docs/images/setup/sinum-01-sign-in-pl.png)
 
 Po zalogowaniu przejdź do **Ustawienia → System → Integracje**. W angielskim UI jest to **Settings → System → Integrations**.
 
-![Integracje Sinum](docs/images/setup/sinum-02-settings-system-integrations.png)
+![Integracje Sinum](docs/images/setup/sinum-02-settings-system-integrations-pl.png)
 
 W sekcji **Tokeny integracji zewnętrznych**:
 
@@ -147,11 +147,11 @@ W sekcji **Tokeny integracji zewnętrznych**:
 4. Kliknij **Zapisz**.
 5. Skopiuj wygenerowany token od razu i przechowuj go bezpiecznie.
 
-![Dodawanie tokena](docs/images/setup/sinum-04-add-token.png)
+![Dodawanie tokena](docs/images/setup/sinum-04-add-token-pl.png)
 
 Listę tokenów znajdziesz później w **Ustawienia → System → Integracje → Tokeny integracji zewnętrznych → Lista tokenów**.
 
-![Lista tokenów](docs/images/setup/sinum-03-token-list.png)
+![Lista tokenów](docs/images/setup/sinum-03-token-list-pl.png)
 
 Nie wklejaj tokena do zgłoszeń GitHub, logów, screenów ani wiadomości. Jeśli token zostanie utracony, utwórz nowy i usuń stary w web UI Sinum.
 
@@ -239,7 +239,7 @@ W angielskim UI:
 
 **Settings → System → Integrations → MQTT client → Add MQTT client**
 
-![Dodawanie klienta MQTT](docs/images/setup/sinum-05-add-mqtt-client.png)
+![Dodawanie klienta MQTT](docs/images/setup/sinum-05-add-mqtt-client-pl.png)
 
 Ustaw adres brokera MQTT na adres Home Assistant, port zwykle `1883`, dane logowania i zapamiętaj identyfikator klienta.
 
