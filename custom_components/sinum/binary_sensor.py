@@ -171,6 +171,12 @@ _TARGET_REACHED_SBUS = SinumBinarySensorDescription(
 )
 
 
+def _needs_target_reached(
+    desc: SinumBinarySensorDescription | None, dev_type: str, device: dict
+) -> bool:
+    return bool(desc and dev_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device)
+
+
 def _add_sensors_for_bus(
     store: dict[int, dict],
     type_map: dict[str, SinumBinarySensorDescription],
@@ -183,13 +189,9 @@ def _add_sensors_for_bus(
         dev_type = device.get("type", "")
         if description := type_map.get(dev_type):
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
-        if (
-            target_reached_desc
-            and dev_type == WTYPE_TEMPERATURE_REGULATOR
-            and "target_temperature_reached" in device
-        ):
+        if _needs_target_reached(target_reached_desc, dev_type, device):
             entities.append(
-                SinumBinarySensor(coordinator, device_id, target_reached_desc, entry_id)
+                SinumBinarySensor(coordinator, device_id, target_reached_desc, entry_id)  # type: ignore[arg-type]
             )
 
 

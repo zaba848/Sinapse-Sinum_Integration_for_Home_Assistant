@@ -394,12 +394,18 @@ class SinumAutomationStatusSensor(CoordinatorEntity[SinumCoordinator], SensorEnt
                 return automation
         return self._initial_automation
 
-    @property
-    def native_value(self) -> str:
+    def _enabled_state(self) -> str | None:
         for key in ("enabled", "is_enabled", "active"):
             value = self._automation.get(key)
             if isinstance(value, bool):
                 return "enabled" if value else "disabled"
+        return None
+
+    @property
+    def native_value(self) -> str:
+        enabled = self._enabled_state()
+        if enabled is not None:
+            return enabled
         state = self._automation.get("state") or self._automation.get("status")
         return str(state) if state is not None else "unknown"
 

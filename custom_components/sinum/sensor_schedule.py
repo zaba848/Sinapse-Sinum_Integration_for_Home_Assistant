@@ -112,13 +112,17 @@ class SinumScheduleActivePeriodSensor(SinumScheduleSensor):
         super().__init__(coordinator, schedule, entry_id, "active_period")
 
     @staticmethod
+    def _raw_entries(day_data: Any) -> list[Any]:
+        if isinstance(day_data, list):
+            return day_data
+        if isinstance(day_data, dict):
+            return day_data.get("configuration", [])
+        return []
+
+    @staticmethod
     def _day_entries(day_data: Any) -> list[dict[str, Any]]:
         """Normalise day schedule data: handles both list (thermal) and dict (relay) formats."""
-        if isinstance(day_data, list):
-            return [e for e in day_data if isinstance(e, dict)]
-        if isinstance(day_data, dict):
-            return [e for e in day_data.get("configuration", []) if isinstance(e, dict)]
-        return []
+        return [e for e in SinumScheduleActivePeriodSensor._raw_entries(day_data) if isinstance(e, dict)]
 
     @property
     def native_value(self) -> str:

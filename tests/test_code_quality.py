@@ -27,7 +27,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "extra_state_attributes": 5,
     },
     "binary_sensor.py": {
-        "_add_sensors_for_bus": 6,
         "is_on": 5,
         "extra_state_attributes": 5,
     },
@@ -57,12 +56,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
     },
     "number.py": {
         "__init__": 5,
-    },
-    "sensor_schedule.py": {
-        "_day_entries": 7,
-    },
-    "sensor_virtual.py": {
-        "native_value": 6,
     },
     "switch.py": {
         "__init__": 6,
