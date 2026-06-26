@@ -56,7 +56,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "async_turn_off": 5,
     },
     "number.py": {
-        "_load_variables": 5,
         "__init__": 5,
     },
     "sensor_schedule.py": {

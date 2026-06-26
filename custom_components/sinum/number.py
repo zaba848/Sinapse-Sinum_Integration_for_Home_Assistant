@@ -20,19 +20,24 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
-async def _load_variables(coordinator: SinumCoordinator) -> list[dict[str, Any]]:
-    variables = getattr(coordinator, "variables", None)
-    if isinstance(variables, list) and variables:
-        return variables
+def _cached_variables(coordinator: SinumCoordinator) -> list[dict[str, Any]]:
+    stored = getattr(coordinator, "variables", None)
+    if isinstance(stored, list):
+        return stored
+    return []
 
-    cached_variables = variables if isinstance(variables, list) else []
+
+async def _load_variables(coordinator: SinumCoordinator) -> list[dict[str, Any]]:
+    cached = _cached_variables(coordinator)
+    if cached:
+        return cached
     try:
         fetched = await coordinator.client.get_variables()
         coordinator.variables = fetched
         return fetched
     except (SinumConnectionError, SinumNotSupportedError):
         _LOGGER.debug("Variables endpoint not available on this hub firmware")
-        return cached_variables
+        return cached
 
 
 def _variable_number_entities(
