@@ -6,9 +6,10 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import SinumClient, SinumConnectionError
+from .api import SinumAuthError, SinumClient, SinumConnectionError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -96,6 +97,12 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.rooms
 
     async def _async_update_data(self) -> dict[str, Any]:
+        try:
+            return await self._fetch_all()
+        except SinumAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+
+    async def _fetch_all(self) -> dict[str, Any]:
         # ── Group 1: metadata — all fetched in parallel ───────────────────────
         meta = await asyncio.gather(
             _safe_fetch(self.client.get_hub_info, "hub info"),
@@ -304,9 +311,11 @@ def _apply_optional_stores(
 
 
 async def _safe_fetch(coro_fn: Any, label: str, default: Any = None) -> Any:
-    """Call an async API method, returning default on any non-cancellation error."""
+    """Call an async API method; returns default on errors, re-raises SinumAuthError."""
     try:
         return await coro_fn()
+    except SinumAuthError:
+        raise
     except Exception as err:
         _LOGGER.debug("Failed to fetch %s: %s", label, err)
         return default

@@ -15,7 +15,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import SinumClient, SinumNotSupportedError
@@ -352,9 +352,30 @@ def _stale_uid_prefixes(entry_id: str, removed_ids: dict[str, frozenset[int]]) -
     return prefixes
 
 
+def _stale_identifiers(entry_id: str, removed_ids: dict[str, frozenset[int]]) -> set[tuple[str, str]]:
+    return {
+        (DOMAIN, f"{entry_id}_{bus}_{device_id}")
+        for bus, ids in removed_ids.items()
+        for device_id in ids
+    }
+
+
 def _is_stale_entity(entity_entry: er.RegistryEntry, prefixes: set[str]) -> bool:
     uid = entity_entry.unique_id
     return any(uid == p or uid.startswith(f"{p}_") for p in prefixes)
+
+
+def _remove_stale_devices(
+    hass: HomeAssistant,
+    entry_id: str,
+    stale_identifiers: set[tuple[str, str]],
+) -> None:
+    dev_reg = dr.async_get(hass)
+    for identifier in stale_identifiers:
+        device = dev_reg.async_get_device(identifiers={identifier})
+        if device is not None:
+            _LOGGER.info("Sinum: removing stale device %s", device.name or device.id)
+            dev_reg.async_remove_device(device.id)
 
 
 async def _cleanup_stale_entities(
@@ -370,6 +391,7 @@ async def _cleanup_stale_entities(
         if _is_stale_entity(entity_entry, prefixes):
             _LOGGER.info("Sinum: removing stale entity %s", entity_entry.entity_id)
             ent_reg.async_remove(entity_entry.entity_id)
+    _remove_stale_devices(hass, entry_id, _stale_identifiers(entry_id, removed_ids))
 
 
 def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:

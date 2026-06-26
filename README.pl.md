@@ -6,9 +6,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/testy-1481%20OK-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/testy-1498%20OK-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-%E2%89%A44%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/wersja-0.5.5-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/wersja-0.5.6-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/licencja-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -38,7 +38,7 @@
 4. Settings → … → Sinum → Configure → włącz WebSocket real-time transport
 ```
 
-→ **[Pełny przewodnik instalacji ze zrzutami ekranu](docs/installation.pl.md)**
+→ **[Pełny przewodnik instalacji ze zrzutami ekranu](docs/installation.md)**
 
 ---
 
@@ -46,10 +46,10 @@
 
 | Dokument | Zawartość |
 |---|---|
-| [Przewodnik instalacji](docs/installation.pl.md) | HACS, instalacja ręczna, generowanie tokena, zrzuty ekranu |
-| [Referencja encji](docs/entities.pl.md) | Wszystkie platformy, atrybuty, przykłady automatyzacji |
-| [Transport czasu rzeczywistego](docs/real-time.pl.md) | Konfiguracja WebSocket + most MQTT (wariant awaryjny) |
-| [Przewodnik developera](docs/development.pl.md) | Środowisko, testy, reguły CC, nowe typy urządzeń |
+| [Przewodnik instalacji](docs/installation.md) | HACS, instalacja ręczna, generowanie tokena, zrzuty ekranu |
+| [Referencja encji](docs/entities.md) | Wszystkie platformy, atrybuty, przykłady automatyzacji |
+| [Transport czasu rzeczywistego](docs/real-time.md) | Konfiguracja WebSocket + most MQTT (wariant awaryjny) |
+| [Przewodnik developera](docs/development.md) | Środowisko, testy, reguły CC, nowe typy urządzeń |
 | [Historia zmian](CHANGELOG.md) | Pełna historia wersji |
 | [Bezpieczeństwo](SECURITY.md) | Zgłaszanie podatności |
 | [Wkład w projekt](CONTRIBUTING.md) | Jak współtworzyć, styl kodu, lista kontrolna PR |

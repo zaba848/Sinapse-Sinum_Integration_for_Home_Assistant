@@ -787,8 +787,58 @@ class TestStaleEntityCleanup:
         mock_reg = MagicMock()
         mock_reg.entities.get_entries_for_config_entry_id.return_value = [entity]
 
-        with patch("custom_components.sinum.er") as mock_er:
+        with patch("custom_components.sinum.er") as mock_er, \
+             patch("custom_components.sinum.dr") as mock_dr:
             mock_er.async_get.return_value = mock_reg
+            mock_dr.async_get.return_value = MagicMock(async_get_device=MagicMock(return_value=None))
             await _cleanup_stale_entities(hass, "e1", {"sbus": frozenset({7})})
 
         mock_reg.async_remove.assert_called_once_with("switch.stale")
+
+
+class TestStaleDeviceRegistryCleanup:
+    """Tests for device registry cleanup helpers."""
+
+    def test_stale_identifiers_builds_correct_set(self):
+        from custom_components.sinum import _stale_identifiers
+
+        result = _stale_identifiers("abc", {"wtp": frozenset({10}), "sbus": frozenset({5})})
+        assert ("sinum", "abc_wtp_10") in result
+        assert ("sinum", "abc_sbus_5") in result
+        assert len(result) == 2
+
+    def test_stale_identifiers_empty_when_no_removed(self):
+        from custom_components.sinum import _stale_identifiers
+
+        result = _stale_identifiers("abc", {"wtp": frozenset(), "sbus": frozenset()})
+        assert result == set()
+
+    def test_remove_stale_devices_removes_found_device(self):
+        from custom_components.sinum import _remove_stale_devices
+
+        mock_device = MagicMock()
+        mock_device.id = "dev-uuid-123"
+        mock_device.name = "Old Relay"
+
+        mock_reg = MagicMock()
+        mock_reg.async_get_device.return_value = mock_device
+
+        hass = MagicMock()
+        with patch("custom_components.sinum.dr") as mock_dr:
+            mock_dr.async_get.return_value = mock_reg
+            _remove_stale_devices(hass, "e1", {("sinum", "e1_wtp_10")})
+
+        mock_reg.async_remove_device.assert_called_once_with("dev-uuid-123")
+
+    def test_remove_stale_devices_noop_when_device_not_found(self):
+        from custom_components.sinum import _remove_stale_devices
+
+        mock_reg = MagicMock()
+        mock_reg.async_get_device.return_value = None
+
+        hass = MagicMock()
+        with patch("custom_components.sinum.dr") as mock_dr:
+            mock_dr.async_get.return_value = mock_reg
+            _remove_stale_devices(hass, "e1", {("sinum", "e1_wtp_10")})
+
+        mock_reg.async_remove_device.assert_not_called()

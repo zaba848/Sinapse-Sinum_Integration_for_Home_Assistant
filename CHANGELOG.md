@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-06-26
+
+### Quality — Code & Tests
+- **websocket.py 100% coverage**: +10 tests covering `_run`, `_wait_reconnect`, `_consume_loop`, `_receive_messages`, and edge cases (`_handle_event` non-dict data, `_apply_device_state` non-dict payload)
+- **`ConfigEntryAuthFailed` on auth errors**: `_safe_fetch` now re-raises `SinumAuthError` (was silently swallowed); `_async_update_data` wraps the fetch in a try/except and converts it to `ConfigEntryAuthFailed` — HA automatically shows a "Re-authenticate" persistent notification
+- **Device registry cleanup**: `_cleanup_stale_entities` now also removes device cards from the device registry (not just entity registry entries) when a hub device disappears
+- **Total: 1 498 tests** across 44 files
+
+### Bug Fixes
+- **README.pl.md**: fixed 4 broken links pointing to non-existent `docs/*.pl.md` files (now point to EN docs)
+
 ## [0.5.5] — 2026-06-26
 
 ### Quality — Code & Tests

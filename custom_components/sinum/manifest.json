@@ -1,13 +1,17 @@
 {
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "documentation": "https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant",
   "issue_tracker": "https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues",
   "homeassistant": "2024.1.0",
-  "requirements": ["aiohttp>=3.9.0"],
+  "requirements": [
+    "aiohttp>=3.9.0"
+  ],
   "dependencies": [],
-  "codeowners": ["@zaba848"],
+  "codeowners": [
+    "@zaba848"
+  ],
   "config_flow": true,
   "iot_class": "local_push",
   "quality_scale": "silver"

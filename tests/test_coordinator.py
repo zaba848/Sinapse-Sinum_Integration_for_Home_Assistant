@@ -394,6 +394,44 @@ class TestSinumCoordinator:
         assert list(result) == [8]
         assert result[8]["class"] == "wtp"
 
+    # ── auth error surfaces as ConfigEntryAuthFailed ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_safe_fetch_reraises_sinum_auth_error(self, mock_client):
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        from custom_components.sinum.api import SinumAuthError
+        from custom_components.sinum.coordinator import _safe_fetch
+
+        async def _raises_auth():
+            raise SinumAuthError("token rejected")
+
+        with pytest.raises(SinumAuthError):
+            await _safe_fetch(_raises_auth, "hub info")
+
+    @pytest.mark.asyncio
+    async def test_async_update_data_raises_config_entry_auth_failed(self, mock_client):
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        from custom_components.sinum.api import SinumAuthError
+
+        coordinator = self._make_coordinator(mock_client)
+        mock_client.get_hub_info = AsyncMock(side_effect=SinumAuthError("token rejected"))
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
+    async def test_safe_fetch_swallows_connection_error(self, mock_client):
+        from custom_components.sinum.api import SinumConnectionError
+        from custom_components.sinum.coordinator import _safe_fetch
+
+        async def _raises_conn():
+            raise SinumConnectionError("timeout")
+
+        result = await _safe_fetch(_raises_conn, "rooms", default=[])
+        assert result == []
+
     def test_inject_parent_models_sets_class_and_parent_id(self, mock_client):
         from custom_components.sinum.coordinator import _inject_parent_models
 

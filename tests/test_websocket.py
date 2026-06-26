@@ -497,3 +497,141 @@ async def test_run_loop_exits_when_stop_event_set():
     bridge._stop_event.set()
     await bridge._run()
     assert call_count == 0
+
+
+# ── _run executes cycle then stops ───────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_executes_one_cycle_then_stops():
+    """_run() calls _run_one_cycle at least once before stop_event exits the loop."""
+    bridge, _hass, _coordinator = _bridge()
+    call_count = 0
+
+    async def _counted_cycle():
+        nonlocal call_count
+        call_count += 1
+        bridge._stop_event.set()
+
+    bridge._run_one_cycle = _counted_cycle  # type: ignore[assignment]
+    bridge._stop_event.clear()
+    await bridge._run()
+    assert call_count == 1
+
+
+# ── _wait_reconnect ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_wait_reconnect_returns_immediately_when_stop_set():
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()
+    await bridge._wait_reconnect()  # must not hang
+
+
+@pytest.mark.asyncio
+async def test_wait_reconnect_times_out_when_not_stopped():
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.clear()
+    with patch("custom_components.sinum.websocket._RECONNECT_DELAY", 0.01):
+        await bridge._wait_reconnect()  # timeout fires after 10 ms, suppressed
+
+
+@pytest.mark.asyncio
+async def test_run_one_cycle_calls_wait_reconnect_when_not_stopped():
+    """After a generic exception, _wait_reconnect is called when stop_event is clear."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.clear()
+    reconnect_called = False
+
+    async def _fail():
+        raise RuntimeError("dropped")
+
+    async def _mock_reconnect():
+        nonlocal reconnect_called
+        reconnect_called = True
+        bridge._stop_event.set()
+
+    bridge._consume_loop = _fail  # type: ignore[assignment]
+    bridge._wait_reconnect = _mock_reconnect  # type: ignore[assignment]
+    await bridge._run_one_cycle()
+    assert reconnect_called
+
+
+# ── _consume_loop ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_consume_loop_connects_and_receives():
+    bridge, _hass, _coordinator = _bridge()
+    bridge._client.ensure_push_auth = AsyncMock()
+    bridge._client.websocket_url_with_access_token = MagicMock(return_value="ws://hub/ws")
+
+    mock_ws = MagicMock()
+    mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
+    mock_ws.__aexit__ = AsyncMock(return_value=None)
+    bridge._client.session.ws_connect = MagicMock(return_value=mock_ws)
+    bridge._receive_messages = AsyncMock()
+
+    await bridge._consume_loop()
+
+    bridge._client.ensure_push_auth.assert_awaited_once()
+    bridge._receive_messages.assert_awaited_once_with(mock_ws)
+
+
+# ── _receive_messages ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_receive_messages_processes_text_message():
+    bridge, _hass, coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.TEXT
+    msg.data = json.dumps([{"data": {"type": "device_state_changed", "details": "humidity",
+                                      "payload": {"class": "sbus", "id": 12, "humidity": 999}}}])
+
+    async def _iter(_self=None):
+        yield msg
+
+    mock_ws = MagicMock()
+    mock_ws.__aiter__ = _iter
+    await bridge._receive_messages(mock_ws)
+    assert coordinator.sbus_devices[12]["humidity"] == 999
+
+
+@pytest.mark.asyncio
+async def test_receive_messages_stops_on_closed():
+    bridge, _hass, _coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.CLOSED
+
+    async def _iter(_self=None):
+        yield msg
+
+    mock_ws = MagicMock()
+    mock_ws.__aiter__ = _iter
+    await bridge._receive_messages(mock_ws)  # must return without error
+
+
+@pytest.mark.asyncio
+async def test_receive_messages_exits_on_stop_event():
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.TEXT
+    msg.data = json.dumps([])
+
+    async def _iter(_self=None):
+        yield msg
+
+    mock_ws = MagicMock()
+    mock_ws.__aiter__ = _iter
+    await bridge._receive_messages(mock_ws)  # must return early
+
+
+# ── _handle_event / _apply_device_state edge cases ───────────────────────────
+
+def test_handle_event_non_dict_data_returns_false():
+    bridge, _hass, _coordinator = _bridge()
+    assert bridge._handle_event({"data": "not-a-dict"}) is False
+
+
+def test_apply_device_state_non_dict_payload_returns_false():
+    bridge, _hass, _coordinator = _bridge()
+    assert bridge._apply_device_state({"payload": "not-a-dict"}) is False
