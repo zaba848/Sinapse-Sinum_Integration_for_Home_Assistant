@@ -53,7 +53,8 @@ upload_mqtt_bridge:
     After upload, activate the scene once from the Sinum UI — it will then run
     automatically on every hub event.
     Prerequisites: configure the MQTT broker IP in the Sinum hub web UI under
-    Settings → MQTT Clients, using your Home Assistant host IP as the broker address.
+    Settings → System → Integrations → MQTT client, using your Home Assistant
+    host IP as the broker address.
   fields:
     entry_id:
       name: Config entry ID
@@ -77,7 +78,7 @@ upload_mqtt_bridge:
       name: MQTT client ID
       description: >
         MQTT client index on the hub (1-based). Matches the client configured
-        in the Sinum hub web UI under Settings → MQTT Clients.
+        in the Sinum hub web UI under Settings → System → Integrations → MQTT client.
         Defaults to the value configured in integration options (default 1).
       required: false
       example: 1

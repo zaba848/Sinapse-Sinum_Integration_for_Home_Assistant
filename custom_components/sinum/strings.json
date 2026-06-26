@@ -9,12 +9,12 @@
           "auth_mode": "Authentication method"
         },
         "data_description": {
-          "auth_mode": "**API Token** (recommended) — more secure, no password stored. Create a token in the Sinum app. **Password** — standard username + password login."
+          "auth_mode": "**API Token** (recommended) — more secure, no password stored. Create a token in the Sinum web UI under Settings → System → Integrations. **Password** — standard username + password login."
         }
       },
       "token": {
         "title": "Sinum API Token",
-        "description": "Create a static API token in the Sinum app (Settings → Integrations → API Tokens) and paste it below.",
+        "description": "Create an external integration token in the Sinum web UI (Settings → System → Integrations → External integration tokens → Add token) and paste it below.",
         "data": {
           "api_token": "API Token",
           "scan_interval": "Polling interval (seconds)"
@@ -79,7 +79,7 @@
           "mqtt_enabled": "Requires the Lua bridge script on the hub and a working MQTT broker in Home Assistant.",
           "mqtt_topic_prefix": "Must match TOPIC_PREFIX in the uploaded mqtt_bridge.lua. Use a unique prefix per hub, e.g. sinum/tablica-wtp.",
           "mqtt_scene_id": "ID of the scene where the MQTT bridge Lua script will be uploaded. Create an empty Lua scene in the Sinum hub web UI first, then use the sinum.upload_mqtt_bridge service.",
-          "mqtt_client_id": "MQTT client index (1-based) configured in the Sinum hub under Settings → MQTT Clients. The broker address must be set to your Home Assistant IP in the hub web UI.",
+          "mqtt_client_id": "MQTT client index (1-based) configured in the Sinum hub under Settings → System → Integrations → MQTT client → Client list. The broker address must be set to your Home Assistant IP in the hub web UI.",
           "ws_enabled": "Connect via WebSocket for instant state updates without polling. Requires hub firmware that supports /api/v1/ws.",
           "ws_path": "Hub WebSocket endpoint path (default: /api/v1/ws)."
         }

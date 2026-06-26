@@ -2,6 +2,8 @@
 
 **Sinapse** connects a TECH Sterowniki Sinum EH-01 building automation hub to Home Assistant over the local network. It exposes all physical and virtual devices as native Home Assistant entities with full read/write control.
 
+**Language:** English | [Polski](README.pl.md)
+
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/tests-1460%20passing-brightgreen.svg)](tests/)
@@ -150,7 +152,33 @@ Current stabilization artifacts are tracked in `HARDWARE_TEST_PLAN.md` and workf
 
 ## Adding Sinum to Home Assistant — Quick Start
 
-### Step 1 — Add the integration
+### Step 1 — Prepare the Sinum hub access token
+
+Open the Sinum web UI in the same local network as Home Assistant, for example `http://sinum.local` or `http://10.0.62.167`.
+
+![Sinum local sign-in](docs/images/setup/sinum-01-sign-in.png)
+
+After signing in, go to **Settings → System → Integrations**.
+
+![Sinum Settings System Integrations](docs/images/setup/sinum-02-settings-system-integrations.png)
+
+In the **External integration tokens** section:
+
+1. Click **Add token**.
+2. Enter a clear name, for example `Home Assistant`.
+3. Select the token type.
+4. Click **Save**.
+5. Copy the generated token immediately and store it securely.
+
+![Sinum add external integration token](docs/images/setup/sinum-04-add-token.png)
+
+You can later review or revoke tokens from **Settings → System → Integrations → External integration tokens → Token list**.
+
+![Sinum token list](docs/images/setup/sinum-03-token-list.png)
+
+Do not paste the token into GitHub issues, logs, screenshots or chat messages. If the token is lost, create a new one and revoke the old token in Sinum.
+
+### Step 2 — Add the integration in Home Assistant
 
 **Settings → Devices & Services → Add Integration → search for "Sinum"**
 
@@ -163,18 +191,18 @@ The setup wizard runs two screens:
 | Host | IP address or hostname of your hub, e.g. `10.0.62.167`. Do not include `http://`. |
 | Auth method | `api_token` (recommended) or `username_password` |
 
-> If you don't know the hub IP, open the Sinum mobile app → Settings → About — it shows the hub IP.
+> If you don't know the hub IP, try `sinum.local` first. If that does not resolve, check the IP assigned to the hub in your router/DHCP lease list.
 
 **Screen 2 — Credentials**
 
 | Auth method | What to enter | Where to get it |
 |---|---|---|
-| API Token | Paste the token | Sinum app → Settings → Integrations → API Tokens → Generate |
+| API Token | Paste the token | Sinum web UI → Settings → System → Integrations → External integration tokens → Add token |
 | Username / Password | Your Sinum login | Same credentials used for the Sinum web UI |
 
 Click **Submit** — HA discovers all devices and creates entities automatically.
 
-### Step 2 — Enable real-time updates (recommended)
+### Step 3 — Enable real-time updates (recommended)
 
 Without this step, entities update every 30 s. With WebSocket, updates arrive in under 1 s.
 
@@ -183,7 +211,7 @@ Without this step, entities update every 30 s. With WebSocket, updates arrive in
 3. Leave path as `/api/v1/ws` (default)
 4. Click **Submit**
 
-### Step 3 — (Optional) MQTT fallback
+### Step 4 — (Optional) MQTT fallback
 
 If your hub firmware doesn't support WebSocket (`/api/v1/ws` returns an error), use the MQTT bridge as fallback. See [MQTT Real-Time Bridge (Legacy)](#mqtt-real-time-bridge-legacy).
 
@@ -538,9 +566,11 @@ HA MQTT Integration
 #### Step 1 — Add an MQTT client on the hub
 
 1. Open the Sinum web UI (e.g. `http://10.0.62.167`)
-2. **Settings → System → Integrations → MQTT → Add**
+2. **Settings → System → Integrations → MQTT client → Add MQTT client**
 3. Fill in broker IP, port `1883`, credentials
 4. Save and note the assigned **Client ID** (e.g. `1`)
+
+![Sinum add MQTT client](docs/images/setup/sinum-05-add-mqtt-client.png)
 
 #### Step 2 — Upload the Lua bridge
 
@@ -828,7 +858,7 @@ The Sinum hub communicates over plain HTTP on the local network. Follow these re
 - If you expose Home Assistant to the internet (Nabu Casa, reverse proxy), ensure the Sinum hub is **not** reachable from the WAN.
 
 ### Authentication
-- Prefer **API Token** authentication over username + password — the token is scoped, doesn't grant shell access, and can be revoked in the Sinum app without changing your password.
+- Prefer **API Token** authentication over username + password — the external integration token is scoped, doesn't grant shell access, and can be revoked in the Sinum web UI without changing your password.
 - Use the **least-privilege token**: generate a dedicated token for the HA integration, not your admin credentials.
 - Do not share the API token in bug reports, logs, or GitHub issues. The integration redacts it from diagnostics, but system logs may still capture it.
 

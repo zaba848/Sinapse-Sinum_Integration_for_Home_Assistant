@@ -9,12 +9,12 @@
           "auth_mode": "Metoda uwierzytelniania"
         },
         "data_description": {
-          "auth_mode": "**Token API** (zalecane) — bezpieczniejszy, nie wymaga hasła. Utwórz token w aplikacji Sinum. **Hasło** — standardowe logowanie login + hasło."
+          "auth_mode": "**Token API** (zalecane) — bezpieczniejszy, nie wymaga hasła. Utwórz token w web UI Sinum w sekcji Ustawienia → System → Integracje. **Hasło** — standardowe logowanie login + hasło."
         }
       },
       "token": {
         "title": "Token API Sinum",
-        "description": "Utwórz statyczny token API w aplikacji Sinum (Ustawienia → Integracje → Tokeny API) i wklej go poniżej.",
+        "description": "Utwórz token integracji zewnętrznej w web UI Sinum (Ustawienia → System → Integracje → Tokeny integracji zewnętrznych → Dodaj token) i wklej go poniżej.",
         "data": {
           "api_token": "Token API",
           "scan_interval": "Interwał odświeżania (sekundy)"
@@ -79,7 +79,7 @@
           "mqtt_enabled": "Wymaga skryptu Lua wgranego na centralę i działającego brokera MQTT w Home Assistant.",
           "mqtt_topic_prefix": "Musi odpowiadać TOPIC_PREFIX wstrzykniętemu do skryptu mostu. Dla wielu central użyj unikalnego prefiksu, np. sinum/tablica-wtp.",
           "mqtt_scene_id": "ID sceny na centrali zawierającej skrypt Lua mostu MQTT. Wgraj przez Narzędzia → Usługi → sinum.upload_mqtt_bridge.",
-          "mqtt_client_id": "Indeks klienta MQTT skonfigurowanego w web UI centrali Sinum (Ustawienia → Klienci MQTT). Tam ustaw adres brokera na IP Home Assistant.",
+          "mqtt_client_id": "Indeks klienta MQTT skonfigurowanego w web UI centrali Sinum (Ustawienia → System → Integracje → Klient MQTT → Lista klientów). Tam ustaw adres brokera na IP Home Assistant.",
           "ws_enabled": "Połącz przez WebSocket dla natychmiastowych aktualizacji stanu. Wymaga firmware huba z obsługą /api/v1/ws.",
           "ws_path": "Ścieżka WebSocket huba (domyślnie: /api/v1/ws)."
         }

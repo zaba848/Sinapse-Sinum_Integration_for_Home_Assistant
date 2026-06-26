@@ -9,12 +9,12 @@
           "auth_mode": "Authentication method"
         },
         "data_description": {
-          "auth_mode": "**API Token** (recommended) — more secure, no password stored. Create a token in the Sinum app. **Password** — standard username + password login."
+          "auth_mode": "**API Token** (recommended) — more secure, no password stored. Create a token in the Sinum web UI under Settings → System → Integrations. **Password** — standard username + password login."
         }
       },
       "token": {
         "title": "Sinum API Token",
-        "description": "Create a static API token in the Sinum app (Settings → Integrations → API Tokens) and paste it below.",
+        "description": "Create an external integration token in the Sinum web UI (Settings → System → Integrations → External integration tokens → Add token) and paste it below.",
         "data": {
           "api_token": "API Token",
           "scan_interval": "Polling interval (seconds)"
@@ -79,7 +79,7 @@
           "mqtt_enabled": "Requires the Lua bridge script uploaded to the hub and a working MQTT broker in Home Assistant.",
           "mqtt_topic_prefix": "Must match the TOPIC_PREFIX injected into the bridge script. Use a unique prefix per hub, e.g. sinum/tablica-wtp.",
           "mqtt_scene_id": "ID of the hub scene that holds the MQTT bridge Lua script. Upload via Developer Tools → Services → sinum.upload_mqtt_bridge.",
-          "mqtt_client_id": "MQTT client index configured in the Sinum hub web UI under Settings → MQTT Clients. Set the broker address there to your Home Assistant IP.",
+          "mqtt_client_id": "MQTT client index configured in the Sinum hub web UI under Settings → System → Integrations → MQTT client → Client list. Set the broker address there to your Home Assistant IP.",
           "ws_enabled": "Connect via WebSocket for instant state updates. Requires hub firmware with /api/v1/ws support.",
           "ws_path": "Hub WebSocket endpoint path (default: /api/v1/ws)."
         }

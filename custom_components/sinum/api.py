@@ -184,7 +184,7 @@ class SinumClient:
     """Async HTTP client for the Sinum EH-01 hub REST API.
 
     Authentication modes:
-    - Static API token  (preferred — never expires, created in Sinum app)
+    - Static API token  (preferred — never expires, created in the Sinum web UI)
     - Username + password  (fallback — JWT renewed automatically via refresh token)
 
     All responses are wrapped in {"data": ...} — _request() unwraps automatically.
