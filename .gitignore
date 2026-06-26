@@ -24,3 +24,4 @@ venv/
 diagnose_*.py
 test_live_*.py
 *_live_*.py
+.claude/
