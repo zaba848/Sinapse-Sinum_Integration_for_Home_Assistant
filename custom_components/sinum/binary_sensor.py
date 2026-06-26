@@ -295,12 +295,10 @@ class SinumBinarySensor(
     def is_on(self) -> bool | None:
         state_key = self.entity_description.state_key
         state = self._device.get(state_key)
-        if state is None:
-            state = self._device.get("status") if state_key == "state" else None
+        if state is None and state_key == "state":
+            state = self._device.get("status")
         if state is None:
             return None
-        if isinstance(state, bool):
-            return str(state).lower() in self.entity_description.on_states
         return str(state).lower() in self.entity_description.on_states
 
     @property

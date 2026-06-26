@@ -26,7 +26,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "extra_state_attributes": 5,
     },
     "binary_sensor.py": {
-        "is_on": 5,
         "extra_state_attributes": 5,
     },
     "camera.py": {
