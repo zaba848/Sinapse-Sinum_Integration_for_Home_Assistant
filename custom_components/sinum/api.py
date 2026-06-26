@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 
@@ -96,11 +97,34 @@ def _extract_by_keys(result: dict[str, Any], keys: tuple[str, ...]) -> list[dict
 def _flatten_values(result: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for value in result.values():
-        if isinstance(value, list):
-            out.extend(_dict_list(value))
-        elif isinstance(value, dict) and "id" in value:
-            out.append(value)
+        _append_value_to_flat_list(out, value)
     return out
+
+
+def _append_value_to_flat_list(out: list[dict[str, Any]], value: Any) -> None:
+    if isinstance(value, list):
+        out.extend(_dict_list(value))
+    elif isinstance(value, dict) and "id" in value:
+        out.append(value)
+
+
+def _partition_energy_results(
+    keys: tuple[str, ...], results: list[Any]
+) -> tuple[dict[str, Any], list[str]]:
+    available: dict[str, Any] = {}
+    missing: list[str] = []
+    for key, result in zip(keys, results):
+        _classify_energy_result(key, result, available, missing)
+    return available, missing
+
+
+def _classify_energy_result(
+    key: str, result: Any, available: dict[str, Any], missing: list[str]
+) -> None:
+    if result is not None:
+        available[key] = result
+    else:
+        missing.append(key)
 
 
 def _list_result_from_dict(
@@ -193,6 +217,36 @@ class SinumClient:
         if self._host.startswith("http"):
             return self._host
         return f"http://{self._host}"
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        """Return aiohttp session used by the REST/WebSocket client."""
+        return self._session
+
+    def websocket_url(self, path: str) -> str:
+        """Build WS/WSS URL from configured hub URL and endpoint path."""
+        parsed = urlsplit(self.base_url)
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        ws_path = path if path.startswith("/") else f"/{path}"
+        return f"{scheme}://{parsed.netloc}{ws_path}"
+
+    def websocket_url_with_access_token(self, path: str) -> str:
+        """Build WS URL with Sinum-compatible access_token query auth."""
+        ws_url = self.websocket_url(path)
+        token = self._auth_token()
+        if not token:
+            return ws_url
+
+        parsed = urlsplit(ws_url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["access_token"] = token
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment))
+
+    async def ensure_push_auth(self) -> None:
+        """Ensure websocket auth token is present before connecting."""
+        if self._api_token or self._jwt:
+            return
+        await self.login()
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}{path}"
@@ -744,15 +798,10 @@ class SinumClient:
 
     @staticmethod
     def _build_energy_center_summary(keys: tuple[str, ...], results: list[Any]) -> dict[str, Any]:
-        available = {key: result for key, result in zip(keys, results) if result is not None}
-        missing = [key for key, result in zip(keys, results) if result is None]
+        available, missing = _partition_energy_results(keys, results)
         if not available:
             raise SinumConnectionError("Energy Center endpoints unavailable")
-        return {
-            **available,
-            "available_endpoints": list(available.keys()),
-            "missing_endpoints": missing,
-        }
+        return {**available, "available_endpoints": list(available.keys()), "missing_endpoints": missing}
 
     async def get_energy_center_summary(self) -> dict[str, Any]:
         keys = self._energy_center_keys()

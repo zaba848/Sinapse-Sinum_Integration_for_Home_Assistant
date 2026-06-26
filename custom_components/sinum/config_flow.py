@@ -26,10 +26,13 @@ from .const import (
     CONF_MQTT_ENABLED,
     CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_WS_ENABLED,
+    CONF_WS_PATH,
     DEFAULT_MQTT_CLIENT_ID,
     DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_WS_PATH,
     DOMAIN,
 )
 
@@ -40,6 +43,27 @@ _PROBE_RETRY_DELAY = 0.5
 _REAUTH_MAX_FAILS = 5
 _REAUTH_COOLDOWN_SEC = 300  # 5 minutes after 5 bad attempts
 T = TypeVar("T")
+_PROBE_MISSING: object = object()
+
+
+async def _try_probe(
+    operation: Callable[[], Awaitable[Any]],
+    attempt: int,
+) -> Any:
+    """Run one probe attempt; return result on success, _PROBE_MISSING on retry."""
+    try:
+        return await operation()
+    except SinumAuthError:
+        raise
+    except SinumConnectionError:
+        if attempt < _PROBE_RETRIES:
+            await asyncio.sleep(_PROBE_RETRY_DELAY)
+            return _PROBE_MISSING
+        raise
+
+
+def _reauth_schema(auth_mode: str) -> vol.Schema:
+    return STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
 
 
 def _reauth_store_key(entry_id: str) -> str:
@@ -71,25 +95,38 @@ def _normalize_host_input(value: str) -> str:
     raw = value.strip()
     if not raw:
         raise ValueError("empty host")
-
     parsed = urlsplit(raw)
-    if parsed.scheme:
-        if parsed.scheme not in {"http", "https"}:
-            raise ValueError("unsupported scheme")
-        if not parsed.netloc:
-            raise ValueError("missing host")
-        if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
-            raise ValueError("path/query/fragment not allowed")
-        host = parsed.netloc
-    else:
-        if any(ch in raw for ch in "/?#"):
-            raise ValueError("path/query/fragment not allowed")
-        host = raw
+    host = _extract_host_from_scheme(parsed, raw) if parsed.scheme else _extract_plain_host(raw)
+    return _validate_extracted_host(host)
 
+
+def _validate_extracted_host(host: str) -> str:
     host = host.strip().strip("/")
     if not host or " " in host:
         raise ValueError("invalid host")
     return host
+
+
+def _extract_host_from_scheme(parsed: Any, raw: str) -> str:
+    """Extract host from a URL string that already includes a scheme."""
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("unsupported scheme")
+    if not parsed.netloc:
+        raise ValueError("missing host")
+    _reject_url_suffix(parsed)
+    return parsed.netloc
+
+
+def _reject_url_suffix(parsed: Any) -> None:
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise ValueError("path/query/fragment not allowed")
+
+
+def _extract_plain_host(raw: str) -> str:
+    """Extract host from a bare hostname/IP with no scheme."""
+    if any(ch in raw for ch in "/?#"):
+        raise ValueError("path/query/fragment not allowed")
+    return raw
 
 
 STEP_AUTH_SCHEMA = vol.Schema(
@@ -132,15 +169,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            try:
-                self._host = _normalize_host_input(user_input[CONF_HOST])
-            except ValueError:
-                errors["base"] = "invalid_host"
-            else:
-                self._auth_mode = user_input[CONF_AUTH_MODE]
-                if self._auth_mode == AUTH_MODE_TOKEN:
-                    return await self.async_step_token()
-                return await self.async_step_password()
+            next_step = await self._process_host_auth_input(user_input, errors)
+            if next_step is not None:
+                return next_step
 
         return self.async_show_form(
             step_id="user",
@@ -151,6 +182,19 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                 "password_mode": AUTH_MODE_PASSWORD,
             },
         )
+
+    async def _process_host_auth_input(
+        self, user_input: dict[str, Any], errors: dict[str, str]
+    ) -> ConfigFlowResult | None:
+        try:
+            self._host = _normalize_host_input(user_input[CONF_HOST])
+        except ValueError:
+            errors["base"] = "invalid_host"
+            return None
+        self._auth_mode = user_input[CONF_AUTH_MODE]
+        if self._auth_mode == AUTH_MODE_TOKEN:
+            return await self.async_step_token()
+        return await self.async_step_password()
 
     async def async_step_token(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -224,18 +268,11 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         return SinumClient(self._host, session, **kwargs)
 
     async def _run_probe_with_retry(self, operation: Callable[[], Awaitable[T]]) -> T:
-        last_error: Exception | None = None
         for attempt in range(1, _PROBE_RETRIES + 1):
-            try:
-                return await operation()
-            except SinumAuthError:
-                raise
-            except SinumConnectionError as err:
-                last_error = err
-                if attempt == _PROBE_RETRIES:
-                    raise
-                await asyncio.sleep(_PROBE_RETRY_DELAY)
-        raise SinumConnectionError(str(last_error) if last_error else "probe failed")
+            result = await _try_probe(operation, attempt)
+            if result is not _PROBE_MISSING:
+                return result  # type: ignore[return-value]
+        raise SinumConnectionError("probe failed after retries")
 
     @staticmethod
     def _map_auth_exception(exc: Exception) -> str:
@@ -304,15 +341,9 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            try:
-                self._host = _normalize_host_input(user_input[CONF_HOST])
-            except ValueError:
-                errors["base"] = "invalid_host"
-            else:
-                self._auth_mode = user_input[CONF_AUTH_MODE]
-                if self._auth_mode == AUTH_MODE_TOKEN:
-                    return await self.async_step_token()
-                return await self.async_step_password()
+            next_step = await self._process_host_auth_input(user_input, errors)
+            if next_step is not None:
+                return next_step
         self._host = entry.data.get(CONF_HOST, "")
         self._auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_TOKEN)
         return self.async_show_form(
@@ -349,34 +380,44 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         errors: dict[str, str] = {}
         entry = self._get_reauth_entry()
         auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_PASSWORD)
-        schema = STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
+        schema = _reauth_schema(auth_mode)
 
-        remaining = _reauth_cooldown_remaining(self.hass, entry.entry_id)
-        if remaining > 0:
-            minutes = max(1, int(remaining // 60) + 1)
-            return self.async_show_form(
-                step_id="reauth_confirm",
-                data_schema=schema,
-                errors={"base": "too_many_attempts"},
-                description_placeholders={"minutes": str(minutes)},
-            )
+        cooldown = _reauth_cooldown_remaining(self.hass, entry.entry_id)
+        if cooldown > 0:
+            return self._reauth_cooldown_form(schema, cooldown)
 
         if user_input is not None:
-            self._host = entry.data[CONF_HOST]
-            client = self._reauth_client(auth_mode, user_input)
-            error = await self._test_connection_error(client)
-            if error:
-                _reauth_record_failure(self.hass, entry.entry_id)
-                errors["base"] = error
-            else:
-                _reauth_reset(self.hass, entry.entry_id)
-                return self.async_update_reload_and_abort(entry, data={**entry.data, **user_input})
+            next_step = await self._process_reauth_input(entry, auth_mode, user_input, errors)
+            if next_step is not None:
+                return next_step
 
+        return self.async_show_form(step_id="reauth_confirm", data_schema=schema, errors=errors)
+
+    def _reauth_cooldown_form(self, schema: Any, remaining: float) -> ConfigFlowResult:
+        minutes = max(1, int(remaining // 60) + 1)
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=schema,
-            errors=errors,
+            errors={"base": "too_many_attempts"},
+            description_placeholders={"minutes": str(minutes)},
         )
+
+    async def _process_reauth_input(
+        self,
+        entry: Any,
+        auth_mode: str,
+        user_input: dict[str, Any],
+        errors: dict[str, str],
+    ) -> ConfigFlowResult | None:
+        self._host = entry.data[CONF_HOST]
+        client = self._reauth_client(auth_mode, user_input)
+        error = await self._test_connection_error(client)
+        if error:
+            _reauth_record_failure(self.hass, entry.entry_id)
+            errors["base"] = error
+            return None
+        _reauth_reset(self.hass, entry.entry_id)
+        return self.async_update_reload_and_abort(entry, data={**entry.data, **user_input})
 
 
 class SinumOptionsFlow(OptionsFlow):
@@ -418,6 +459,14 @@ class SinumOptionsFlow(OptionsFlow):
                     CONF_MQTT_CLIENT_ID,
                     default=self._opt(CONF_MQTT_CLIENT_ID, DEFAULT_MQTT_CLIENT_ID),
                 ): vol.All(int, vol.Range(min=1)),
+                vol.Optional(
+                    CONF_WS_ENABLED,
+                    default=self._opt(CONF_WS_ENABLED, False),
+                ): bool,
+                vol.Optional(
+                    CONF_WS_PATH,
+                    default=self._opt(CONF_WS_PATH, DEFAULT_WS_PATH),
+                ): _websocket_path,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -431,3 +480,13 @@ def _mqtt_topic_prefix(value: str) -> str:
     if "#" in prefix or "+" in prefix:
         raise vol.Invalid("MQTT wildcards are not allowed in topic prefix")
     return prefix
+
+
+def _websocket_path(value: str) -> str:
+    """Validate websocket endpoint path on the Sinum hub."""
+    path = value.strip()
+    if not path:
+        return DEFAULT_WS_PATH
+    if path.startswith(("ws://", "wss://", "http://", "https://")):
+        raise vol.Invalid("Provide only endpoint path, e.g. /api/v1/events")
+    return path if path.startswith("/") else f"/{path}"

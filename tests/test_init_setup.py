@@ -19,6 +19,8 @@ from custom_components.sinum.const import (
     CONF_AUTH_MODE,
     CONF_MQTT_ENABLED,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_WS_ENABLED,
+    CONF_WS_PATH,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_SEND_NOTIFICATION,
@@ -222,6 +224,56 @@ class TestAsyncSetupEntry:
 
         assert "no_mqtt_entry" not in _MQTT_BRIDGES
         MockBridge.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_setup_entry_ws_bridge_started_when_enabled(self, hass):
+        from custom_components.sinum import _WS_BRIDGES, async_setup_entry
+
+        entry = MagicMock()
+        entry.entry_id = "ws_entry"
+        entry.data = {
+            "host": "10.0.0.1",
+            CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+            CONF_API_TOKEN: "tok",
+            CONF_WS_ENABLED: True,
+            "scan_interval": DEFAULT_SCAN_INTERVAL,
+        }
+        entry.options = {CONF_WS_PATH: "/api/v1/ws"}
+
+        with (
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.sinum.SinumClient") as MockClient,
+            patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
+            patch("custom_components.sinum.SinumWebSocketBridge") as MockWsBridge,
+            patch("custom_components.sinum.SinumMqttBridge") as MockMqttBridge,
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            client = MagicMock()
+            client.login = AsyncMock()
+            MockClient.return_value = client
+
+            coordinator = MagicMock()
+            coordinator.async_config_entry_first_refresh = AsyncMock()
+            coordinator.client = client
+            coordinator.update_interval = None
+            coordinator.mqtt_bridge = None
+            MockCoordinator.return_value = coordinator
+
+            ws_bridge = MagicMock()
+            ws_bridge.async_start = AsyncMock(return_value=True)
+            MockWsBridge.return_value = ws_bridge
+
+            await async_setup_entry(hass, entry)
+
+        assert "ws_entry" in _WS_BRIDGES
+        MockWsBridge.assert_called_once_with(
+            hass,
+            client,
+            coordinator,
+            ws_path="/api/v1/ws",
+        )
+        MockMqttBridge.assert_not_called()
+        _WS_BRIDGES.pop("ws_entry", None)
 
 
 class TestAsyncUnloadEntry:

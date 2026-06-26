@@ -60,7 +60,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rooms is not None:
             self.rooms = rooms
         if floors_list is not None:
-            self.floors = {int(f["id"]): f for f in floors_list if "id" in f}
+            self.floors = _index_by_id(floors_list)
 
     def _apply_optional_metadata(self, values: dict[str, Any]) -> None:
         for attr, value in values.items():
@@ -164,13 +164,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.wtp_devices = wtp
         self.sbus_devices = sbus
         self.lora_devices = lora
-
-        if alarm_list:
-            self.alarm_zones = {int(z["id"]): z for z in alarm_list if "id" in z}
-        if modbus_list:
-            self.modbus_devices = {int(d["id"]): d for d in modbus_list if "id" in d}
-        if video_list:
-            self.video_devices = {int(d["id"]): d for d in video_list if "id" in d}
+        _apply_optional_stores(self, alarm_list, modbus_list, video_list)
 
         # ── Enrich child devices with parent hardware model and class ─────────
         parent_maps, parent_class_maps = _build_parent_maps(self.parent_devices)
@@ -268,6 +262,33 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
+def _index_by_id(lst: list[Any]) -> dict[int, dict[str, Any]]:
+    return {int(d["id"]): d for d in lst if "id" in d}
+
+
+def _maybe_index_list(lst: list[Any] | None) -> dict[int, dict[str, Any]] | None:
+    if not lst:
+        return None
+    return {int(d["id"]): d for d in lst if "id" in d}
+
+
+def _apply_optional_stores(
+    coordinator: "SinumCoordinator",
+    alarm: list[Any] | None,
+    modbus: list[Any] | None,
+    video: list[Any] | None,
+) -> None:
+    indexed_alarm = _maybe_index_list(alarm)
+    indexed_modbus = _maybe_index_list(modbus)
+    indexed_video = _maybe_index_list(video)
+    if indexed_alarm is not None:
+        coordinator.alarm_zones = indexed_alarm
+    if indexed_modbus is not None:
+        coordinator.modbus_devices = indexed_modbus
+    if indexed_video is not None:
+        coordinator.video_devices = indexed_video
+
+
 async def _safe_fetch(coro_fn: Any, label: str, default: Any = None) -> Any:
     """Call an async API method, returning default on any non-cancellation error."""
     try:
@@ -305,13 +326,20 @@ def _device_id_as_int(value: Any) -> int | None:
         return None
 
 
+_KNOWN_CLASSES = ("virtual", "wtp", "sbus", "lora")
+
+
 def _device_class(device: dict[str, Any]) -> str:
-    raw = device.get("class") or device.get("source") or device.get("bus") or ""
-    cls = str(raw).lower()
-    for prefix in ("virtual", "wtp", "sbus", "lora"):
-        if cls.startswith(prefix):
-            return prefix
-    return cls
+    cls = _first_device_class_field(device)
+    return next((p for p in _KNOWN_CLASSES if cls.startswith(p)), cls)
+
+
+def _first_device_class_field(device: dict[str, Any]) -> str:
+    for key in ("class", "source", "bus"):
+        val = device.get(key)
+        if val:
+            return str(val).lower()
+    return ""
 
 
 def _source_from_label(label: str) -> str:
@@ -342,10 +370,13 @@ def _find_room_containing_device(
 ) -> tuple[dict[str, Any] | None, str]:
     """Return (room, device_name_in_room) or (None, '') if not found."""
     for room, dev in _iter_room_device_pairs(rooms):
-        dev_id = _device_id_as_int(dev.get("id"))
-        if dev_id == device_id and _device_class(dev) == device_class:
+        if _device_matches(dev, device_id, device_class):
             return room, (dev.get("name") or "")
     return None, ""
+
+
+def _device_matches(dev: dict[str, Any], device_id: int, device_class: str) -> bool:
+    return _device_id_as_int(dev.get("id")) == device_id and _device_class(dev) == device_class
 
 
 def _inject_room_from_explicit_id(
@@ -451,7 +482,11 @@ def _room_devices(room: Any):
     devices = room.get("devices", [])
     if not isinstance(devices, list):
         return ()
-    return (device for device in devices if isinstance(device, dict))
+    return _filter_dicts(devices)
+
+
+def _filter_dicts(lst: list[Any]):
+    return (item for item in lst if isinstance(item, dict))
 
 
 def _parent_id(value: Any) -> int | None:
@@ -506,16 +541,25 @@ def _build_parent_maps(
     model_maps: dict[str, dict[int, str]] = {}
     class_maps: dict[str, dict[int, str]] = {}
     for p in parent_devices:
-        cls = p.get("class", "")
-        pid = p.get("id")
-        model = p.get("model")
-        if pid is not None and "_parent_device" in cls:
-            bus = cls.split("_parent_device")[0]  # "sbus", "wtp", "lora"
-            pid = int(pid)
-            if model:
-                model_maps.setdefault(bus, {})[pid] = model
-            class_maps.setdefault(bus, {})[pid] = cls
+        _accumulate_parent_entry(p, model_maps, class_maps)
     return model_maps, class_maps
+
+
+def _accumulate_parent_entry(
+    p: dict[str, Any],
+    model_maps: dict[str, dict[int, str]],
+    class_maps: dict[str, dict[int, str]],
+) -> None:
+    cls = p.get("class", "")
+    pid = p.get("id")
+    if pid is None or "_parent_device" not in cls:
+        return
+    bus = cls.split("_parent_device")[0]
+    pid = int(pid)
+    model = p.get("model")
+    if model:
+        model_maps.setdefault(bus, {})[pid] = model
+    class_maps.setdefault(bus, {})[pid] = cls
 
 
 def _inject_parent_models(
@@ -526,11 +570,15 @@ def _inject_parent_models(
 ) -> None:
     """Inject _parent_model and _parent_class from parent device info into child devices."""
     bus_map = parent_maps.get(bus, {})
-    class_map = (parent_class_maps or {}).get(bus, {})
+    class_map = _map_for_bus(parent_class_maps, bus)
     if not bus_map and not class_map:
         return
     for device in devices.values():
         _inject_parent_model_for_device(device, bus_map, class_map)
+
+
+def _map_for_bus(maps: dict[str, dict[int, str]] | None, bus: str) -> dict[int, str]:
+    return maps.get(bus, {}) if maps else {}
 
 
 class SinumDeviceAvailableMixin:

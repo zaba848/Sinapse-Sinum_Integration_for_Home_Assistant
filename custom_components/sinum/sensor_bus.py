@@ -56,23 +56,18 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
         self._source = description.source
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{self._source}_{device_id}_{description.key}"
-
         device = self._get_device_dict(coordinator)
-        if not description.native_unit_of_measurement:
-            device_unit = device.get("unit") or None  # "" → None
-            if device_unit:
-                self._attr_native_unit_of_measurement = device_unit
+        self._apply_dynamic_unit(device, description)
+        self._attr_device_info = _sensor_device_info(device, entry_id, self._source, device_id)
 
-        label = device.get("_device_name") or device.get("name", str(device_id))
-        via = via_device_for(device, entry_id)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or _model_for_source(self._source),
-            suggested_area=device.get("_area") or None,
-            via_device=via,
-        )
+    def _apply_dynamic_unit(
+        self, device: dict[str, Any], description: SinumSensorDescription
+    ) -> None:
+        if description.native_unit_of_measurement:
+            return
+        device_unit = device.get("unit") or None
+        if device_unit:
+            self._attr_native_unit_of_measurement = device_unit
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
         if self._source == "virtual":
@@ -89,15 +84,16 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
 
     def _normalized_numeric_raw(self) -> int | float | None:
         raw = self._device.get(self.entity_description.api_key)
-        if not isinstance(raw, (int, float)):
+        if not isinstance(raw, (int, float)) or raw == _SENTINEL_INT16:
             return None
-        if raw == _SENTINEL_INT16:
-            return None
-        if raw == 0 and (
-            self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
-        ):
+        if self._is_zero_unavailable(raw):
             return None
         return raw
+
+    def _is_zero_unavailable(self, raw: int | float) -> bool:
+        if raw != 0:
+            return False
+        return self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
 
     @property
     def native_value(self) -> float | str | None:
@@ -110,6 +106,39 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
         if normalized is None:
             return None
         return normalized * self.entity_description.scale
+
+
+def _sensor_device_info(
+    device: dict[str, Any], entry_id: str, source: str, device_id: int
+) -> DeviceInfo:
+    label = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
+        name=label,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or _model_for_source(source),
+        suggested_area=device.get("_area") or None,
+        via_device=via_device_for(device, entry_id),
+    )
+
+
+def _button_device_info(
+    device: dict[str, Any], entry_id: str, bus: str, device_id: int
+) -> DeviceInfo:
+    label = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
+        name=label,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
+        suggested_area=device.get("_area") or None,
+    )
+
+
+def _wtp_or_sbus(
+    coordinator: SinumCoordinator, bus: str
+) -> dict[int, dict[str, Any]]:
+    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
 
 
 def _model_for_source(source: str) -> str:
@@ -185,16 +214,8 @@ class SinumButtonSensor(
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_last_action"
-        store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        device = store.get(device_id, {})
-        label = device.get("_device_name") or device.get("name", str(device_id))
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
-            suggested_area=device.get("_area") or None,
-        )
+        device = _wtp_or_sbus(coordinator, bus).get(device_id, {})
+        self._attr_device_info = _button_device_info(device, entry_id, bus, device_id)
 
     @property
     def _device(self) -> dict[str, Any]:

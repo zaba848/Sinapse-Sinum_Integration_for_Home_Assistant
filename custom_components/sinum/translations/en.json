@@ -71,13 +71,17 @@
           "mqtt_enabled": "Enable MQTT real-time transport",
           "mqtt_topic_prefix": "MQTT topic prefix",
           "mqtt_scene_id": "MQTT bridge scene ID",
-          "mqtt_client_id": "MQTT client ID (on hub)"
+          "mqtt_client_id": "MQTT client ID (on hub)",
+          "ws_enabled": "Enable WebSocket real-time transport",
+          "ws_path": "WebSocket path"
         },
         "data_description": {
           "mqtt_enabled": "Requires the Lua bridge script uploaded to the hub and a working MQTT broker in Home Assistant.",
           "mqtt_topic_prefix": "Must match the TOPIC_PREFIX injected into the bridge script. Use a unique prefix per hub, e.g. sinum/tablica-wtp.",
           "mqtt_scene_id": "ID of the hub scene that holds the MQTT bridge Lua script. Upload via Developer Tools → Services → sinum.upload_mqtt_bridge.",
-          "mqtt_client_id": "MQTT client index configured in the Sinum hub web UI under Settings → MQTT Clients. Set the broker address there to your Home Assistant IP."
+          "mqtt_client_id": "MQTT client index configured in the Sinum hub web UI under Settings → MQTT Clients. Set the broker address there to your Home Assistant IP.",
+          "ws_enabled": "Connect via WebSocket for instant state updates. Requires hub firmware with /api/v1/ws support.",
+          "ws_path": "Hub WebSocket endpoint path (default: /api/v1/ws)."
         }
       }
     }

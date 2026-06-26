@@ -105,6 +105,22 @@ class TestTokenAuth:
         client = SinumClient("192.168.1.1", session, api_token="tok")
         assert client.base_url == "http://192.168.1.1"
 
+    def test_websocket_url_with_access_token_for_api_token(self, session):
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        url = client.websocket_url_with_access_token("/api/v1/ws")
+        assert url == "ws://192.168.1.1/api/v1/ws?access_token=tok"
+
+    def test_websocket_url_with_access_token_for_jwt(self, session):
+        client = SinumClient("192.168.1.1", session, username="u", password="p")
+        client._jwt = "jwt-token"
+        url = client.websocket_url_with_access_token("/api/v1/ws")
+        assert url == "ws://192.168.1.1/api/v1/ws?access_token=jwt-token"
+
+    def test_websocket_url_without_token_leaves_query_unchanged(self, session):
+        client = SinumClient("192.168.1.1", session, username="u", password="p")
+        url = client.websocket_url_with_access_token("/api/v1/ws?foo=bar")
+        assert url == "ws://192.168.1.1/api/v1/ws?foo=bar"
+
     def test_unwrap_data_returns_empty_dict_for_non_dict_body(self, session):
         client = SinumClient("192.168.1.1", session, api_token="tok")
         assert client._unwrap_data("not-a-dict") == {}
@@ -257,3 +273,296 @@ class TestApiRequests:
 
         assert result == {"id": 5, "state": True}
         assert session.request.call_count == 2
+
+
+class TestHubInfoEndpoints:
+    @pytest.mark.asyncio
+    async def test_get_hub_info_returns_data(self, session):
+        resp = make_response(200, {"data": {"name": "MyHub", "version": "1.2.3"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_hub_info()
+        assert result["name"] == "MyHub"
+
+    @pytest.mark.asyncio
+    async def test_get_rooms_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "Living room"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_rooms()
+        assert result == [{"id": 1, "name": "Living room"}]
+
+    @pytest.mark.asyncio
+    async def test_get_floors_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "Ground floor"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_floors()
+        assert result == [{"id": 1, "name": "Ground floor"}]
+
+    @pytest.mark.asyncio
+    async def test_get_weather_returns_data(self, session):
+        resp = make_response(200, {"data": {"temperature": 185, "humidity": 650}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_weather()
+        assert result["temperature"] == 185
+
+    @pytest.mark.asyncio
+    async def test_get_lua_hub_info_returns_dict(self, session):
+        resp = make_response(200, {"data": {"ip": "10.0.0.1", "mac": "aa:bb:cc"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lua_hub_info()
+        assert result["ip"] == "10.0.0.1"
+
+
+class TestLoraAlarmModbus:
+    @pytest.mark.asyncio
+    async def test_get_lora_devices_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 7, "class": "lora", "type": "opening_sensor"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_lora_devices()
+        assert result[0]["id"] == 7
+
+    @pytest.mark.asyncio
+    async def test_patch_lora_device_sends_patch(self, session):
+        resp = make_response(200, {"data": {"id": 7, "state": True}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_lora_device(7, {"state": True})
+        assert result["state"] is True
+        args = session.request.await_args.args
+        assert args[0] == "PATCH"
+        assert "lora" in args[1]
+
+    @pytest.mark.asyncio
+    async def test_get_alarm_devices_404_raises_not_supported(self, session):
+        resp = make_response(404, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumNotSupportedError),
+        ):
+            await client.get_alarm_devices()
+
+    @pytest.mark.asyncio
+    async def test_patch_alarm_device_sends_patch(self, session):
+        resp = make_response(200, {"data": {"id": 1, "arm": True}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_alarm_device(1, {"arm": True})
+        assert result["arm"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_modbus_devices_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 10, "class": "modbus"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_modbus_devices()
+        assert result[0]["class"] == "modbus"
+
+    @pytest.mark.asyncio
+    async def test_get_modbus_device_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 10, "class": "modbus", "power": 1200}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_modbus_device(10)
+        assert result["power"] == 1200
+
+
+class TestVideoEndpoints:
+    @pytest.mark.asyncio
+    async def test_get_video_devices_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 3, "class": "video", "type": "camera"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_devices()
+        assert result[0]["type"] == "camera"
+
+    @pytest.mark.asyncio
+    async def test_get_video_device_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 3, "class": "video", "snapshot": "/snap"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_device(3)
+        assert result["snapshot"] == "/snap"
+
+    @pytest.mark.asyncio
+    async def test_get_video_snapshot_returns_bytes(self, session):
+        import base64
+        jpeg = b"\xff\xd8\xff"
+        resp = make_response(200, {"data": {"payload": base64.b64encode(jpeg).decode()}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_snapshot(3)
+        assert result == jpeg
+
+    @pytest.mark.asyncio
+    async def test_get_video_snapshot_404_raises_not_supported(self, session):
+        resp = make_response(404, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with (
+            patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout),
+            pytest.raises(SinumNotSupportedError),
+        ):
+            await client.get_video_snapshot(3)
+
+
+class TestSceneScheduleEndpoints:
+    @pytest.mark.asyncio
+    async def test_get_scenes_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "Night", "type": "code"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scenes()
+        assert result[0]["name"] == "Night"
+
+    @pytest.mark.asyncio
+    async def test_get_scene_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 5, "name": "Day", "code": "return 1"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_scene(5)
+        assert result["name"] == "Day"
+
+    @pytest.mark.asyncio
+    async def test_patch_scene_lua_sends_patch(self, session):
+        resp = make_response(200, {"data": {}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.patch_scene_lua(5, "return 42")
+        args = session.request.await_args.args
+        assert args[0] == "PATCH"
+        assert "5" in args[1]
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_scene_returns_existing(self, session):
+        resp = make_response(200, {"data": [{"id": 8, "name": "_ha_test"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            scene_id = await client.get_or_create_scene("_ha_test")
+        assert scene_id == 8
+
+    @pytest.mark.asyncio
+    async def test_get_schedules_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "Heating"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_schedules()
+        assert result[0]["name"] == "Heating"
+
+    @pytest.mark.asyncio
+    async def test_get_schedule_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 3, "name": "Summer"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_schedule(3)
+        assert result["name"] == "Summer"
+
+    @pytest.mark.asyncio
+    async def test_patch_schedule_sends_data(self, session):
+        resp = make_response(200, {"data": {"id": 3, "name": "Updated"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_schedule(3, {"name": "Updated"})
+        assert result["name"] == "Updated"
+        assert session.request.await_args.args[0] == "PATCH"
+
+    @pytest.mark.asyncio
+    async def test_get_variables_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "name": "setpoint", "value": 220}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_variables()
+        assert result[0]["name"] == "setpoint"
+
+    @pytest.mark.asyncio
+    async def test_get_automations_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 2, "name": "night_mode"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_automations()
+        assert result[0]["name"] == "night_mode"
+
+
+class TestWtpEndpoints:
+    @pytest.mark.asyncio
+    async def test_get_wtp_device_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 4, "class": "wtp", "temperature": 215}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_wtp_device(4)
+        assert result["temperature"] == 215
+
+    @pytest.mark.asyncio
+    async def test_patch_wtp_device_sends_patch(self, session):
+        resp = make_response(200, {"data": {"id": 4, "target_temperature": 220}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_wtp_device(4, {"target_temperature": 220})
+        assert result["target_temperature"] == 220
+        assert session.request.await_args.args[0] == "PATCH"
+
+    @pytest.mark.asyncio
+    async def test_get_sbus_device_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 11, "class": "sbus", "humidity": 550}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_sbus_device(11)
+        assert result["humidity"] == 550
+
+    @pytest.mark.asyncio
+    async def test_get_virtual_device_returns_single(self, session):
+        resp = make_response(200, {"data": {"id": 2, "class": "virtual", "type": "thermostat"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_virtual_device(2)
+        assert result["type"] == "thermostat"
+
+    @pytest.mark.asyncio
+    async def test_get_virtual_devices_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 1, "class": "virtual", "type": "thermostat"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_virtual_devices()
+        assert result[0]["type"] == "thermostat"
+
+    @pytest.mark.asyncio
+    async def test_get_sbus_devices_returns_list(self, session):
+        resp = make_response(200, {"data": [{"id": 5, "class": "sbus", "type": "relay"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_sbus_devices()
+        assert result[0]["class"] == "sbus"

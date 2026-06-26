@@ -15,42 +15,46 @@ async def async_get_config_entry_diagnostics(
     entry: SinumConfigEntry,
 ) -> dict[str, Any]:
     coordinator = entry.runtime_data
-
-    entry_data = {**entry.data}
-    for secret_key in (CONF_API_TOKEN, CONF_PASSWORD):
-        if secret_key in entry_data:
-            entry_data[secret_key] = "**REDACTED**"
-
-    virtual_snapshot = {
-        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.virtual_devices.items()
-    }
-    wtp_snapshot = {
-        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.wtp_devices.items()
-    }
-    sbus_snapshot = {
-        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.sbus_devices.items()
-    }
-    lora_snapshot = {
-        str(dev_id): _sanitize_device(dev) for dev_id, dev in coordinator.lora_devices.items()
-    }
-
     return {
-        "entry": entry_data,
+        "entry": _redact_entry_data(dict(entry.data)),
         "hub_info": _sanitize_device(coordinator.hub_info),
-        "virtual_devices": virtual_snapshot,
-        "wtp_devices": wtp_snapshot,
-        "sbus_devices": sbus_snapshot,
-        "lora_devices": lora_snapshot,
-        "parent_devices": [_sanitize_device(dev) for dev in coordinator.parent_devices],
-        "floors": {str(fid): _sanitize_device(floor) for fid, floor in coordinator.floors.items()},
+        **_bus_snapshots(coordinator),
+        **_bus_counts(coordinator),
+        "mqtt_enabled": coordinator.mqtt_bridge is not None,
+    }
+
+
+def _redact_entry_data(data: dict[str, Any]) -> dict[str, Any]:
+    for key in (CONF_API_TOKEN, CONF_PASSWORD):
+        if key in data:
+            data[key] = "**REDACTED**"
+    return data
+
+
+def _bus_snapshots(coordinator: Any) -> dict[str, Any]:
+    return {
+        "virtual_devices": _snapshot_store(coordinator.virtual_devices),
+        "wtp_devices": _snapshot_store(coordinator.wtp_devices),
+        "sbus_devices": _snapshot_store(coordinator.sbus_devices),
+        "lora_devices": _snapshot_store(coordinator.lora_devices),
+        "parent_devices": [_sanitize_device(d) for d in coordinator.parent_devices],
+        "floors": _snapshot_store(coordinator.floors),
+    }
+
+
+def _bus_counts(coordinator: Any) -> dict[str, Any]:
+    return {
         "rooms_count": len(coordinator.rooms),
         "virtual_count": len(coordinator.virtual_devices),
         "wtp_count": len(coordinator.wtp_devices),
         "sbus_count": len(coordinator.sbus_devices),
         "lora_count": len(coordinator.lora_devices),
         "parent_count": len(coordinator.parent_devices),
-        "mqtt_enabled": coordinator.mqtt_bridge is not None,
     }
+
+
+def _snapshot_store(store: dict[Any, dict[str, Any]]) -> dict[str, Any]:
+    return {str(dev_id): _sanitize_device(dev) for dev_id, dev in store.items()}
 
 
 def _sanitize_device(device: dict[str, Any]) -> dict[str, Any]:

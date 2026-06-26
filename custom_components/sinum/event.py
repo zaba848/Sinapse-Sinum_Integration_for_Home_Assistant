@@ -15,6 +15,50 @@ from .coordinator import SinumCoordinator
 PARALLEL_UPDATES = 0
 
 
+def _detect_button_press(
+    action: Any, count: Any, prev_action: Any, prev_count: Any
+) -> str | None:
+    """Return the action string if WTP-style press is detected, else None."""
+    if not _is_valid_action(action):
+        return None
+    if _action_or_count_changed(action, count, prev_action, prev_count):
+        return action
+    return None
+
+
+def _is_valid_action(action: Any) -> bool:
+    return isinstance(action, str) and bool(action)
+
+
+def _action_or_count_changed(action: Any, count: Any, prev_action: Any, prev_count: Any) -> bool:
+    if action != prev_action:
+        return True
+    return count is not None and count != prev_count
+
+
+def _count_only_press(count: Any, prev_count: Any) -> bool:
+    return count is not None and count != prev_count
+
+
+def _button_store(
+    coordinator: SinumCoordinator, bus: str
+) -> dict[int, dict[str, Any]]:
+    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+
+
+def _button_event_device_info(
+    device: dict[str, Any], entry_id: str, bus: str, device_id: int
+) -> DeviceInfo:
+    label = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
+        name=label,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
+        suggested_area=device.get("_area") or None,
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -77,16 +121,8 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_event"
-        store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        device = store.get(device_id, {})
-        label = device.get("_device_name") or device.get("name", str(device_id))
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
-            suggested_area=device.get("_area") or None,
-        )
+        device = _button_store(coordinator, bus).get(device_id, {})
+        self._attr_device_info = _button_event_device_info(device, entry_id, bus, device_id)
         self._prev_action: str | None = device.get("action")
         self._prev_count: int | None = device.get("buttons_count")
 
@@ -100,23 +136,14 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         device = self._device
-        action = device.get("action")
-        count = device.get("buttons_count")
-
-        action_valid = action is not None and action != ""
-        action_changed = action_valid and action != self._prev_action
-        # buttons_count increments on every press regardless of action type.
-        count_changed = count is not None and count != self._prev_count
-
-        if action_changed or (count_changed and action_valid):
-            # WTP: action field persists → detected by action change or count (same-type repeat)
+        action, count = device.get("action"), device.get("buttons_count")
+        fired_action = _detect_button_press(action, count, self._prev_action, self._prev_count)
+        if fired_action is not None:
             self._prev_action = action
             self._prev_count = count
-            self._trigger_event("pressed", {"action": action, "buttons_count": count})
-        elif count_changed:
-            # SBUS: hub resets action to '' before the next poll — count is the only signal.
-            # Fire with action=None; use MQTT bridge for real-time action type detection.
+            self._trigger_event("pressed", {"action": fired_action, "buttons_count": count})
+        elif _count_only_press(count, self._prev_count):
+            # SBUS: hub resets action to '' before next poll — count is the only signal.
             self._prev_count = count
             self._trigger_event("pressed", {"action": None, "buttons_count": count})
-
         self.async_write_ha_state()

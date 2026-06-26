@@ -11,6 +11,8 @@ CONF_MQTT_ENABLED = "mqtt_enabled"
 CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
 CONF_MQTT_SCENE_ID = "mqtt_scene_id"
 CONF_MQTT_CLIENT_ID = "mqtt_client_id"
+CONF_WS_ENABLED = "ws_enabled"
+CONF_WS_PATH = "ws_path"
 
 # Auth modes
 AUTH_MODE_TOKEN = "token"
@@ -20,6 +22,7 @@ DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_MQTT_TOPIC_PREFIX = "sinum"
 DEFAULT_MQTT_SCENE_ID = 1
 DEFAULT_MQTT_CLIENT_ID = 1
+DEFAULT_WS_PATH = "/api/v1/ws"
 
 # REST API — all paths include /api/v1 prefix
 API_LOGIN = "/api/v1/login"

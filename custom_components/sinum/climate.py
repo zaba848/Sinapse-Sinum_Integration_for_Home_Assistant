@@ -73,14 +73,33 @@ def _add_virtual_climate(
 def _add_bus_climate(
     coordinator: SinumCoordinator, entities: list[ClimateEntity], entry_id: str, bus: str
 ) -> None:
-    store = coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
-    fan_coil_types = {STYPE_FAN_COIL} if bus == "sbus" else _WTP_FAN_COIL_TYPES
+    store, fan_coil_types = _bus_climate_config(coordinator, bus)
     for device_id, device in store.items():
-        dev_type = device.get("type")
-        if dev_type in fan_coil_types and _has_climate_control(device, source=bus):
-            entities.append(SinumFanCoilClimate(coordinator, device_id, entry_id, bus))
-        elif dev_type == "temperature_regulator":
-            entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry_id, bus))
+        _maybe_add_climate_entity(coordinator, entities, entry_id, bus, device_id, device, fan_coil_types)
+
+
+def _bus_climate_config(
+    coordinator: SinumCoordinator, bus: str
+) -> tuple[dict[int, dict[str, Any]], set[str]]:
+    if bus == "sbus":
+        return coordinator.sbus_devices, {STYPE_FAN_COIL}
+    return coordinator.wtp_devices, _WTP_FAN_COIL_TYPES
+
+
+def _maybe_add_climate_entity(
+    coordinator: SinumCoordinator,
+    entities: list[ClimateEntity],
+    entry_id: str,
+    bus: str,
+    device_id: int,
+    device: dict[str, Any],
+    fan_coil_types: set[str],
+) -> None:
+    dev_type = device.get("type")
+    if dev_type in fan_coil_types and _has_climate_control(device, source=bus):
+        entities.append(SinumFanCoilClimate(coordinator, device_id, entry_id, bus))
+    elif dev_type == "temperature_regulator":
+        entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry_id, bus))
 
 
 async def async_setup_entry(
@@ -94,6 +113,58 @@ async def async_setup_entry(
     _add_bus_climate(coordinator, entities, entry.entry_id, "sbus")
     _add_bus_climate(coordinator, entities, entry.entry_id, "wtp")
     async_add_entities(entities)
+
+
+def _fan_coil_features(device: dict[str, Any]) -> ClimateEntityFeature:
+    features = ClimateEntityFeature(0)
+    if "target_temperature" in device:
+        features |= ClimateEntityFeature.TARGET_TEMPERATURE
+    if "fan" in device or device.get("fan_operation_mode"):
+        features |= ClimateEntityFeature.FAN_MODE
+    return features
+
+
+def _fan_coil_device_info(
+    device: dict[str, Any], entry_id: str, source: str, device_id: int
+) -> DeviceInfo:
+    area = device.get("_area") or None
+    label = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
+        name=label,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or f"Sinum {source.upper()} Fan Coil",
+        suggested_area=area,
+        via_device=via_device_for(device, entry_id),
+    )
+
+
+def _bus_store(
+    coordinator: SinumCoordinator, bus: str
+) -> dict[int, dict[str, Any]]:
+    return coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
+
+
+def _regulator_features(device: dict[str, Any]) -> ClimateEntityFeature:
+    features = ClimateEntityFeature.TARGET_TEMPERATURE
+    if device.get("mode_mutable", True):
+        features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+    return features
+
+
+def _regulator_device_info(
+    device: dict[str, Any], entry_id: str, bus: str, device_id: int
+) -> DeviceInfo:
+    area = device.get("_area") or None
+    label = device.get("_device_name") or device.get("name", str(device_id))
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_{bus}_regulator_{device_id}")},
+        name=label,
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or "Sinum Temperature Regulator",
+        suggested_area=area,
+        via_device=via_device_for(device, entry_id),
+    )
 
 
 def _is_thermostat(device: dict[str, Any]) -> bool:
@@ -503,28 +574,9 @@ class SinumFanCoilClimate(_BusClimateMixin, CoordinatorEntity[SinumCoordinator],
         self._device_id = device_id
         self._source = source
         self._attr_unique_id = f"{entry_id}_{source}_{device_id}"
-
         device = self._device_dict(coordinator)
-
-        # Dynamically determine supported features based on available fields.
-        features = ClimateEntityFeature(0)
-        if "target_temperature" in device:
-            features |= ClimateEntityFeature.TARGET_TEMPERATURE
-        if "fan" in device or device.get("fan_operation_mode"):
-            features |= ClimateEntityFeature.FAN_MODE
-        self._attr_supported_features = features
-
-        area = device.get("_area") or None
-        label = device.get("_device_name") or device.get("name", str(device_id))
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or f"Sinum {source.upper()} Fan Coil",
-            suggested_area=area,
-            via_device=via_device_for(device, entry_id),
-        )
+        self._attr_supported_features = _fan_coil_features(device)
+        self._attr_device_info = _fan_coil_device_info(device, entry_id, source, device_id)
 
     @property
     def hvac_action(self) -> HVACAction:
@@ -581,27 +633,9 @@ class SinumTemperatureRegulatorClimate(
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_regulator_{device_id}"
-
-        store = coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
-        device = store.get(device_id, {})
-
-        # Dynamic features based on mode_mutable
-        features = ClimateEntityFeature.TARGET_TEMPERATURE
-        if device.get("mode_mutable", True):
-            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
-        self._attr_supported_features = features
-
-        area = device.get("_area") or None
-        label = device.get("_device_name") or device.get("name", str(device_id))
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{bus}_regulator_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or "Sinum Temperature Regulator",
-            suggested_area=area,
-            via_device=via_device_for(device, entry_id),
-        )
+        device = _bus_store(coordinator, bus).get(device_id, {})
+        self._attr_supported_features = _regulator_features(device)
+        self._attr_device_info = _regulator_device_info(device, entry_id, bus, device_id)
 
     @property
     def hvac_action(self) -> HVACAction:
@@ -739,15 +773,19 @@ class SinumHeatPumpManagerClimate(
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
+        payload = self._build_temperature_payload(temperature)
+        await self._patch_virtual_temperature(payload)
+
+    def _build_temperature_payload(self, temperature: float) -> dict[str, Any]:
         raw = self.coordinator.client.encode_temperature(
             max(self.min_temp, min(self.max_temp, temperature))
         )
         tt = self._device.get("target_temperature")
-        payload: dict[str, Any] = (
-            {"target_temperature": {"current": raw}}
-            if isinstance(tt, dict)
-            else {"target_temperature": raw}
-        )
+        if isinstance(tt, dict):
+            return {"target_temperature": {"current": raw}}
+        return {"target_temperature": raw}
+
+    async def _patch_virtual_temperature(self, payload: dict[str, Any]) -> None:
         try:
             updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:

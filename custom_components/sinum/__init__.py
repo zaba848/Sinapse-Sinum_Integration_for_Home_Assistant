@@ -35,10 +35,13 @@ from .const import (
     CONF_MQTT_ENABLED,
     CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_WS_ENABLED,
+    CONF_WS_PATH,
     DEFAULT_MQTT_CLIENT_ID,
     DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_WS_PATH,
     DOMAIN,
     SERVICE_SEND_NOTIFICATION,
     SERVICE_UPDATE_SCHEDULE,
@@ -47,6 +50,7 @@ from .const import (
 from .lua_mqtt_bridge import render as _render_mqtt_bridge_lua
 from .coordinator import SinumCoordinator
 from .mqtt import SinumMqttBridge
+from .websocket import SinumWebSocketBridge
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +100,7 @@ UPLOAD_MQTT_BRIDGE_SCHEMA = vol.Schema(
 SinumConfigEntry: TypeAlias = ConfigEntry[SinumCoordinator]
 
 _MQTT_BRIDGES: dict[str, SinumMqttBridge] = {}
+_WS_BRIDGES: dict[str, SinumWebSocketBridge] = {}
 
 
 def _notification_clients(hass: HomeAssistant) -> dict[str, SinumClient]:
@@ -175,8 +180,15 @@ def _sync_entry_title(
     if not hub_name:
         return
     expected = f"Sinum ({hub_name})"
-    if entry.title != expected and hass.config_entries.async_get_entry(entry.entry_id):
-        hass.config_entries.async_update_entry(entry, title=expected)
+    if entry.title != expected:
+        _update_entry_title_if_loaded(hass, entry, expected)
+
+
+def _update_entry_title_if_loaded(
+    hass: HomeAssistant, entry: SinumConfigEntry, title: str
+) -> None:
+    if hass.config_entries.async_get_entry(entry.entry_id):
+        hass.config_entries.async_update_entry(entry, title=title)
 
 
 async def _start_mqtt_bridge(
@@ -195,6 +207,39 @@ async def _start_mqtt_bridge(
     if await bridge.async_start():
         _MQTT_BRIDGES[entry.entry_id] = bridge
         coordinator.mqtt_bridge = bridge
+
+
+async def _start_ws_bridge(
+    hass: HomeAssistant,
+    entry: SinumConfigEntry,
+    coordinator: SinumCoordinator,
+    opts: dict[str, Any],
+) -> bool:
+    if not opts.get(CONF_WS_ENABLED, False):
+        return False
+
+    bridge = SinumWebSocketBridge(
+        hass,
+        coordinator.client,
+        coordinator,
+        ws_path=opts.get(CONF_WS_PATH, DEFAULT_WS_PATH),
+    )
+    if not await bridge.async_start():
+        return False
+
+    _WS_BRIDGES[entry.entry_id] = bridge
+    return True
+
+
+async def _start_realtime_bridge(
+    hass: HomeAssistant,
+    entry: SinumConfigEntry,
+    coordinator: SinumCoordinator,
+    opts: dict[str, Any],
+) -> None:
+    if await _start_ws_bridge(hass, entry, coordinator, opts):
+        return
+    await _start_mqtt_bridge(hass, entry, coordinator, opts)
 
 
 def _register_service_if_missing(
@@ -290,6 +335,12 @@ async def _stop_mqtt_bridge_for_entry(entry_id: str) -> None:
         await bridge.async_stop()
 
 
+async def _stop_ws_bridge_for_entry(entry_id: str) -> None:
+    bridge = _WS_BRIDGES.pop(entry_id, None)
+    if bridge:
+        await bridge.async_stop()
+
+
 def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:
     _notification_clients(hass).pop(entry_id, None)
     _coordinators(hass).pop(entry_id, None)
@@ -333,7 +384,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
 
     _sync_entry_title(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    await _start_mqtt_bridge(hass, entry, coordinator, opts)
+    await _start_realtime_bridge(hass, entry, coordinator, opts)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     _notification_clients(hass)[entry.entry_id] = client
@@ -344,6 +395,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> bool:
+    await _stop_ws_bridge_for_entry(entry.entry_id)
     await _stop_mqtt_bridge_for_entry(entry.entry_id)
 
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

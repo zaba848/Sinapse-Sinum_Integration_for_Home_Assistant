@@ -4,9 +4,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1375%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1458%20passing-brightgreen.svg)](tests/)
 [![Stability](https://img.shields.io/badge/stability-weekly%20validated-green.svg)](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/actions/workflows/test-stability.yml)
-[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -31,6 +31,7 @@
   - [Event — Physical Buttons](#event--physical-buttons)
 - [HA Services](#ha-services)
 - [Sinum Scenes, Automations and Variables](#sinum-scenes-automations-and-variables)
+- [WebSocket Real-Time Transport](#websocket-real-time-transport)
 - [MQTT Real-Time Bridge](#mqtt-real-time-bridge)
 - [Release Stabilization Policy](#release-stabilization-policy)
 - [Development Guide](#development-guide)
@@ -64,7 +65,12 @@ SinumCoordinator (coordinator.py)
     │    Each entity reads from coordinator.{bus}_devices[id]
     │    Writes go directly to the hub via coordinator.client
     │
-    └──► MQTT bridge (optional, mqtt.py)
+    ├──► WebSocket bridge (optional, websocket.py)
+    │    Hub pushes event arrays
+    │    → integration iterates events and applies device_state_changed updates
+    │    → coordinator updated in-place → instant entity refresh
+    │
+    └──► MQTT bridge (optional fallback, mqtt.py)
          Hub Lua script publishes state changes → HA subscribes
          → coordinator updated in-place → instant entity refresh
 ```
@@ -142,32 +148,66 @@ Current stabilization artifacts are tracked in `HARDWARE_TEST_PLAN.md` and workf
 
 ---
 
-## Configuration
+## Adding Sinum to Home Assistant — Quick Start
 
-Go to **Settings → Devices & Services → Add Integration → Sinum (Sinapse)**.
+### Step 1 — Add the integration
 
-The setup wizard has two steps:
+**Settings → Devices & Services → Add Integration → search for "Sinum"**
 
-**Step 1 — Hub address and auth method**
+The setup wizard runs two screens:
+
+**Screen 1 — Hub address and auth method**
 
 | Field | Description |
 |---|---|
-| Host | IP address or hostname of your Sinum hub (e.g. `10.0.62.167`) |
+| Host | IP address or hostname of your hub, e.g. `10.0.62.167`. Do not include `http://`. |
 | Auth method | `api_token` (recommended) or `username_password` |
 
-**Step 2 — Credentials**
+> If you don't know the hub IP, open the Sinum mobile app → Settings → About — it shows the hub IP.
 
-| Auth method | Fields | Notes |
+**Screen 2 — Credentials**
+
+| Auth method | What to enter | Where to get it |
 |---|---|---|
-| API Token | Token | Obtained from Sinum app → **Settings → Integrations → API Tokens** |
-| Username + Password | Username, Password | Integration manages JWT refresh automatically |
+| API Token | Paste the token | Sinum app → Settings → Integrations → API Tokens → Generate |
+| Username / Password | Your Sinum login | Same credentials used for the Sinum web UI |
 
-Both auth methods support an optional **Scan interval** (10–300 s, default 30 s).
+Click **Submit** — HA discovers all devices and creates entities automatically.
 
-### Reconfiguration / Options
+### Step 2 — Enable real-time updates (recommended)
 
-- Click **Configure** on the integration card to change the MQTT settings or scan interval.
-- If credentials expire, HA will prompt for re-authentication automatically.
+Without this step, entities update every 30 s. With WebSocket, updates arrive in under 1 s.
+
+1. **Settings → Devices & Services → Sinum (Sinapse) → Configure**
+2. Enable **"Enable WebSocket real-time transport"**
+3. Leave path as `/api/v1/ws` (default)
+4. Click **Submit**
+
+### Step 3 — (Optional) MQTT fallback
+
+If your hub firmware doesn't support WebSocket (`/api/v1/ws` returns an error), use the MQTT bridge as fallback. See [MQTT Real-Time Bridge (Legacy)](#mqtt-real-time-bridge-legacy).
+
+---
+
+## Configuration Reference
+
+### Options (accessible via Configure on the integration card)
+
+| Option | Default | Description |
+|---|---|---|
+| Scan interval | 30 s | REST poll interval. 10–300 s. Always active as safety reconciliation path. |
+| Enable WebSocket real-time transport | off | Opens a persistent WS to the hub for instant state push. Recommended. |
+| WebSocket endpoint path | `/api/v1/ws` | Change only if your hub uses a non-standard path. |
+| Enable MQTT real-time transport | off | Legacy MQTT push via Lua bridge. Use only if WS not supported. |
+| MQTT topic prefix | `sinum` | Must match `TOPIC_PREFIX` in `mqtt_bridge.lua`. |
+
+### Re-authentication
+
+If the hub token or password changes, HA will show a persistent notification — click **Re-authenticate** and enter the new credentials. No restart needed.
+
+### Reconfiguration
+
+Click **Configure** (not Reconfigure) on the integration card to change options (WS, MQTT, scan interval). Click **⋮ → Reconfigure** to change the host or auth method.
 
 ---
 
@@ -304,17 +344,18 @@ automation:
 
 > This requires MQTT bridge enabled. See [MQTT Real-Time Bridge](#mqtt-real-time-bridge).
 
-#### Eliminating the polling delay (setup guide)
+#### Eliminating the polling delay
 
-The only way to get instant button response (< 1 s) is the MQTT bridge. Follow these steps:
+The preferred method is **WebSocket** (no broker needed, hub firmware ≥ 0.5.x with `/api/v1/ws` support):
 
-1. **Install Mosquitto broker** — in HA go to **Settings → Add-ons → Mosquitto broker → Install → Start**
-2. **Set up HA MQTT integration** — **Settings → Devices & Services → Add Integration → MQTT** — use `localhost` as broker, leave port `1883`, no auth needed with the Mosquitto add-on
-3. **Add MQTT client on the hub** — Sinum web UI → **Settings → System → Integrations → MQTT → Add** → enter HA IP, port 1883, username/password from Mosquitto add-on
-4. **Upload `mqtt_bridge.lua`** to the hub as an automation (see [MQTT Real-Time Bridge](#mqtt-real-time-bridge) for full instructions)
-5. **Enable MQTT in the Sinum integration** — **Settings → Devices & Services → Sinum → Configure** → enable MQTT, set prefix to match the Lua script
+1. **Settings → Devices & Services → Sinum → Configure**
+2. Enable **"Enable WebSocket real-time transport"**
+3. Leave path as `/api/v1/ws` (default)
+4. Click **Submit** — HA restarts the bridge automatically
 
-After setup: press a button and watch the HA event fire instantly in **Developer Tools → Events → Listen → sinum_button_event**.
+Fallback: the legacy **MQTT bridge** still works for older hub firmware. See [MQTT Real-Time Bridge](#mqtt-real-time-bridge).
+
+After enabling WebSocket: press a button and watch the HA event fire instantly in **Developer Tools → Events → Listen → `sinum_device_state_changed`**.
 
 ### Number
 
@@ -423,15 +464,62 @@ sbus[43]:setValue("target_temperature", setpoint * 10)
 
 ---
 
-## MQTT Real-Time Bridge
+## WebSocket Real-Time Transport
 
-REST polling (30 s default) works without MQTT. With MQTT enabled, the hub pushes state changes immediately so entities update in under a second.
+WebSocket is the recommended real-time transport. No broker, no Lua script — the hub pushes events directly.
+
+### How it works
+
+The integration opens a persistent WebSocket connection to `/api/v1/ws` on the hub. The hub sends arrays of `device_state_changed` events whenever any device state changes. The integration iterates all events in each frame, patches only the changed field (`details`), and refreshes affected entities instantly — no waiting for the poll cycle.
+
+```json
+[
+  {
+    "data": {
+      "type": "device_state_changed",
+      "details": "humidity",
+      "payload": { "class": "sbus", "id": 12, "humidity": 445 }
+    }
+  }
+]
+```
+
+Supported buses: `virtual`, `wtp`, `sbus`, `lora`, `modbus`, `video`.
+
+If the WS connection drops, the bridge reconnects after 5 s. REST polling (30 s default) continues in parallel as a reconciliation path.
+
+### Setup
+
+1. **Settings → Devices & Services → Sinum (Sinapse) → Configure**
+2. Enable **"Enable WebSocket real-time transport"**
+3. Path: `/api/v1/ws` (default — change only if your hub uses a different endpoint)
+4. Click **Submit**
+
+### Verifying WebSocket
+
+Open **Developer Tools → Events → Listen to events** and type `sinum_device_state_changed`. Trigger any state change (toggle a switch, open a door, etc.) — the event should appear in under a second.
+
+### Troubleshooting WebSocket
+
+| Symptom | Likely cause |
+|---|---|
+| Entities still update at 30 s intervals | WS not enabled, or hub firmware doesn't support `/api/v1/ws` |
+| `PermissionError: WebSocket unauthorized` in logs | API token invalid or expired — re-authenticate the integration |
+| Frequent reconnects in logs | Hub WS connection is not stable — check hub firmware version |
+
+---
+
+## MQTT Real-Time Bridge (Legacy)
+
+The MQTT bridge is the legacy real-time path. Use it only if your hub firmware doesn't support WebSocket. Requires a running MQTT broker (e.g. Mosquitto HA add-on).
+
+**Priority:** the integration tries WebSocket first. Only if WebSocket is disabled does it fall back to MQTT.
 
 ### Architecture
 
 ```
 Sinum Hub
-  └── mqtt_bridge.lua (Automation)
+  └── mqtt_bridge.lua (Automation, uploaded via sinum.upload_mqtt_bridge service)
         On any device state change:
         PUBLISH  {prefix}/state/{device_id}  ← full device JSON
         PUBLISH  {prefix}/event/heartbeat    ← every 60 s
@@ -442,74 +530,53 @@ MQTT Broker (e.g. Mosquitto add-on)
 HA MQTT Integration
   └── Sinapse mqtt.py
         SUBSCRIBE {prefix}/state/+
-        SUBSCRIBE {prefix}/event/+
         On message: update coordinator cache → refresh entities
 ```
 
-### Prerequisites
-
-- MQTT broker reachable from both HA and the hub (e.g. **Mosquitto** HA add-on)
-- **HA MQTT integration** configured: Settings → Devices & Services → MQTT
-
-### Step-by-step setup
+### Step-by-step MQTT setup
 
 #### Step 1 — Add an MQTT client on the hub
 
 1. Open the Sinum web UI (e.g. `http://10.0.62.167`)
 2. **Settings → System → Integrations → MQTT → Add**
-3. Fill in the broker IP, port (`1883`), and credentials
+3. Fill in broker IP, port `1883`, credentials
 4. Save and note the assigned **Client ID** (e.g. `1`)
 
-#### Step 2 — Upload the Lua bridge script
+#### Step 2 — Upload the Lua bridge
 
-1. Sinum web UI → **Automations → +** (top right) → give it a name, e.g. `mqtt_bridge`
-2. Paste the full contents of [`lua_scripts/mqtt_bridge.lua`](lua_scripts/mqtt_bridge.lua)
-3. Edit the config block at the top of the script:
-   ```lua
-   local CLIENT_ID    = 1          -- MQTT client ID from Step 1
-   local TOPIC_PREFIX = "sinum"    -- must match HA integration option
-   ```
-4. Save and **enable** the automation
+Use the HA service **`sinum.upload_mqtt_bridge`** — no manual copy/paste needed:
 
-For multiple hubs on the same broker use a unique prefix per hub:
-```lua
--- Hub 1
-local TOPIC_PREFIX = "sinum/tablica-wtp"
--- Hub 2
-local TOPIC_PREFIX = "sinum/tablica-sbus-1"
+```yaml
+service: sinum.upload_mqtt_bridge
+data:
+  mqtt_scene_id: 1    # scene ID on the hub to overwrite (create one first)
+  mqtt_client_id: 1   # MQTT client ID from Step 1
 ```
+
+Or use the Developer Tools → Services UI. The service renders the Lua script and PATCHes it to the hub scene.
 
 #### Step 3 — Enable MQTT in the HA integration
 
 1. Settings → Devices & Services → find **Sinum (Sinapse)** → **Configure**
 2. Enable **"MQTT real-time transport"**
-3. Set **Topic prefix** to match `TOPIC_PREFIX` from the Lua script
+3. Set **Topic prefix** to match the Lua script (default: `sinum`)
 4. Click **Submit**
-
-### Verifying it works
-
-- Sinum web UI → Logs → look for lines like `[Sinapse] Published: sinum/state/42`
-- HA → Developer Tools → Events → listen for `sinum_heartbeat` (fires every minute)
-- Toggle a relay — the HA entity should update instantly, without waiting for the poll cycle
 
 ### MQTT topic reference
 
 | Topic | Direction | Content |
 |---|---|---|
-| `{prefix}/state/{device_id}` | Hub → HA | Full device state JSON; `source` field identifies bus (`"virtual"`, `"wtp"`, `"sbus"`, `"lora"`) |
+| `{prefix}/state/{device_id}` | Hub → HA | Full device state JSON |
 | `{prefix}/event/heartbeat` | Hub → HA | Heartbeat JSON, fires every 60 s |
-| `{prefix}/event/{type}` | Hub → HA | Any hub event (button_press, scene_activated, …) |
+| `{prefix}/event/{type}` | Hub → HA | Hub events (button_press, …) |
 
-Payloads without a `source` field are treated as virtual devices.
-
-### Troubleshooting
+### MQTT troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | Entities still update at 30 s intervals | MQTT not enabled in options, or `TOPIC_PREFIX` mismatch |
-| No log lines on hub | Lua automation is disabled or MQTT client is offline |
-| `sinum_heartbeat` never fires | Lua running but MQTT broker unreachable |
-| HA MQTT shows disconnected | Go to Settings → Devices & Services → MQTT and reconfigure |
+| No log lines on hub | Lua automation disabled or MQTT client offline |
+| `sinum_heartbeat` never fires | Lua running but broker unreachable |
 
 ---
 
@@ -528,9 +595,15 @@ pip install -r requirements-dev.txt
 ### Running tests
 
 ```bash
-pytest tests/                                       # 1036 tests, ~4 s
+pytest tests/                                       # 1458 tests, ~8 s
 pytest -v tests/test_api.py                         # single file, verbose
 pytest --cov=custom_components/sinum tests/         # coverage report
+```
+
+Run the cyclomatic complexity gate:
+
+```bash
+pytest tests/test_code_quality.py -v               # all functions must have CC ≤ 4
 ```
 
 ### Linting
@@ -568,7 +641,8 @@ custom_components/sinum/
   ├── notify.py                send_notification → hub push notification
   ├── update.py                Parent device firmware tracker
   ├── alarm_control_panel.py   Alarm system
-  ├── mqtt.py                  MQTT bridge transport
+  ├── websocket.py             WebSocket real-time transport (SinumWebSocketBridge)
+  ├── mqtt.py                  MQTT legacy bridge transport
   ├── diagnostics.py           HA diagnostics (redacts credentials)
   │
   ├── services.yaml            Service schemas (send_notification, update_schedule)
@@ -584,7 +658,9 @@ lua_scripts/
 tests/
   ├── fixtures/sinum_devices.json   Sample hub API payloads used by tests
   ├── conftest.py
-  └── test_*.py                1036 tests across all platforms and device types
+  ├── test_code_quality.py     CC gate — all functions must have CC ≤ 4
+  ├── hardware_in_loop/        HIL scripts for live hub testing
+  └── test_*.py                1458 tests across all platforms and device types
 ```
 
 ### Key classes
