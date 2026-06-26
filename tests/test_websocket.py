@@ -319,12 +319,12 @@ async def test_ws_bridge_async_start_creates_task():
     bridge, hass, coordinator = _bridge()
     created_tasks: list = []
 
-    def _track_task(coro):
+    def _track_task(coro, name=None):
         created_tasks.append(coro)
         coro.close()  # prevent "coroutine never awaited" GC warning
         return MagicMock()
 
-    hass.async_create_task = _track_task
+    hass.async_create_background_task = _track_task
     result = await bridge.async_start()
     assert result is True
     assert len(created_tasks) == 1
@@ -368,7 +368,7 @@ async def test_ws_bridge_double_start_is_noop():
     mock_task = MagicMock()
     mock_task.done.return_value = False
     bridge._task = mock_task
-    hass.async_create_task = MagicMock()
+    hass.async_create_background_task = MagicMock()
     result = await bridge.async_start()
     assert result is True
-    hass.async_create_task.assert_not_called()
+    hass.async_create_background_task.assert_not_called()

@@ -51,7 +51,9 @@ class SinumWebSocketBridge:
             return True
         self._stop_event.clear()
         self._auth_failed = False
-        self._task = self._hass.async_create_task(self._run())
+        self._task = self._hass.async_create_background_task(
+            self._run(), name="sinum_ws_bridge"
+        )
         _LOGGER.info("Sinapse WebSocket bridge starting (%s)", self._ws_path)
         return True
 
