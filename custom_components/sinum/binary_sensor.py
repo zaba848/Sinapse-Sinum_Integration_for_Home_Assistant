@@ -171,6 +171,12 @@ _TARGET_REACHED_SBUS = SinumBinarySensorDescription(
 )
 
 
+def _fan_coil_gear_active(d: dict[str, Any], gear: str) -> bool | None:
+    if gear in d and isinstance(d[gear], dict):
+        return bool(d[gear].get("state", False))
+    return None
+
+
 def _needs_target_reached(
     desc: SinumBinarySensorDescription | None, dev_type: str, device: dict
 ) -> bool:
@@ -307,10 +313,10 @@ class SinumBinarySensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         attrs: dict[str, Any] = {}
-        # Fan coil gear states — show which relay gear is active
         for gear in ("gear_1", "gear_2", "gear_3"):
-            if gear in d and isinstance(d[gear], dict):
-                attrs[f"{gear}_active"] = bool(d[gear].get("state", False))
+            value = _fan_coil_gear_active(d, gear)
+            if value is not None:
+                attrs[f"{gear}_active"] = value
         if "hotel_mode" in d:
             attrs["hotel_mode"] = d["hotel_mode"]
         return attrs

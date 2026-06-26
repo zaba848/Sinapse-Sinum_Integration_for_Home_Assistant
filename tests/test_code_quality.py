@@ -22,22 +22,6 @@ _SINUM_DIR = pathlib.Path(__file__).parent.parent / "custom_components" / "sinum
 _MAX_CC = 4
 
 _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
-    "alarm_control_panel.py": {
-        "extra_state_attributes": 5,
-    },
-    "binary_sensor.py": {
-        "extra_state_attributes": 5,
-    },
-    "camera.py": {
-        "extra_state_attributes": 5,
-    },
-    "cover.py": {
-        "_restore_cover_from_last_state": 6,
-        "async_added_to_hass": 5,
-        "is_opening": 5,
-        "is_closing": 5,
-        "__init__": 5,
-    },
     "light.py": {
         "_supports_rgb": 6,
         "async_turn_on": 6,

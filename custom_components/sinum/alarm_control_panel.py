@@ -42,6 +42,10 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
+def _format_alarm_inputs(inputs: list) -> list[str]:
+    return [f"{i['class']}/{i['id']}" for i in inputs]
+
+
 def _alarm_zone_dict(devices: list[dict]) -> dict[int, dict]:
     return {int(d["id"]): d for d in devices if "id" in d}
 
@@ -124,7 +128,7 @@ class SinumAlarmZone(
             attrs["exit_delay_s"] = v
         inputs = d.get("associations", {}).get("inputs", [])
         if inputs:
-            attrs["inputs"] = [f"{i['class']}/{i['id']}" for i in inputs]
+            attrs["inputs"] = _format_alarm_inputs(inputs)
         return attrs
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:

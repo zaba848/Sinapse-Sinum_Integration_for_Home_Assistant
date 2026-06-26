@@ -372,3 +372,128 @@ async def test_ws_bridge_double_start_is_noop():
     result = await bridge.async_start()
     assert result is True
     hass.async_create_background_task.assert_not_called()
+
+
+# ── _dispatch_message msg type routing ───────────────────────────────────────
+
+def test_dispatch_message_ping_continues():
+    """PING is not CLOSED/ERROR — bridge should keep the loop running."""
+    bridge, _hass, _coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.PING
+    result = bridge._dispatch_message(msg)
+    assert result is True
+
+
+def test_dispatch_message_closed_stops_loop():
+    bridge, _hass, _coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.CLOSED
+    assert bridge._dispatch_message(msg) is False
+
+
+def test_dispatch_message_closing_stops_loop():
+    bridge, _hass, _coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.CLOSING
+    assert bridge._dispatch_message(msg) is False
+
+
+def test_dispatch_message_error_raises():
+    bridge, _hass, _coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.ERROR
+    with pytest.raises(RuntimeError):
+        bridge._dispatch_message(msg)
+
+
+def test_dispatch_message_text_processes_payload():
+    bridge, _hass, coordinator = _bridge()
+    msg = MagicMock()
+    msg.type = aiohttp.WSMsgType.TEXT
+    msg.data = json.dumps([{"data": {"type": "device_state_changed", "details": "humidity",
+                                      "payload": {"class": "sbus", "id": 12, "humidity": 500}}}])
+    result = bridge._dispatch_message(msg)
+    assert result is True
+    assert coordinator.sbus_devices[12]["humidity"] == 500
+
+
+# ── source field as fallback for class ───────────────────────────────────────
+
+def test_ws_source_field_used_when_class_absent():
+    """Hub may send 'source' instead of 'class' in payload."""
+    bridge, _hass, coordinator = _bridge()
+    payload = [{"data": {"type": "device_state_changed", "details": "humidity",
+                          "payload": {"source": "sbus", "id": 12, "humidity": 777}}}]
+    bridge._handle_payload(json.dumps(payload))
+    assert coordinator.sbus_devices[12]["humidity"] == 777
+
+
+def test_ws_payload_without_class_and_source_ignored():
+    bridge, _hass, coordinator = _bridge()
+    payload = [{"data": {"type": "device_state_changed", "details": "x",
+                          "payload": {"id": 5, "x": 1}}}]
+    bridge._handle_payload(json.dumps(payload))
+    coordinator.async_set_updated_data.assert_not_called()
+
+
+# ── Auth failure raises PermissionError on next message ──────────────────────
+
+def test_handle_text_message_raises_after_auth_failed():
+    """Once auth_failed is set, the next text message must raise PermissionError."""
+    bridge, _hass, _coordinator = _bridge()
+    # First message: unauthorized → sets auth_failed
+    bridge._handle_payload(json.dumps([{"data": {"type": "unauthorized"}}]))
+    assert bridge._auth_failed is True
+    # Second message: must raise so _consume_loop exits
+    with pytest.raises(PermissionError):
+        bridge._handle_text_message(json.dumps([{"data": {"type": "some_event"}}]))
+
+
+# ── _run_one_cycle handles generic exceptions ─────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_one_cycle_catches_generic_exception():
+    """Generic exceptions must not crash the bridge — they are logged and reconnect waits."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()  # prevent actual reconnect wait
+
+    async def _fail():
+        raise RuntimeError("connection dropped")
+
+    bridge._consume_loop = _fail  # type: ignore[assignment]
+    # Must not raise
+    await bridge._run_one_cycle()
+
+
+@pytest.mark.asyncio
+async def test_run_one_cycle_reraises_cancelled_error():
+    """CancelledError must propagate so the task can be properly cancelled."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()
+
+    async def _cancel():
+        raise asyncio.CancelledError
+
+    bridge._consume_loop = _cancel  # type: ignore[assignment]
+    with pytest.raises(asyncio.CancelledError):
+        await bridge._run_one_cycle()
+
+
+@pytest.mark.asyncio
+async def test_run_loop_exits_when_stop_event_set():
+    """_run() must exit quickly when stop_event is already set."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()
+    call_count = 0
+
+    async def _counted_cycle():
+        nonlocal call_count
+        call_count += 1
+        bridge._stop_event.set()
+
+    bridge._run_one_cycle = _counted_cycle  # type: ignore[assignment]
+    bridge._stop_event.clear()
+    bridge._stop_event.set()
+    await bridge._run()
+    assert call_count == 0

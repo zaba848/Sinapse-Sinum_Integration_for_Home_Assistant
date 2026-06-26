@@ -97,14 +97,57 @@ def _device_info(
     )
 
 
+def _apply_restored_position(entity: Any, last: Any) -> None:
+    if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
+        entity._attr_current_cover_position = int(v)
+
+
+def _apply_restored_tilt(entity: Any, last: Any) -> None:
+    if (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
+        entity._attr_current_cover_tilt_position = int(v)
+
+
 async def _restore_cover_from_last_state(entity: Any, restore_tilt: bool) -> None:
     last = await entity.async_get_last_state()
     if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
         return
-    if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
-        entity._attr_current_cover_position = int(v)
-    if restore_tilt and (v := last.attributes.get(ATTR_CURRENT_TILT_POSITION)) is not None:
-        entity._attr_current_cover_tilt_position = int(v)
+    _apply_restored_position(entity, last)
+    if restore_tilt:
+        _apply_restored_tilt(entity, last)
+
+
+def _compare_target_current(d: dict[str, Any]) -> int | None:
+    """Return (target - current) opening delta, or None if values are missing/invalid."""
+    target = d.get("target_opening")
+    current = d.get("current_opening")
+    if target is None or current is None:
+        return None
+    try:
+        return int(target) - int(current)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sbus_blind_features(device: dict[str, Any]) -> CoverEntityFeature:
+    has_tilt = "current_tilt" in device or "target_tilt" in device
+    base = (
+        CoverEntityFeature.OPEN
+        | CoverEntityFeature.CLOSE
+        | CoverEntityFeature.STOP
+        | CoverEntityFeature.SET_POSITION
+    )
+    return base | (CoverEntityFeature.SET_TILT_POSITION if has_tilt else CoverEntityFeature(0))
+
+
+def _sbus_blind_device_info(device: dict[str, Any], entry_id: str, device_id: int) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+        name=_label(device),
+        manufacturer="TECH Sterowniki",
+        model=device.get("_parent_model") or "Sinum SBUS Blind Controller",
+        suggested_area=device.get("_area") or None,
+        via_device=via_device_for(device, entry_id),
+    )
 
 
 class SinumBlindCover(
@@ -346,11 +389,7 @@ class SinumWtpBlindCover(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        if (v := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
-            self._attr_current_cover_position = int(v)
+        await _restore_cover_from_last_state(self, restore_tilt=False)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -372,27 +411,13 @@ class SinumWtpBlindCover(
 
     @property
     def is_opening(self) -> bool:
-        d = self._device
-        target = d.get("target_opening")
-        current = d.get("current_opening")
-        if target is None or current is None:
-            return False
-        try:
-            return bool(d.get("action_in_progress")) and int(target) > int(current)
-        except (TypeError, ValueError):
-            return False
+        delta = _compare_target_current(self._device)
+        return delta is not None and bool(self._device.get("action_in_progress")) and delta > 0
 
     @property
     def is_closing(self) -> bool:
-        d = self._device
-        target = d.get("target_opening")
-        current = d.get("current_opening")
-        if target is None or current is None:
-            return False
-        try:
-            return bool(d.get("action_in_progress")) and int(target) < int(current)
-        except (TypeError, ValueError):
-            return False
+        delta = _compare_target_current(self._device)
+        return delta is not None and bool(self._device.get("action_in_progress")) and delta < 0
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         try:
@@ -450,23 +475,8 @@ class SinumSbusBlindCover(
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
         device = coordinator.sbus_devices.get(device_id, {})
-        label = _label(device)
-        has_tilt = "current_tilt" in device or "target_tilt" in device
-        self._attr_supported_features = (
-            CoverEntityFeature.OPEN
-            | CoverEntityFeature.CLOSE
-            | CoverEntityFeature.STOP
-            | CoverEntityFeature.SET_POSITION
-            | (CoverEntityFeature.SET_TILT_POSITION if has_tilt else CoverEntityFeature(0))
-        )
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
-            name=label,
-            manufacturer="TECH Sterowniki",
-            model=device.get("_parent_model") or "Sinum SBUS Blind Controller",
-            suggested_area=device.get("_area") or None,
-            via_device=via_device_for(device, entry_id),
-        )
+        self._attr_supported_features = _sbus_blind_features(device)
+        self._attr_device_info = _sbus_blind_device_info(device, entry_id, device_id)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -501,27 +511,13 @@ class SinumSbusBlindCover(
 
     @property
     def is_opening(self) -> bool:
-        d = self._device
-        target = d.get("target_opening")
-        current = d.get("current_opening")
-        if target is None or current is None:
-            return False
-        try:
-            return int(target) > int(current)
-        except (TypeError, ValueError):
-            return False
+        delta = _compare_target_current(self._device)
+        return delta is not None and delta > 0
 
     @property
     def is_closing(self) -> bool:
-        d = self._device
-        target = d.get("target_opening")
-        current = d.get("current_opening")
-        if target is None or current is None:
-            return False
-        try:
-            return int(target) < int(current)
-        except (TypeError, ValueError):
-            return False
+        delta = _compare_target_current(self._device)
+        return delta is not None and delta < 0
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         try:

@@ -28,6 +28,21 @@ _LOGGER = logging.getLogger(__name__)
 _VIDEO_STATUS_ONLINE = "online"
 _VIDEO_STATUS_OFFLINE = "offline"
 
+_CAMERA_BASE_KEYS = (
+    ("video_type", "video_type"),
+    ("ip", "ip"),
+    ("port", "port"),
+    ("url", "url_path"),
+    ("mac", "mac"),
+    ("status", "status"),
+    ("purpose", "purpose"),
+    ("room_id", "room_id"),
+)
+
+
+def _camera_base_attrs(dev: dict[str, Any]) -> dict[str, Any]:
+    return {attr: dev[key] for key, attr in _CAMERA_BASE_KEYS if dev.get(key) is not None}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -95,21 +110,12 @@ class SinumCamera(Camera):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         dev = self._device
-        attrs: dict[str, Any] = {
-            "video_type": dev.get("video_type"),
-            "ip": dev.get("ip"),
-            "port": dev.get("port"),
-            "url_path": dev.get("url"),
-            "mac": dev.get("mac"),
-            "status": dev.get("status"),
-            "purpose": dev.get("purpose"),
-            "room_id": dev.get("room_id"),
-        }
+        attrs = _camera_base_attrs(dev)
         if dev.get("url2"):
             attrs["url2_path"] = dev["url2"]
         if dev.get("url3"):
             attrs["url3_path"] = dev["url3"]
-        return {k: v for k, v in attrs.items() if v is not None}
+        return attrs
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
