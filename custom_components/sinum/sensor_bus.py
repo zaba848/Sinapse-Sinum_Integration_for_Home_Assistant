@@ -93,7 +93,9 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
     def _is_zero_unavailable(self, raw: int | float) -> bool:
         if raw != 0:
             return False
-        return self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
+        return (
+            self.entity_description.zero_is_unavailable or self._device.get("status") == "offline"
+        )
 
     @property
     def native_value(self) -> float | str | None:
@@ -135,9 +137,7 @@ def _button_device_info(
     )
 
 
-def _wtp_or_sbus(
-    coordinator: SinumCoordinator, bus: str
-) -> dict[int, dict[str, Any]]:
+def _wtp_or_sbus(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
     return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
 
 

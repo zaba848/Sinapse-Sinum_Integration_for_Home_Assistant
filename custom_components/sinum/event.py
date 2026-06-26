@@ -15,9 +15,7 @@ from .coordinator import SinumCoordinator
 PARALLEL_UPDATES = 0
 
 
-def _detect_button_press(
-    action: Any, count: Any, prev_action: Any, prev_count: Any
-) -> str | None:
+def _detect_button_press(action: Any, count: Any, prev_action: Any, prev_count: Any) -> str | None:
     """Return the action string if WTP-style press is detected, else None."""
     if not _is_valid_action(action):
         return None
@@ -40,9 +38,7 @@ def _count_only_press(count: Any, prev_count: Any) -> bool:
     return count is not None and count != prev_count
 
 
-def _button_store(
-    coordinator: SinumCoordinator, bus: str
-) -> dict[int, dict[str, Any]]:
+def _button_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
     return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
 
 

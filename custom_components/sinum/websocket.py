@@ -8,6 +8,7 @@ coordinator data without waiting for the poll cycle.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections.abc import Iterator
@@ -51,9 +52,7 @@ class SinumWebSocketBridge:
             return True
         self._stop_event.clear()
         self._auth_failed = False
-        self._task = self._hass.async_create_background_task(
-            self._run(), name="sinum_ws_bridge"
-        )
+        self._task = self._hass.async_create_background_task(self._run(), name="sinum_ws_bridge")
         _LOGGER.info("Sinapse WebSocket bridge starting (%s)", self._ws_path)
         return True
 
@@ -64,10 +63,8 @@ class SinumWebSocketBridge:
         if task is None:
             return
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
         self._task = None
         _LOGGER.debug("Sinapse WebSocket bridge stopped")
 
@@ -86,10 +83,8 @@ class SinumWebSocketBridge:
             await self._wait_reconnect()
 
     async def _wait_reconnect(self) -> None:
-        try:
+        with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(self._stop_event.wait(), timeout=_RECONNECT_DELAY)
-        except asyncio.TimeoutError:
-            pass
 
     async def _consume_loop(self) -> None:
         await self._client.ensure_push_auth()
@@ -162,9 +157,7 @@ class SinumWebSocketBridge:
         self._fire_state_event(device_id, payload, details)
         return True
 
-    def _fire_state_event(
-        self, device_id: int, payload: dict[str, Any], details: Any
-    ) -> None:
+    def _fire_state_event(self, device_id: int, payload: dict[str, Any], details: Any) -> None:
         device_class = _device_class(payload.get("class") or payload.get("source"))
         self._hass.bus.async_fire(
             "sinum_device_state_changed",

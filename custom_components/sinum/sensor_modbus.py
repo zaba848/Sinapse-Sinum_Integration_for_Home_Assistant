@@ -208,9 +208,7 @@ def _get_field(device: dict[str, Any], path: str) -> Any:
     return val
 
 
-class SinumModbusSensor(
-    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
-):
+class SinumModbusSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]):
     """A single sensor field on a Modbus device."""
 
     _attr_has_entity_name = True

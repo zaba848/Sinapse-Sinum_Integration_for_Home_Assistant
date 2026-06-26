@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from urllib.parse import urlsplit
 
 import voluptuous as vol
@@ -82,7 +82,9 @@ def _reauth_record_failure(hass: Any, entry_id: str) -> None:
     store["fails"] = store["fails"] + 1
     if store["fails"] >= _REAUTH_MAX_FAILS:
         store["blocked_until"] = time.monotonic() + _REAUTH_COOLDOWN_SEC
-        _LOGGER.warning("Sinum reauth blocked after %d failures for entry %s", store["fails"], entry_id)
+        _LOGGER.warning(
+            "Sinum reauth blocked after %d failures for entry %s", store["fails"], entry_id
+        )
     hass.data[key] = store
 
 
@@ -271,7 +273,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         for attempt in range(1, _PROBE_RETRIES + 1):
             result = await _try_probe(operation, attempt)
             if result is not _PROBE_MISSING:
-                return result  # type: ignore[return-value]
+                return cast(T, result)
         raise SinumConnectionError("probe failed after retries")
 
     @staticmethod

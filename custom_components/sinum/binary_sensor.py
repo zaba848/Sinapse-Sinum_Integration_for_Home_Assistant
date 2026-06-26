@@ -174,7 +174,9 @@ _TARGET_REACHED_SBUS = SinumBinarySensorDescription(
 def _needs_target_reached(
     desc: SinumBinarySensorDescription | None, dev_type: str, device: dict
 ) -> bool:
-    return bool(desc and dev_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device)
+    return bool(
+        desc and dev_type == WTYPE_TEMPERATURE_REGULATOR and "target_temperature_reached" in device
+    )
 
 
 def _add_sensors_for_bus(

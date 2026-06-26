@@ -36,9 +36,6 @@ from .const import (
     API_MODBUS_DEVICE,
     API_MODBUS_DEVICES,
     API_NOTIFICATIONS,
-    API_VIDEO_DEVICE,
-    API_VIDEO_DEVICES,
-    API_VIDEO_SNAPSHOT,
     API_PARENT_DEVICES,
     API_REFRESH,
     API_ROOMS,
@@ -55,6 +52,9 @@ from .const import (
     API_SCHEDULES,
     API_VARIABLE,
     API_VARIABLES,
+    API_VIDEO_DEVICE,
+    API_VIDEO_DEVICES,
+    API_VIDEO_SNAPSHOT,
     API_VIRTUAL_DEVICE,
     API_VIRTUAL_DEVICES,
     API_WEATHER,
@@ -240,7 +240,9 @@ class SinumClient:
         parsed = urlsplit(ws_url)
         query = dict(parse_qsl(parsed.query, keep_blank_values=True))
         query["access_token"] = token
-        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment))
+        return urlunsplit(
+            (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+        )
 
     async def ensure_push_auth(self) -> None:
         """Ensure websocket auth token is present before connecting."""
@@ -708,6 +710,7 @@ class SinumClient:
     async def get_video_snapshot(self, device_id: int) -> bytes | None:
         """Return raw JPEG bytes from hub snapshot proxy, or None if unavailable."""
         import base64
+
         result = await self._request("GET", API_VIDEO_SNAPSHOT.format(id=device_id))
         payload = (result or {}).get("payload")
         if not payload:
@@ -801,7 +804,11 @@ class SinumClient:
         available, missing = _partition_energy_results(keys, results)
         if not available:
             raise SinumConnectionError("Energy Center endpoints unavailable")
-        return {**available, "available_endpoints": list(available.keys()), "missing_endpoints": missing}
+        return {
+            **available,
+            "available_endpoints": list(available.keys()),
+            "missing_endpoints": missing,
+        }
 
     async def get_energy_center_summary(self) -> dict[str, Any]:
         keys = self._energy_center_keys()
