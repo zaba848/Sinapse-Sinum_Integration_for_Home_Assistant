@@ -570,7 +570,7 @@ HA MQTT Integration
 
 #### Step 1 — Add an MQTT client on the hub
 
-1. Open the Sinum web UI (e.g. `http://10.0.62.167`)
+1. Open the Sinum web UI (e.g. `http://10.0.62.167` — use your own hub address/hostname)
 2. **Settings → System → Integrations → MQTT client → Add MQTT client**
 3. Fill in broker IP, port `1883`, credentials
 4. Save and note the assigned **Client ID** (e.g. `1`)

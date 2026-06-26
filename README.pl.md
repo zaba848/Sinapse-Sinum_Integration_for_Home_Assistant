@@ -236,7 +236,7 @@ MQTT jest wariantem awaryjnym dla firmware bez WebSocket.
 
 ### Dodanie klienta MQTT w centrali
 
-W web UI Sinum przejdź do:
+W web UI Sinum przejdź do (użyj swojego hosta/IP centrali, nie przykładu z dokumentacji):
 
 **Ustawienia → System → Integracje → Klient MQTT → Dodaj klient MQTT**
 
