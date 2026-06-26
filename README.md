@@ -4,9 +4,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1458%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1460%20passing-brightgreen.svg)](tests/)
 [![Stability](https://img.shields.io/badge/stability-weekly%20validated-green.svg)](https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/actions/workflows/test-stability.yml)
-[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.4-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -595,7 +595,7 @@ pip install -r requirements-dev.txt
 ### Running tests
 
 ```bash
-pytest tests/                                       # 1458 tests, ~8 s
+pytest tests/                                       # 1460 tests, ~8 s
 pytest -v tests/test_api.py                         # single file, verbose
 pytest --cov=custom_components/sinum tests/         # coverage report
 ```
@@ -660,7 +660,7 @@ tests/
   ├── conftest.py
   ├── test_code_quality.py     CC gate — all functions must have CC ≤ 4
   ├── hardware_in_loop/        HIL scripts for live hub testing
-  └── test_*.py                1458 tests across all platforms and device types
+  └── test_*.py                1460 tests across all platforms and device types
 ```
 
 ### Key classes
