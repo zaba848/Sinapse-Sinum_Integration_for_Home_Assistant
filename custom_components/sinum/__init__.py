@@ -47,8 +47,8 @@ from .const import (
     SERVICE_UPDATE_SCHEDULE,
     SERVICE_UPLOAD_MQTT_BRIDGE,
 )
-from .lua_mqtt_bridge import render as _render_mqtt_bridge_lua
 from .coordinator import SinumCoordinator
+from .lua_mqtt_bridge import render as _render_mqtt_bridge_lua
 from .mqtt import SinumMqttBridge
 from .websocket import SinumWebSocketBridge
 
@@ -184,9 +184,7 @@ def _sync_entry_title(
         _update_entry_title_if_loaded(hass, entry, expected)
 
 
-def _update_entry_title_if_loaded(
-    hass: HomeAssistant, entry: SinumConfigEntry, title: str
-) -> None:
+def _update_entry_title_if_loaded(hass: HomeAssistant, entry: SinumConfigEntry, title: str) -> None:
     if hass.config_entries.async_get_entry(entry.entry_id):
         hass.config_entries.async_update_entry(entry, title=title)
 
@@ -300,13 +298,18 @@ def _register_services(hass: HomeAssistant) -> None:
         if dry_run:
             _LOGGER.info(
                 "sinum.upload_mqtt_bridge dry_run: scene=%d client=%d prefix=%s lua_len=%d",
-                scene_id, client_id, topic_prefix, len(lua_code),
+                scene_id,
+                client_id,
+                topic_prefix,
+                len(lua_code),
             )
             return
         await coordinator.client.patch_scene_lua(int(scene_id), lua_code)
         _LOGGER.info(
             "Uploaded MQTT bridge Lua to scene %d (client_id=%d prefix=%s)",
-            scene_id, client_id, topic_prefix,
+            scene_id,
+            client_id,
+            topic_prefix,
         )
 
     _register_service_if_missing(

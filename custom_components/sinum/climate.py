@@ -75,7 +75,9 @@ def _add_bus_climate(
 ) -> None:
     store, fan_coil_types = _bus_climate_config(coordinator, bus)
     for device_id, device in store.items():
-        _maybe_add_climate_entity(coordinator, entities, entry_id, bus, device_id, device, fan_coil_types)
+        _maybe_add_climate_entity(
+            coordinator, entities, entry_id, bus, device_id, device, fan_coil_types
+        )
 
 
 def _bus_climate_config(
@@ -139,9 +141,7 @@ def _fan_coil_device_info(
     )
 
 
-def _bus_store(
-    coordinator: SinumCoordinator, bus: str
-) -> dict[int, dict[str, Any]]:
+def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
     return coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
 
 

@@ -73,7 +73,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _ensure_variable_cached(coordinator: SinumCoordinator, variable_id: int, variable: dict) -> None:
+def _ensure_variable_cached(
+    coordinator: SinumCoordinator, variable_id: int, variable: dict
+) -> None:
     if not isinstance(getattr(coordinator, "variables", None), list):
         coordinator.variables = []
     if not any(item.get("id") == variable_id for item in coordinator.variables):

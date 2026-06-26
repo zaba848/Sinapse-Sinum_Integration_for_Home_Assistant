@@ -273,7 +273,7 @@ def _maybe_index_list(lst: list[Any] | None) -> dict[int, dict[str, Any]] | None
 
 
 def _apply_optional_stores(
-    coordinator: "SinumCoordinator",
+    coordinator: SinumCoordinator,
     alarm: list[Any] | None,
     modbus: list[Any] | None,
     video: list[Any] | None,

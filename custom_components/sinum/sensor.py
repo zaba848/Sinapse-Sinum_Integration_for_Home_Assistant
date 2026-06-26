@@ -21,6 +21,7 @@ from .sensor_bus import (
     SinumSensorDescription,
     SinumTemperatureRegulatorSensor,
 )
+from .sensor_modbus import build_modbus_sensor_entities
 from .sensor_schedule import (
     SinumScheduleActivePeriodSensor,
     SinumScheduleAssociationCountSensor,
@@ -28,7 +29,6 @@ from .sensor_schedule import (
     SinumScheduleSensor,
     SinumScheduleTargetTempSensor,
 )
-from .sensor_modbus import build_modbus_sensor_entities
 from .sensor_virtual import (
     ENERGY_SENSORS,
     VIRTUAL_SENSORS,
