@@ -21,18 +21,7 @@ except ImportError:
 _SINUM_DIR = pathlib.Path(__file__).parent.parent / "custom_components" / "sinum"
 _MAX_CC = 4
 
-_LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
-    "light.py": {
-        "_supports_rgb": 6,
-        "async_turn_on": 6,
-        "_bus_light_entity": 5,
-        "_color_mode": 5,
-        "async_added_to_hass": 5,
-        "_sbus_lua_commands": 5,
-        "_apply_sbus_color": 5,
-        "async_turn_off": 5,
-    },
-}
+_LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {}
 
 
 def _is_legacy_allowed(filename: str, func_name: str, cc: int) -> bool:

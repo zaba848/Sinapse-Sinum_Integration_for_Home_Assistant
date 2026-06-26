@@ -61,6 +61,10 @@ def _add_bus_lights(
             entities.append(entity)
 
 
+def _is_button_with_color(dev_type: str, button_type: str, device: dict[str, Any]) -> bool:
+    return dev_type == button_type and "color" in device
+
+
 def _bus_light_entity(
     coordinator: SinumCoordinator,
     device_id: int,
@@ -76,7 +80,7 @@ def _bus_light_entity(
         return SinumBusDimmerLight(coordinator, device_id, entry_id, bus)
     if dev_type == rgb_type:
         return SinumBusRgbLight(coordinator, device_id, entry_id, bus)
-    if dev_type == button_type and "color" in device:
+    if _is_button_with_color(dev_type, button_type, device):
         return SinumButtonLight(coordinator, device_id, entry_id, bus)
     return None
 
@@ -179,6 +183,13 @@ def _hs_to_hex(hue: float, saturation: float, value: float = 1.0) -> str:
     return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
 
 
+_RGB_DEVICE_TYPES = frozenset(
+    {VTYPE_DIMMER_RGB, VTYPE_DIMMER_RGB_INTEGRATOR, WTYPE_RGB_CONTROLLER, STYPE_RGB_CONTROLLER}
+)
+_RGB_COLOR_MODES = frozenset({"rgb", "hs", "color"})
+_COLOR_TEMP_MODES = frozenset({"temperature", "color_temp", "white_temperature"})
+
+
 def _labels(device: dict[str, Any]) -> set[str]:
     labels = device.get("labels", [])
     if not isinstance(labels, list):
@@ -186,16 +197,20 @@ def _labels(device: dict[str, Any]) -> set[str]:
     return {str(label).lower() for label in labels}
 
 
+def _has_rgb_label(labels: set[str]) -> bool:
+    return any("rgb" in label for label in labels)
+
+
+def _rgb_by_label_or_type(device: dict[str, Any]) -> bool:
+    return _has_rgb_label(_labels(device)) or device.get("type") in _RGB_DEVICE_TYPES
+
+
 def _supports_rgb(device: dict[str, Any]) -> bool:
-    labels = _labels(device)
-    dev_type = device.get("type")
     mode = str(device.get("color_mode", "")).lower()
     return (
         "led_color" in device
-        or mode in {"rgb", "hs", "color"}
-        or any("rgb" in label for label in labels)
-        or dev_type in (VTYPE_DIMMER_RGB, VTYPE_DIMMER_RGB_INTEGRATOR)
-        or dev_type in (WTYPE_RGB_CONTROLLER, STYPE_RGB_CONTROLLER)
+        or mode in _RGB_COLOR_MODES
+        or _rgb_by_label_or_type(device)
     )
 
 
@@ -204,7 +219,7 @@ def _supports_color_temperature(device: dict[str, Any]) -> bool:
     mode = str(device.get("color_mode", "")).lower()
     return (
         "white_temperature" in device
-        or mode in {"temperature", "color_temp", "white_temperature"}
+        or mode in _COLOR_TEMP_MODES
         or "rgbww" in labels
         or "ww" in labels
     )
@@ -221,15 +236,37 @@ def _supported_color_modes(device: dict[str, Any]) -> set[ColorMode]:
     return modes
 
 
+def _color_mode_is_rgb(mode: str, device: dict[str, Any]) -> bool:
+    return mode in _RGB_COLOR_MODES or _supports_rgb(device)
+
+
 def _color_mode(device: dict[str, Any]) -> ColorMode:
     mode = str(device.get("color_mode", "")).lower()
-    if mode in {"temperature", "color_temp", "white_temperature"}:
+    if mode in _COLOR_TEMP_MODES:
         return ColorMode.COLOR_TEMP
-    if mode in {"rgb", "hs", "color"} or _supports_rgb(device):
+    if _color_mode_is_rgb(mode, device):
         return ColorMode.HS
     if _supports_color_temperature(device):
         return ColorMode.COLOR_TEMP
     return ColorMode.BRIGHTNESS
+
+
+async def _restore_light_state(entity: Any) -> None:
+    last = await entity.async_get_last_state()
+    if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return
+    entity._attr_is_on = last.state == STATE_ON
+    if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
+        entity._attr_brightness = int(v)
+
+
+async def _restore_button_light_state(entity: Any) -> None:
+    last = await entity.async_get_last_state()
+    if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return
+    entity._attr_is_on = last.state == STATE_ON
+    if last.attributes.get(ATTR_HS_COLOR):
+        entity._attr_hs_color = tuple(last.attributes[ATTR_HS_COLOR])
 
 
 class SinumDimmerLight(
@@ -260,12 +297,7 @@ class SinumDimmerLight(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        self._attr_is_on = last.state == STATE_ON
-        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
-            self._attr_brightness = int(v)
+        await _restore_light_state(self)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -378,12 +410,7 @@ class SinumBusDimmerLight(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        self._attr_is_on = last.state == STATE_ON
-        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
-            self._attr_brightness = int(v)
+        await _restore_light_state(self)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -437,6 +464,32 @@ class SinumBusDimmerLight(
         self.async_write_ha_state()
 
 
+def _sbus_temp_lua(prefix: str, device: dict[str, Any], kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+    current_pct = device.get("brightness") or 80
+    line = f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})'
+    return line, {"color_mode": "temperature", "white_temperature": kelvin}
+
+
+def _sbus_color_lua(prefix: str, kwargs: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    lines: list[str] = []
+    optimistic: dict[str, Any] = {}
+    if ATTR_HS_COLOR in kwargs:
+        h, s = kwargs[ATTR_HS_COLOR]
+        color_hex = _hs_to_hex(h, s, 1.0)
+        lines.append(f'{prefix}:call("set_color",{{"{color_hex}",200}})')
+        optimistic.update({"color_mode": "rgb", "led_color": color_hex})
+    if ATTR_BRIGHTNESS in kwargs:
+        pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
+        lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')
+        optimistic["brightness"] = pct
+    return lines, optimistic
+
+
+def _has_color_kwargs(kwargs: dict[str, Any]) -> bool:
+    return ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
+
+
 class SinumBusRgbLight(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
 ):
@@ -479,12 +532,7 @@ class SinumBusRgbLight(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        self._attr_is_on = last.state == STATE_ON
-        if (v := last.attributes.get(ATTR_BRIGHTNESS)) is not None:
-            self._attr_brightness = int(v)
+        await _restore_light_state(self)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -566,29 +614,11 @@ class SinumBusRgbLight(
 
     def _sbus_lua_commands(self, **kwargs: Any) -> tuple[list[str], dict[str, Any]]:
         """Build Lua command lines and optimistic state for SBUS RGB control."""
-        lua_lines: list[str] = []
-        optimistic: dict[str, Any] = {}
         prefix = f"sbus[{self._device_id}]"
-
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
-            kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            current_pct = self._device.get("brightness") or 80
-            lua_lines.append(f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})')
-            optimistic["color_mode"] = "temperature"
-            optimistic["white_temperature"] = kelvin
-        else:
-            if ATTR_HS_COLOR in kwargs:
-                h, s = kwargs[ATTR_HS_COLOR]
-                color_hex = _hs_to_hex(h, s, 1.0)
-                lua_lines.append(f'{prefix}:call("set_color",{{"{color_hex}",200}})')
-                optimistic["color_mode"] = "rgb"
-                optimistic["led_color"] = color_hex
-            if ATTR_BRIGHTNESS in kwargs:
-                pct = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
-                lua_lines.append(f'{prefix}:call("set_brightness",{{{pct}}})')
-                optimistic["brightness"] = pct
-
-        return lua_lines, optimistic
+            line, optimistic = _sbus_temp_lua(prefix, self._device, kwargs)
+            return [line], optimistic
+        return _sbus_color_lua(prefix, kwargs)
 
     def _wtp_color_payload(self, **kwargs: Any) -> dict[str, Any]:
         """Build REST color payload for WTP RGB control."""
@@ -620,10 +650,7 @@ class SinumBusRgbLight(
 
     async def _apply_sbus_color(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Run Lua color commands and return optimistic state; no-op if no color kwargs."""
-        has_color = (
-            ATTR_HS_COLOR in kwargs or ATTR_BRIGHTNESS in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs
-        )
-        if not has_color:
+        if not _has_color_kwargs(kwargs):
             return {}
         lua_lines, optimistic = self._sbus_lua_commands(**kwargs)
         try:
@@ -631,6 +658,13 @@ class SinumBusRgbLight(
         except Exception as err:
             raise HomeAssistantError(f"Cannot control RGB: {err}") from err
         return optimistic
+
+    def _rest_turn_on_payload(self, **kwargs: Any) -> dict[str, Any]:
+        payload: dict[str, Any] = {"state": True}
+        mode = str(self._device.get("color_mode", "")).lower()
+        if self._bus == "wtp" and mode not in ("temperature", "animation"):
+            payload.update(self._wtp_color_payload(**kwargs))
+        return payload
 
     async def _patch_on(
         self, store: dict[int, dict[str, Any]], rest_payload: dict[str, Any]
@@ -648,38 +682,33 @@ class SinumBusRgbLight(
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err
 
+    async def _patch_off(self) -> dict[str, Any]:
+        try:
+            if self._bus == "wtp":
+                result = await self.coordinator.client.patch_wtp_device(
+                    self._device_id, {"state": False}
+                )
+            else:
+                result = await self.coordinator.client.patch_sbus_device(
+                    self._device_id, {"state": False}
+                )
+            return result or {}
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
+
     async def async_turn_on(self, **kwargs: Any) -> None:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
+        store = _bus_store(self.coordinator, self._bus)
         optimistic: dict[str, Any] = {"state": True}
         if self._bus == "sbus":
             optimistic.update(await self._apply_sbus_color(kwargs))
-        mode = str(self._device.get("color_mode", "")).lower()
-        rest_payload: dict[str, Any] = {"state": True}
-        # WTP REST PATCH cannot override the schedule in temperature/animation mode
-        if self._bus == "wtp" and mode not in ("temperature", "animation"):
-            rest_payload.update(self._wtp_color_payload(**kwargs))
-        await self._patch_on(store, rest_payload)
+        await self._patch_on(store, self._rest_turn_on_payload(**kwargs))
         store[self._device_id].update(optimistic)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"state": False}
-                )
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": False}
-                )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn off: {err}") from err
-        store[self._device_id].update({**{"state": False}, **(updated or {})})
+        store = _bus_store(self.coordinator, self._bus)
+        updated = await self._patch_off()
+        store[self._device_id].update({"state": False, **updated})
         self.async_write_ha_state()
 
 
@@ -719,12 +748,7 @@ class SinumButtonLight(
         await super().async_added_to_hass()
         if self._device:
             return
-        last = await self.async_get_last_state()
-        if last is None or last.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return
-        self._attr_is_on = last.state == STATE_ON
-        if last.attributes.get(ATTR_HS_COLOR):
-            self._attr_hs_color = tuple(last.attributes[ATTR_HS_COLOR])
+        await _restore_button_light_state(self)
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -751,24 +775,30 @@ class SinumButtonLight(
     def _store(self) -> dict[int, dict[str, Any]]:
         return self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    def _resolve_turn_on_color(self, kwargs: dict[str, Any]) -> str:
         if ATTR_HS_COLOR in kwargs:
             h, s = kwargs[ATTR_HS_COLOR]
-            color = _hs_to_hex(h, s)
-        else:
-            color = self._device.get("color") or "#0072c3"
+            return _hs_to_hex(h, s)
+        return self._device.get("color") or "#0072c3"
+
+    async def _patch_bus_color(self, color: str) -> dict[str, Any]:
         try:
             if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
+                result = await self.coordinator.client.patch_wtp_device(
                     self._device_id, {"color": color}
                 )
             else:
-                updated = await self.coordinator.client.patch_sbus_device(
+                result = await self.coordinator.client.patch_sbus_device(
                     self._device_id, {"color": color}
                 )
+            return result or {}
         except Exception as err:
             raise HomeAssistantError(f"Cannot set backlight color: {err}") from err
-        self._store()[self._device_id].update({**{"color": color}, **(updated or {})})
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        color = self._resolve_turn_on_color(kwargs)
+        updated = await self._patch_bus_color(color)
+        self._store()[self._device_id].update({"color": color, **updated})
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
