@@ -30,9 +30,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
         "is_on": 5,
         "extra_state_attributes": 5,
     },
-    "button.py": {
-        "async_setup_entry": 6,
-    },
     "camera.py": {
         "extra_state_attributes": 5,
     },
@@ -55,9 +52,6 @@ _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
     },
     "number.py": {
         "__init__": 5,
-    },
-    "switch.py": {
-        "__init__": 6,
     },
 }
 

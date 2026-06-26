@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
-from .api import SinumConnectionError
+from .api import SinumConnectionError, SinumNotSupportedError
 from .const import DOMAIN
 from .coordinator import SinumCoordinator
 
@@ -18,23 +18,27 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
+async def _load_scenes(coordinator: SinumCoordinator) -> list[dict]:
+    cached = getattr(coordinator, "scenes", [])
+    scenes: list[dict] = cached if isinstance(cached, list) else []
+    if scenes:
+        return scenes
+    try:
+        scenes = await coordinator.client.get_scenes()
+        coordinator.scenes = scenes
+        return scenes
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Scenes endpoint not available on this hub firmware")
+        return []
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
-    cached_scenes = getattr(coordinator, "scenes", [])
-    scenes = cached_scenes if isinstance(cached_scenes, list) else []
-    if not scenes:
-        try:
-            scenes = await coordinator.client.get_scenes()
-        except SinumConnectionError:
-            _LOGGER.debug("Scenes endpoint not available on this hub firmware")
-            scenes = []
-        else:
-            coordinator.scenes = scenes
-
+    scenes = await _load_scenes(coordinator)
     entities = [SinumSceneButton(coordinator, scene, entry.entry_id) for scene in scenes]
     async_add_entities(entities)
 

@@ -243,6 +243,14 @@ class SinumWicketSwitch(
         self.async_write_ha_state()
 
 
+def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> dict[str, Any]:
+    if bus == "wtp":
+        return coordinator.wtp_devices.get(device_id, {})
+    if bus == "sbus":
+        return coordinator.sbus_devices.get(device_id, {})
+    return coordinator.lora_devices.get(device_id, {})
+
+
 class SinumBusRelaySwitch(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
 ):
@@ -259,12 +267,7 @@ class SinumBusRelaySwitch(
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        if bus == "wtp":
-            device = coordinator.wtp_devices.get(device_id, {})
-        elif bus == "sbus":
-            device = coordinator.sbus_devices.get(device_id, {})
-        else:
-            device = coordinator.lora_devices.get(device_id, {})
+        device = _relay_device(coordinator, bus, device_id)
         name = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -277,11 +280,7 @@ class SinumBusRelaySwitch(
 
     @property
     def _device(self) -> dict[str, Any]:
-        if self._bus == "wtp":
-            return self.coordinator.wtp_devices.get(self._device_id, {})
-        if self._bus == "sbus":
-            return self.coordinator.sbus_devices.get(self._device_id, {})
-        return self.coordinator.lora_devices.get(self._device_id, {})
+        return _relay_device(self.coordinator, self._bus, self._device_id)
 
     @property
     def is_on(self) -> bool:
