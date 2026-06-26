@@ -155,6 +155,7 @@ Current stabilization artifacts are tracked in `HARDWARE_TEST_PLAN.md` and workf
 ### Step 1 — Prepare the Sinum hub access token
 
 Open the Sinum web UI in the same local network as Home Assistant, for example `http://sinum.local` or `http://10.0.62.167`.
+These are example addresses only - always use your own hub hostname/IP from your local network.
 
 ![Sinum local sign-in](docs/images/setup/sinum-01-sign-in.png)
 
@@ -178,6 +179,10 @@ You can later review or revoke tokens from **Settings → System → Integration
 
 Do not paste the token into GitHub issues, logs, screenshots or chat messages. If the token is lost, create a new one and revoke the old token in Sinum.
 
+Need official Sinum docs from TECH Sterowniki?
+- Knowledge base (Sinum): https://www.techsterowniki.pl/blog/kategoria/sinum
+- FAQ: https://www.techsterowniki.pl/serwis/faq
+
 ### Step 2 — Add the integration in Home Assistant
 
 **Settings → Devices & Services → Add Integration → search for "Sinum"**
@@ -188,7 +193,7 @@ The setup wizard runs two screens:
 
 | Field | Description |
 |---|---|
-| Host | IP address or hostname of your hub, e.g. `10.0.62.167`. Do not include `http://`. |
+| Host | IP address or hostname of your hub, e.g. `10.0.62.167` (example only). Do not include `http://`. |
 | Auth method | `api_token` (recommended) or `username_password` |
 
 > If you don't know the hub IP, try `sinum.local` first. If that does not resolve, check the IP assigned to the hub in your router/DHCP lease list.

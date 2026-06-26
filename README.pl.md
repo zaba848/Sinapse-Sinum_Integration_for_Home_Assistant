@@ -132,6 +132,7 @@ Następnie zrestartuj Home Assistant.
 ### Krok 1 — przygotuj token dostępu w centrali Sinum
 
 Otwórz web UI centrali Sinum w tej samej sieci lokalnej co Home Assistant, na przykład `http://sinum.local` albo adres IP centrali.
+To są tylko przykładowe adresy - użyj własnego hosta/IP swojej centrali w sieci lokalnej.
 
 ![Logowanie do Sinum](docs/images/setup/sinum-01-sign-in-pl.png)
 
@@ -155,6 +156,10 @@ Listę tokenów znajdziesz później w **Ustawienia → System → Integracje �
 
 Nie wklejaj tokena do zgłoszeń GitHub, logów, screenów ani wiadomości. Jeśli token zostanie utracony, utwórz nowy i usuń stary w web UI Sinum.
 
+Szukasz oficjalnych materiałów TECH Sterowniki?
+- Baza wiedzy Sinum: https://www.techsterowniki.pl/blog/kategoria/sinum
+- FAQ: https://www.techsterowniki.pl/serwis/faq
+
 ### Krok 2 — dodaj integrację w Home Assistant
 
 W Home Assistant przejdź do:
@@ -167,7 +172,7 @@ Kreator konfiguracji ma dwa etapy.
 
 | Pole | Co wpisać |
 |---|---|
-| Host | Adres IP lub nazwa hosta centrali, np. `10.0.62.167`. Bez `http://`. |
+| Host | Adres IP lub nazwa hosta centrali, np. `10.0.62.167` (to tylko przykład). Bez `http://`. |
 | Auth method | `api_token` zalecane albo `username_password` |
 
 Jeśli nie znasz adresu IP centrali, spróbuj `sinum.local`. Jeśli to nie działa, sprawdź listę dzierżaw DHCP w routerze.
