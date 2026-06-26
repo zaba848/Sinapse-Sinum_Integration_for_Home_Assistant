@@ -33,7 +33,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .api import SinumConnectionError
+from .api import SinumConnectionError, SinumNotSupportedError
 from .const import DOMAIN
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
@@ -42,29 +42,32 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
+def _alarm_zone_dict(devices: list[dict]) -> dict[int, dict]:
+    return {int(d["id"]): d for d in devices if "id" in d}
+
+
+async def _fetch_alarm_devices(coordinator: SinumCoordinator) -> list[dict]:
+    try:
+        devices = await coordinator.client.get_alarm_devices()
+        coordinator.alarm_zones = _alarm_zone_dict(devices)
+        return devices
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Alarm system endpoint not available on this hub")
+        return []
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: SinumCoordinator = entry.runtime_data
-    entities: list[AlarmControlPanelEntity] = []
-
-    cached_zones = getattr(coordinator, "alarm_zones", {})
-    alarm_devices = list(cached_zones.values()) if isinstance(cached_zones, dict) else []
-    if not alarm_devices:
-        try:
-            alarm_devices = await coordinator.client.get_alarm_devices()
-        except SinumConnectionError:
-            _LOGGER.debug("Alarm system endpoint not available on this hub")
-            return
-        coordinator.alarm_zones = {
-            int(device["id"]): device for device in alarm_devices if "id" in device
-        }
-
-    for device in alarm_devices:
-        entities.append(SinumAlarmZone(coordinator, device, entry.entry_id))
-
+    cached = getattr(coordinator, "alarm_zones", {})
+    if isinstance(cached, dict) and cached:
+        alarm_devices = list(cached.values())
+    else:
+        alarm_devices = await _fetch_alarm_devices(coordinator)
+    entities = [SinumAlarmZone(coordinator, d, entry.entry_id) for d in alarm_devices]
     async_add_entities(entities)
 
 

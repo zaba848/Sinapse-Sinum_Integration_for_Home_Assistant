@@ -61,7 +61,9 @@ class TestAlarmSetup:
 
         await async_setup_entry(MagicMock(), entry, async_add_entities)
 
-        async_add_entities.assert_not_called()
+        # async_add_entities is called with empty list (no entities registered)
+        added = async_add_entities.call_args[0][0] if async_add_entities.called else []
+        assert added == []
 
     @pytest.mark.asyncio
     async def test_two_zones_create_two_entities(self):

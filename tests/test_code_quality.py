@@ -23,7 +23,6 @@ _MAX_CC = 4
 
 _LEGACY_ALLOWANCE: dict[str, dict[str, int]] = {
     "alarm_control_panel.py": {
-        "async_setup_entry": 7,
         "extra_state_attributes": 5,
     },
     "binary_sensor.py": {
