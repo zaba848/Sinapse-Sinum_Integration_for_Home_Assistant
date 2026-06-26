@@ -47,6 +47,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
+        self.removed_ids: dict[str, frozenset[int]] = {}  # bus → device IDs gone after last refresh
 
     def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
         if hub_info is not None:
@@ -121,6 +122,12 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _unique_ids([*room_ids[3], *parent_ids[3]]),
         )
 
+        # ── Snapshot IDs before fetch so we can detect removals ──────────────
+        prev_virtual = frozenset(self.virtual_devices)
+        prev_wtp = frozenset(self.wtp_devices)
+        prev_sbus = frozenset(self.sbus_devices)
+        prev_lora = frozenset(self.lora_devices)
+
         # ── Group 2: device collections — all fetched in parallel ─────────────
         virtual, wtp, sbus, lora, alarm_list, modbus_list, video_list = await asyncio.gather(
             self._fetch_device_collection(
@@ -165,6 +172,13 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sbus_devices = sbus
         self.lora_devices = lora
         _apply_optional_stores(self, alarm_list, modbus_list, video_list)
+
+        self.removed_ids = {
+            "virtual": prev_virtual - frozenset(virtual),
+            "wtp": prev_wtp - frozenset(wtp),
+            "sbus": prev_sbus - frozenset(sbus),
+            "lora": prev_lora - frozenset(lora),
+        }
 
         # ── Enrich child devices with parent hardware model and class ─────────
         parent_maps, parent_class_maps = _build_parent_maps(self.parent_devices)

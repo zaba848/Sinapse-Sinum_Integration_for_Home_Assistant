@@ -692,3 +692,103 @@ class TestInitHelpers:
             result = await async_unload_entry(hass, entry)
 
         assert result is False
+
+
+class TestStaleEntityCleanup:
+    """Tests for stale device cleanup helpers."""
+
+    def test_stale_uid_prefixes_empty_when_no_removed_ids(self):
+        from custom_components.sinum import _stale_uid_prefixes
+
+        result = _stale_uid_prefixes("entry1", {"wtp": frozenset(), "sbus": frozenset()})
+        assert result == set()
+
+    def test_stale_uid_prefixes_builds_correct_prefixes(self):
+        from custom_components.sinum import _stale_uid_prefixes
+
+        result = _stale_uid_prefixes("abc", {"wtp": frozenset({10, 20}), "sbus": frozenset({5})})
+        assert "abc_wtp_10" in result
+        assert "abc_wtp_20" in result
+        assert "abc_sbus_5" in result
+        assert len(result) == 3
+
+    def test_is_stale_entity_matches_exact_uid(self):
+        from custom_components.sinum import _is_stale_entity
+
+        entity = MagicMock()
+        entity.unique_id = "abc_wtp_10"
+        assert _is_stale_entity(entity, {"abc_wtp_10"}) is True
+
+    def test_is_stale_entity_matches_prefixed_uid(self):
+        from custom_components.sinum import _is_stale_entity
+
+        entity = MagicMock()
+        entity.unique_id = "abc_wtp_10_temperature"
+        assert _is_stale_entity(entity, {"abc_wtp_10"}) is True
+
+    def test_is_stale_entity_does_not_match_partial_prefix(self):
+        from custom_components.sinum import _is_stale_entity
+
+        entity = MagicMock()
+        entity.unique_id = "abc_wtp_100_temperature"
+        assert _is_stale_entity(entity, {"abc_wtp_10"}) is False
+
+    def test_is_stale_entity_no_match_for_different_bus(self):
+        from custom_components.sinum import _is_stale_entity
+
+        entity = MagicMock()
+        entity.unique_id = "abc_sbus_10_state"
+        assert _is_stale_entity(entity, {"abc_wtp_10"}) is False
+
+    def test_is_stale_entity_returns_false_when_no_prefixes(self):
+        from custom_components.sinum import _is_stale_entity
+
+        entity = MagicMock()
+        entity.unique_id = "abc_wtp_10"
+        assert _is_stale_entity(entity, set()) is False
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_entities_noop_when_no_removed(self, hass):
+        from custom_components.sinum import _cleanup_stale_entities
+
+        with patch("custom_components.sinum.er") as mock_er:
+            await _cleanup_stale_entities(hass, "entry1", {"wtp": frozenset(), "sbus": frozenset()})
+            mock_er.async_get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_entities_removes_matching_entities(self, hass):
+        from custom_components.sinum import _cleanup_stale_entities
+
+        stale_entity = MagicMock()
+        stale_entity.unique_id = "e1_wtp_42_temperature"
+        stale_entity.entity_id = "sensor.stale_device_temp"
+
+        live_entity = MagicMock()
+        live_entity.unique_id = "e1_wtp_99_temperature"
+        live_entity.entity_id = "sensor.live_device_temp"
+
+        mock_reg = MagicMock()
+        mock_reg.entities.get_entries_for_config_entry_id.return_value = [stale_entity, live_entity]
+
+        with patch("custom_components.sinum.er") as mock_er:
+            mock_er.async_get.return_value = mock_reg
+            await _cleanup_stale_entities(hass, "e1", {"wtp": frozenset({42})})
+
+        mock_reg.async_remove.assert_called_once_with("sensor.stale_device_temp")
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_entities_removes_exact_uid_match(self, hass):
+        from custom_components.sinum import _cleanup_stale_entities
+
+        entity = MagicMock()
+        entity.unique_id = "e1_sbus_7"
+        entity.entity_id = "switch.stale"
+
+        mock_reg = MagicMock()
+        mock_reg.entities.get_entries_for_config_entry_id.return_value = [entity]
+
+        with patch("custom_components.sinum.er") as mock_er:
+            mock_er.async_get.return_value = mock_reg
+            await _cleanup_stale_entities(hass, "e1", {"sbus": frozenset({7})})
+
+        mock_reg.async_remove.assert_called_once_with("switch.stale")

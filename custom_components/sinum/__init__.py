@@ -13,9 +13,9 @@ from homeassistant.const import (
     CONF_USERNAME,
     Platform,
 )
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import SinumClient, SinumNotSupportedError
@@ -344,6 +344,34 @@ async def _stop_ws_bridge_for_entry(entry_id: str) -> None:
         await bridge.async_stop()
 
 
+def _stale_uid_prefixes(entry_id: str, removed_ids: dict[str, frozenset[int]]) -> set[str]:
+    prefixes: set[str] = set()
+    for bus, ids in removed_ids.items():
+        for device_id in ids:
+            prefixes.add(f"{entry_id}_{bus}_{device_id}")
+    return prefixes
+
+
+def _is_stale_entity(entity_entry: er.RegistryEntry, prefixes: set[str]) -> bool:
+    uid = entity_entry.unique_id
+    return any(uid == p or uid.startswith(f"{p}_") for p in prefixes)
+
+
+async def _cleanup_stale_entities(
+    hass: HomeAssistant,
+    entry_id: str,
+    removed_ids: dict[str, frozenset[int]],
+) -> None:
+    prefixes = _stale_uid_prefixes(entry_id, removed_ids)
+    if not prefixes:
+        return
+    ent_reg = er.async_get(hass)
+    for entity_entry in list(ent_reg.entities.get_entries_for_config_entry_id(entry_id)):
+        if _is_stale_entity(entity_entry, prefixes):
+            _LOGGER.info("Sinum: removing stale entity %s", entity_entry.entity_id)
+            ent_reg.async_remove(entity_entry.entity_id)
+
+
 def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:
     _notification_clients(hass).pop(entry_id, None)
     _coordinators(hass).pop(entry_id, None)
@@ -393,6 +421,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: SinumConfigEntry) -> boo
     _notification_clients(hass)[entry.entry_id] = client
     _coordinators(hass)[entry.entry_id] = coordinator
     _register_services(hass)
+
+    @callback
+    def _handle_stale_cleanup() -> None:
+        if coordinator.last_update_success and any(coordinator.removed_ids.values()):
+            hass.async_create_task(
+                _cleanup_stale_entities(hass, entry.entry_id, coordinator.removed_ids)
+            )
+
+    entry.async_on_unload(coordinator.async_add_listener(_handle_stale_cleanup))
 
     return True
 
