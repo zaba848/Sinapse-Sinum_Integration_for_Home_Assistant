@@ -372,3 +372,22 @@ class TestRemainingNumberCoverage:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
 
         assert any(isinstance(e, SinumVariableNumber) for e in added)
+
+    @pytest.mark.asyncio
+    async def test_variables_404_does_not_crash_platform(self):
+        """Regression: SinumNotSupportedError (404) from /variables must not crash number platform."""
+        from custom_components.sinum.api import SinumNotSupportedError
+        from custom_components.sinum.number import async_setup_entry
+
+        coordinator = _make_coordinator(sbus_devices={})
+        coordinator.variables = []
+        coordinator.client = MagicMock()
+        coordinator.client.get_variables = AsyncMock(
+            side_effect=SinumNotSupportedError("Endpoint not found on this hub: /api/v1/variables")
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))

@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .api import SinumConnectionError
+from .api import SinumConnectionError, SinumNotSupportedError
 from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
@@ -30,7 +30,7 @@ async def _load_variables(coordinator: SinumCoordinator) -> list[dict[str, Any]]
         fetched = await coordinator.client.get_variables()
         coordinator.variables = fetched
         return fetched
-    except SinumConnectionError:
+    except (SinumConnectionError, SinumNotSupportedError):
         _LOGGER.debug("Variables endpoint not available on this hub firmware")
         return cached_variables
 

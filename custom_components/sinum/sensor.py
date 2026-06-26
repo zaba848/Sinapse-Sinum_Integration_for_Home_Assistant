@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
-from .api import SinumConnectionError
+from .api import SinumConnectionError, SinumNotSupportedError
 from .const import STYPE_BUTTON, VTYPE_THERMOSTAT_OUTPUT_GROUP, WTYPE_BUTTON
 from .coordinator import SinumCoordinator
 from .sensor_bus import (
@@ -157,7 +157,7 @@ async def _try_add_weather_sensors(
         for desc in WEATHER_SENSORS:
             if desc.api_key in weather:
                 entities.append(SinumWeatherSensor(coordinator.client, weather, desc, entry_id))
-    except SinumConnectionError:
+    except (SinumConnectionError, SinumNotSupportedError):
         _LOGGER.debug("Weather endpoint not available on this hub")
 
 
@@ -169,7 +169,7 @@ async def _try_add_energy_sensors(
         for desc in ENERGY_SENSORS:
             if desc.api_key in energy:
                 entities.append(SinumEnergySensor(coordinator.client, energy, desc, entry_id))
-    except SinumConnectionError:
+    except (SinumConnectionError, SinumNotSupportedError):
         _LOGGER.debug("Energy endpoint not available on this hub")
 
 

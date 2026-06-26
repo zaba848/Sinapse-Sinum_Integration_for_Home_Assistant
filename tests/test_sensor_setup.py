@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.sinum.api import SinumConnectionError
+from custom_components.sinum.api import SinumConnectionError, SinumNotSupportedError
 from custom_components.sinum.const import STYPE_BUTTON, WTYPE_BUTTON
 from custom_components.sinum.sensor import (
     ENERGY_SENSORS,
@@ -297,6 +297,26 @@ class TestAsyncSetupEntry:
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
         wifi = [e for e in added if isinstance(e, SinumHubWifiSensor)]
         assert len(wifi) == 0
+
+    @pytest.mark.asyncio
+    async def test_energy_404_does_not_crash_platform(self):
+        """Regression: SinumNotSupportedError (404) from optional endpoints must not
+        propagate — the sensor platform was crashing silently on hubs without /energy."""
+        coordinator = _make_coordinator()
+        coordinator.client.get_energy = AsyncMock(
+            side_effect=SinumNotSupportedError("Endpoint not found on this hub: /api/v1/energy")
+        )
+        coordinator.client.get_weather = AsyncMock(
+            side_effect=SinumNotSupportedError("Endpoint not found")
+        )
+        coordinator.client.get_energy_center_summary = AsyncMock(
+            side_effect=SinumNotSupportedError("Endpoint not found")
+        )
+        entry = _make_entry(coordinator)
+        added = []
+        await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
+        # Platform must not raise; some entities are created (virtual/wtp/sbus are empty in
+        # _make_coordinator default, so total may be 0 — the key is no exception).
 
     @pytest.mark.asyncio
     async def test_schedule_sensors_created(self):

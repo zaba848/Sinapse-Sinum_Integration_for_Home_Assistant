@@ -19,7 +19,7 @@ from homeassistant.const import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import SinumConnectionError
+from .api import SinumConnectionError, SinumNotSupportedError
 from .const import DOMAIN
 from .coordinator import SinumCoordinator
 from .sensor_bus import _SENTINEL_INT16, SinumSensorDescription
@@ -232,7 +232,7 @@ class SinumWeatherSensor(SensorEntity):
     async def async_update(self) -> None:
         try:
             self._data = await self._client.get_weather()
-        except SinumConnectionError as err:
+        except (SinumConnectionError, SinumNotSupportedError) as err:
             _LOGGER.warning("Weather update failed: %s", err)
 
 
@@ -270,7 +270,7 @@ class SinumEnergySensor(SensorEntity):
     async def async_update(self) -> None:
         try:
             self._data = await self._client.get_energy()
-        except SinumConnectionError as err:
+        except (SinumConnectionError, SinumNotSupportedError) as err:
             _LOGGER.warning("Energy update failed: %s", err)
 
 
@@ -447,7 +447,7 @@ class SinumEnergyCenterStatusSensor(SensorEntity):
     async def async_update(self) -> None:
         try:
             self._data = await self._client.get_energy_center_summary()
-        except SinumConnectionError as err:
+        except (SinumConnectionError, SinumNotSupportedError) as err:
             _LOGGER.warning("Energy Center status update failed: %s", err)
 
 
