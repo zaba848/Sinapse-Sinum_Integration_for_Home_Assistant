@@ -1,366 +1,246 @@
 # Sinapse — integracja Sinum dla Home Assistant
 
-**Sinapse** łączy centralę automatyki budynkowej TECH Sterowniki Sinum EH-01 z Home Assistant przez sieć lokalną. Integracja wykrywa urządzenia fizyczne i wirtualne z centrali Sinum, tworzy natywne encje Home Assistant i umożliwia odczyt oraz sterowanie.
+**Sinapse** łączy centralę automatyki budynkowej [TECH Sterowniki](https://www.techsterowniki.pl) **Sinum EH-01** z Home Assistant przez sieć lokalną. Urządzenia fizyczne i wirtualne z centrali są widoczne w HA jako natywne encje z pełnym odczytem, sterowaniem i aktualizacjami stanu w czasie rzeczywistym.
 
 **Język:** [English](README.md) | Polski
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1460%20passing-brightgreen.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-0.5.4-blue.svg)](custom_components/sinum/manifest.json)
-[![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/testy-1481%20OK-brightgreen.svg)](tests/)
+[![CC Gate](https://img.shields.io/badge/CC-%E2%89%A44%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
+[![Version](https://img.shields.io/badge/wersja-0.5.5-blue.svg)](custom_components/sinum/manifest.json)
+[![License](https://img.shields.io/badge/licencja-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
 
-## Informacja prawna
+## Co zyskujesz
 
-- To nieoficjalny projekt społecznościowy. Nie jest powiązany z TECH Sterowniki, autoryzowany przez TECH Sterowniki ani utrzymywany przez producenta.
-- Nazwy „TECH”, „Sinum” oraz powiązane oznaczenia mogą być znakami towarowymi ich właścicieli.
-- Integracja korzysta z dostępnych API centrali do odczytu i sterowania urządzeniami we własnej instalacji użytkownika.
-- Użytkownik odpowiada za zgodność użycia z prawem, regulaminami dostawcy oraz polityką bezpieczeństwa swojej sieci.
-- Oprogramowanie jest dostarczane bez gwarancji. Szczegóły znajdują się w pliku [LICENSE](LICENSE).
-
----
-
-## Spis treści
-
-- [Jak to działa](#jak-to-działa)
-- [Obsługiwane urządzenia](#obsługiwane-urządzenia)
-- [Instalacja](#instalacja)
-- [Dodanie Sinum do Home Assistant](#dodanie-sinum-do-home-assistant)
-- [Konfiguracja](#konfiguracja)
-- [Transport WebSocket](#transport-websocket)
-- [Most MQTT](#most-mqtt)
-- [Usługi Home Assistant](#usługi-home-assistant)
-- [Sceny, automatyzacje i zmienne Sinum](#sceny-automatyzacje-i-zmienne-sinum)
-- [Testowane centrale](#testowane-centrale)
-- [Znane ograniczenia](#znane-ograniczenia)
-- [Bezpieczeństwo](#bezpieczeństwo)
-- [Wycofanie zmian](#wycofanie-zmian)
-- [Licencja](#licencja)
+- **2 581 encji HA** z 2 produkcyjnych central (WTP + SBUS)
+- **11 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
+- **4 magistrale**: Virtual, WTP, SBUS, LoRa — odpytywane równolegle co 30 s
+- **Aktualizacje w czasie rzeczywistym** przez WebSocket (opóźnienie \< 1 s), most MQTT jako wariant awaryjny
+- **1 481 testów** w 44 plikach, CC ≤ 4 w każdej funkcji, czysty mypy
 
 ---
 
-## Jak to działa
+## Szybki start
 
-```text
-Centrala Sinum
-    │
-    │  REST API HTTP/JSON
-    │  POST/PATCH /api/v1/devices/{bus}/{id}
-    │
-    ▼
-SinumClient (api.py)
-    │  asyncio + aiohttp, timeout 25 s
-    │  token API albo login i JWT z automatycznym odświeżaniem
-    │
-    ▼
-SinumCoordinator (coordinator.py)
-    │  DataUpdateCoordinator
-    │  cykliczny odczyt virtual, WTP, SBUS i LoRa
-    │  stan z cache przy krótkiej niedostępności centrali
-    │
-    ├──► Platformy encji Home Assistant
-    │    climate, sensor, switch, cover, light, event, button, number, update
-    │
-    ├──► WebSocket (zalecane)
-    │    centrala wysyła zdarzenia zmian stanu
-    │    integracja aktualizuje encje bez czekania na polling
-    │
-    └──► MQTT przez skrypt Lua (wariant awaryjny)
-         skrypt w centrali publikuje zmiany stanu do brokera MQTT
+```
+1. HACS → Integrations → ⋮ → Custom repositories
+   URL: https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant
+   Category: Integration
+
+2. Zainstaluj "Sinum (Sinapse)" → Uruchom ponownie Home Assistant
+
+3. Settings → Devices & Services → Add Integration → wyszukaj "Sinum"
+   Wpisz adres IP centrali i token API
+
+4. Settings → … → Sinum → Configure → włącz WebSocket real-time transport
 ```
 
-Zalecana metoda logowania to **token API** utworzony w web UI Sinum. Dzięki temu Home Assistant nie przechowuje hasła użytkownika centrali.
+→ **[Pełny przewodnik instalacji ze zrzutami ekranu](docs/installation.pl.md)**
+
+---
+
+## Dokumentacja
+
+| Dokument | Zawartość |
+|---|---|
+| [Przewodnik instalacji](docs/installation.pl.md) | HACS, instalacja ręczna, generowanie tokena, zrzuty ekranu |
+| [Referencja encji](docs/entities.pl.md) | Wszystkie platformy, atrybuty, przykłady automatyzacji |
+| [Transport czasu rzeczywistego](docs/real-time.pl.md) | Konfiguracja WebSocket + most MQTT (wariant awaryjny) |
+| [Przewodnik developera](docs/development.pl.md) | Środowisko, testy, reguły CC, nowe typy urządzeń |
+| [Historia zmian](CHANGELOG.md) | Pełna historia wersji |
+| [Bezpieczeństwo](SECURITY.md) | Zgłaszanie podatności |
+| [Wkład w projekt](CONTRIBUTING.md) | Jak współtworzyć, styl kodu, lista kontrolna PR |
+
+---
+
+## Architektura
+
+```
+Centrala Sinum
+    │  REST API (HTTP/JSON)  PATCH /api/v1/devices/{magistrala}/{id}
+    ▼
+SinumClient (api.py)
+    │  aiohttp · auto-odświeżanie JWT · ponowna próba przy 408 · SinumNotSupportedError
+    ▼
+SinumCoordinator (coordinator.py)
+    │  DataUpdateCoordinator · równoległy odczyt magistral · fallback na cache
+    │  śledzenie removed_ids → czyszczenie przestarzałych encji z rejestru
+    │
+    ├──► Platformy encji (climate · sensor · switch · cover · light · …)
+    │    Odczyt: coordinator.{magistrala}_devices[id]
+    │    Zapis: coordinator.client.patch_{magistrala}_device(id, payload)
+    │
+    ├──► Most WebSocket (websocket.py)       ← zalecane
+    │    Centrala wysyła zdarzenia device_state_changed
+    │    Cache koordynatora aktualizowany natychmiast → encje odświeżane < 1 s
+    │
+    └──► Most MQTT (mqtt.py + lua_scripts/mqtt_bridge.lua)  ← wariant awaryjny
+         Skrypt Lua w centrali publikuje zmiany do brokera MQTT
+         Integracja subskrybuje i aktualizuje cache koordynatora
+```
+
+**Logowanie**: preferowany statyczny token API (bez wygaśnięcia). Alternatywnie login + hasło z JWT z automatycznym odświeżaniem przy 401.
+
+**Obsługa błędów**: `SinumConnectionError` przy problemach sieciowych/JSON. Koordynator zwraca stan z cache podczas niedostępności centrali. Operacje zapisu trafiają do użytkownika jako `HomeAssistantError` w UI HA. HTTP 408 (zajęta magistrala) — jedna ponowna próba po 1 s.
 
 ---
 
 ## Obsługiwane urządzenia
 
-### Platformy Home Assistant
+### Platformy encji
 
 | Platforma | Zakres |
 |---|---|
-| `climate` | Termostaty wirtualne, fan coile WTP/SBUS, regulatory temperatury, manager pompy ciepła |
-| `sensor` | Temperatura, wilgotność, CO₂, ciśnienie, jakość powietrza, energia, moc, napięcie, prąd, pogoda, diagnostyka centrali, status automatyzacji |
-| `binary_sensor` | Zalanie, ruch, otwarcie, dym, wejścia dwustanowe, łączność urządzeń nadrzędnych |
-| `switch` | Przekaźniki wirtualne i fizyczne, elektrozaczep, zawory i pompy |
-| `cover` | Bramy, rolety, integratory rolet |
-| `light` | Ściemniacze, RGB, integratory dimmer/RGB |
-| `event` | Zdarzenia przycisków fizycznych do automatyzacji HA |
-| `button` | Sceny Sinum i skrypty Lua |
-| `number` | Numeryczne zmienne środowiskowe Lua, wyjścia analogowe SBUS |
-| `update` | Informacja o firmware urządzeń nadrzędnych |
-| `alarm_control_panel` | System alarmowy, jeśli występuje w centrali |
+| `climate` | Termostaty wirtualne · fan coile WTP/SBUS · regulatory temperatury · manager pompy ciepła |
+| `sensor` | Temperatura · wilgotność · CO₂ · ciśnienie · natężenie światła · PM · IAQ · moc · energia · napięcie · prąd · pogoda · diagnostyka centrali · Energy Center · status automatyzacji · harmonogramy |
+| `binary_sensor` | Zalanie · ruch · otwarcie · dym · wejście dwustanowe · stan zaworu fan coila WTP · łączność urządzeń nadrzędnych |
+| `switch` | Integratory przekaźników · przekaźniki WTP/SBUS · elektrozaczep · pompa zaworu · zawór wspólny |
+| `cover` | Integratory rolet wirtualnych · brama · sterowniki rolet WTP/SBUS |
+| `light` | Integratory ściemniaczy/RGB · ściemniacze WTP/SBUS · sterowniki RGB WTP/SBUS |
+| `event` | Zdarzenia przycisków fizycznych — idealne do automatyzacji HA |
+| `button` | Sceny Sinum Lua (uruchamiane przez `POST /activate`) |
+| `number` | Numeryczne zmienne środowiskowe Lua · wyjście analogowe SBUS (0–10 V) |
+| `update` | Śledzenie firmware urządzeń nadrzędnych |
+| `alarm_control_panel` | System alarmowy (jeśli dostępny w centrali) |
+| `camera` | Kamery IP/ONVIF przez proxy snapshotów centrali |
 
-### Magistrale i typy urządzeń
+### Typy urządzeń na magistralach
 
-**Virtual:** `thermostat`, `relay_integrator`, `blind_controller_integrator`, `gate`, `wicket`, `dimmer_rgb_controller_integrator`, `heat_pump_manager`
+**Virtual** — `thermostat` · `relay_integrator` · `blind_controller_integrator` · `gate` · `wicket` · `dimmer_rgb_controller_integrator` · `dimmer_rgb_integrator` · `heat_pump_manager`
 
-**WTP:** czujniki temperatury, wilgotności, ciśnienia, światła, CO₂, IAQ, ruchu, zalania, otwarcia, dymu, wejścia dwustanowe, przekaźniki, dimmery, RGB, rolety, liczniki energii, fan coile, regulatory temperatury, przyciski
+**WTP** — `temperature_sensor` · `humidity_sensor` · `pressure_sensor` · `light_sensor` · `co2_sensor` · `iaq_sensor` · `aq_sensor` · `motion_sensor` · `flood_sensor` · `opening_sensor` · `smoke_sensor` · `two_state_input_sensor` · `relay` · `dimmer` · `rgb_controller` · `blind_controller` · `energy_meter` · `fan_coil` · `fan_coil_v2` · `temperature_regulator` · `button`
 
-**SBUS:** czujniki temperatury, wilgotności, światła i ruchu, wejścia i wyjścia analogowe, liczniki impulsów, przekaźniki, dimmery, RGB, fan coile, regulatory, zawory, PWM, rolety, liczniki energii
+**SBUS** — `temperature_sensor` · `humidity_sensor` · `light_sensor` · `motion_sensor` · `two_state_input_sensor` · `analog_input` · `analog_output` · `impulse_meter` · `relay` · `dimmer` · `rgb_controller` · `fan_coil` · `temperature_regulator` · `button` · `valve_pump` · `common_valve` · `pulse_width_modulation` · `blind_controller` · `energy_meter`
 
-**LoRa:** czujniki temperatury, wilgotności, otwarcia, zalania, dymu, przekaźniki i wejścia dwustanowe
-
----
-
-## Instalacja
-
-### HACS
-
-1. Wejdź w **HACS → Integrations → ⋮ → Custom repositories**.
-2. Dodaj repozytorium `https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant`.
-3. Wybierz kategorię **Integration**.
-4. Zainstaluj **Sinum (Sinapse)**.
-5. Zrestartuj Home Assistant.
-
-### Instalacja ręczna
-
-Skopiuj katalog integracji do konfiguracji Home Assistant:
-
-```bash
-cp -r custom_components/sinum /config/custom_components/
-```
-
-Następnie zrestartuj Home Assistant.
-
----
-
-## Dodanie Sinum do Home Assistant
-
-### Krok 1 — przygotuj token dostępu w centrali Sinum
-
-Otwórz web UI centrali Sinum w tej samej sieci lokalnej co Home Assistant, na przykład `http://sinum.local` albo adres IP centrali.
-To są tylko przykładowe adresy - użyj własnego hosta/IP swojej centrali w sieci lokalnej.
-
-![Logowanie do Sinum](docs/images/setup/sinum-01-sign-in-pl.png)
-
-Po zalogowaniu przejdź do **Ustawienia → System → Integracje**. W angielskim UI jest to **Settings → System → Integrations**.
-
-![Integracje Sinum](docs/images/setup/sinum-02-settings-system-integrations-pl.png)
-
-W sekcji **Tokeny integracji zewnętrznych**:
-
-1. Kliknij **Dodaj token**.
-2. Wpisz nazwę, na przykład `Home Assistant`.
-3. Wybierz typ tokena.
-4. Kliknij **Zapisz**.
-5. Skopiuj wygenerowany token od razu i przechowuj go bezpiecznie.
-
-![Dodawanie tokena](docs/images/setup/sinum-04-add-token-pl.png)
-
-Listę tokenów znajdziesz później w **Ustawienia → System → Integracje → Tokeny integracji zewnętrznych → Lista tokenów**.
-
-![Lista tokenów](docs/images/setup/sinum-03-token-list-pl.png)
-
-Nie wklejaj tokena do zgłoszeń GitHub, logów, screenów ani wiadomości. Jeśli token zostanie utracony, utwórz nowy i usuń stary w web UI Sinum.
-
-Szukasz oficjalnych materiałów TECH Sterowniki?
-- Baza wiedzy Sinum: https://www.techsterowniki.pl/blog/kategoria/sinum
-- FAQ: https://www.techsterowniki.pl/serwis/faq
-
-### Krok 2 — dodaj integrację w Home Assistant
-
-W Home Assistant przejdź do:
-
-**Settings → Devices & Services → Add Integration → Sinum**
-
-Kreator konfiguracji ma dwa etapy.
-
-**Ekran 1 — adres centrali i metoda logowania**
-
-| Pole | Co wpisać |
-|---|---|
-| Host | Adres IP lub nazwa hosta centrali, np. `10.0.62.167` (to tylko przykład). Bez `http://`. |
-| Auth method | `api_token` zalecane albo `username_password` |
-
-Jeśli nie znasz adresu IP centrali, spróbuj `sinum.local`. Jeśli to nie działa, sprawdź listę dzierżaw DHCP w routerze.
-
-**Ekran 2 — dane dostępowe**
-
-| Metoda | Co wpisać | Skąd wziąć |
-|---|---|---|
-| API Token | Token z Sinum | `Ustawienia → System → Integracje → Tokeny integracji zewnętrznych → Dodaj token` |
-| Username / Password | Login i hasło Sinum | Dane używane do web UI Sinum |
-
-Po kliknięciu **Submit** integracja pobierze urządzenia z centrali i utworzy encje.
-
-### Krok 3 — włącz aktualizacje w czasie rzeczywistym
-
-Bez WebSocket encje są odświeżane cyklicznie. Z WebSocket zmiany stanu pojawiają się zwykle poniżej jednej sekundy.
-
-1. W Home Assistant przejdź do **Settings → Devices & Services → Sinum (Sinapse) → Configure**.
-2. Włącz **Enable WebSocket real-time transport**.
-3. Zostaw ścieżkę `/api/v1/ws`, jeśli centrala nie wymaga innej.
-4. Kliknij **Submit**.
-
-### Krok 4 — MQTT jako wariant awaryjny
-
-Jeśli firmware centrali nie obsługuje WebSocket, można użyć mostu MQTT opartego o skrypt Lua. Szczegóły są w sekcji [Most MQTT](#most-mqtt).
+**LoRa** — `temperature_sensor` · `humidity_sensor` · `opening_sensor` · `flood_sensor` · `relay` · `two_state_input_sensor` · `smoke_sensor`
 
 ---
 
 ## Konfiguracja
 
-Opcje dostępne są z karty integracji przez **Configure**.
+### Opcje integracji (Settings → … → Sinum → Configure)
 
 | Opcja | Domyślnie | Opis |
-|---|---:|---|
-| Scan interval | 30 s | Cykliczny odczyt REST. Zakres 10-300 s. Działa także jako ścieżka kontrolna przy WebSocket/MQTT. |
-| Enable WebSocket real-time transport | wyłączone | Stałe połączenie WebSocket z centralą. Zalecane. |
-| WebSocket endpoint path | `/api/v1/ws` | Zmieniaj tylko, jeśli dana wersja firmware używa innej ścieżki. |
-| Enable MQTT real-time transport | wyłączone | Starszy wariant push przez Lua i MQTT. Używaj tylko, gdy WebSocket nie działa. |
+|---|---|---|
+| Scan interval | 30 s | Interwał odpytywania REST (10–300 s). Zawsze aktywne jako ścieżka kontrolna. |
+| Enable WebSocket real-time transport | wyłączone | Stałe połączenie WebSocket z centralą dla natychmiastowych aktualizacji. Zalecane. |
+| WebSocket endpoint path | `/api/v1/ws` | Zmień tylko jeśli Twój firmware centrali używa innej ścieżki. |
+| Enable MQTT real-time transport | wyłączone | Starszy wariant push przez Lua i MQTT. Używaj tylko gdy WebSocket nie działa. |
 | MQTT topic prefix | `sinum` | Musi być zgodny z `TOPIC_PREFIX` w skrypcie `mqtt_bridge.lua`. |
 
-Jeśli token lub hasło zostanie zmienione, Home Assistant pokaże powiadomienie reautoryzacji. Kliknij **Re-authenticate** i podaj nowe dane.
+### Reautoryzacja
+
+Jeśli token lub hasło ulegną zmianie, HA wyświetli powiadomienie. Kliknij **Re-authenticate** i wpisz nowe dane — restart nie jest potrzebny.
+
+### Wiele central
+
+Wiele central Sinum można dodać jako oddzielne wpisy konfiguracyjne. Usługi (`sinum.send_notification`, `sinum.update_schedule`, `sinum.upload_mqtt_bridge`) akceptują opcjonalne pole `entry_id` wskazujące konkretną centralę.
 
 ---
 
-## Transport WebSocket
-
-WebSocket jest zalecaną metodą szybkich aktualizacji. Centrala wysyła zdarzenia zmian stanu, a integracja aktualizuje cache koordynatora bez czekania na kolejny polling REST.
-
-Sprawdzenie działania:
-
-1. Włącz WebSocket w opcjach integracji.
-2. Zmień stan dowolnego urządzenia w Sinum.
-3. Sprawdź, czy encja w Home Assistant aktualizuje się niemal natychmiast.
-4. Jeśli nie, sprawdź logi Home Assistant dla `custom_components.sinum`.
-
----
-
-## Most MQTT
-
-MQTT jest wariantem awaryjnym dla firmware bez WebSocket.
-
-### Dodanie klienta MQTT w centrali
-
-W web UI Sinum przejdź do (użyj swojego hosta/IP centrali, nie przykładu z dokumentacji):
-
-**Ustawienia → System → Integracje → Klient MQTT → Dodaj klient MQTT**
-
-W angielskim UI:
-
-**Settings → System → Integrations → MQTT client → Add MQTT client**
-
-![Dodawanie klienta MQTT](docs/images/setup/sinum-05-add-mqtt-client-pl.png)
-
-Ustaw adres brokera MQTT na adres Home Assistant, port zwykle `1883`, dane logowania i zapamiętaj identyfikator klienta.
-
-### Wgranie mostu Lua
-
-Użyj usługi Home Assistant:
-
-```yaml
-service: sinum.upload_mqtt_bridge
-data:
-  mqtt_scene_id: 1
-  mqtt_client_id: 1
-```
-
-`mqtt_scene_id` to ID sceny Lua w centrali, która ma zostać nadpisana skryptem mostu. `mqtt_client_id` to numer klienta MQTT utworzonego w Sinum.
-
-### Włączenie MQTT w integracji
-
-1. Wejdź w **Settings → Devices & Services → Sinum (Sinapse) → Configure**.
-2. Włącz **MQTT real-time transport**.
-3. Ustaw `Topic prefix` zgodnie z konfiguracją skryptu Lua, domyślnie `sinum`.
-
----
-
-## Usługi Home Assistant
+## Usługi HA
 
 ### `sinum.send_notification`
 
-Wysyła powiadomienie push przez centralę Sinum do aplikacji mobilnej.
+Wysyła powiadomienie push przez centralę do aplikacji mobilnej Sinum.
 
 ```yaml
 service: sinum.send_notification
 data:
-  title: "Alarm"
-  message: "Wykryto zalanie w kotłowni"
+  title: "Home Assistant"
+  message: "Drzwi wejściowe otwarte od 10 minut."
 ```
 
 ### `sinum.update_schedule`
 
-Aktualizuje harmonogram termiczny Sinum przez API centrali.
+Aktualizuje harmonogram termiczny Sinum. Przydatne do dynamicznych programów grzewczych z automatyzacji HA.
 
 ```yaml
 service: sinum.update_schedule
 data:
-  schedule_id: 2
+  schedule_id: 3
   payload:
-    name: "Tryb komfortowy"
+    name: "Tryb letni"
+    periods:
+      - start: "08:00"
+        temperature: 210   # °C × 10
 ```
 
 ### `sinum.upload_mqtt_bridge`
 
-Wgrywa skrypt Lua mostu MQTT do wskazanej sceny w centrali.
-
----
-
-## Sceny, automatyzacje i zmienne Sinum
-
-Sceny Sinum typu Lua są widoczne w Home Assistant jako encje `button`. Kliknięcie przycisku uruchamia scenę w centrali.
-
-Numeryczne zmienne środowiskowe Lua są widoczne jako encje `number`, dzięki czemu automatyzacje Home Assistant mogą ustawiać wartości odczytywane później przez skrypty w Sinum.
-
-Przykład automatyzacji Home Assistant:
+Renderuje i wgrywa skrypt Lua mostu MQTT do sceny w centrali. Zastępuje ręczne kopiowanie kodu.
 
 ```yaml
-alias: Zamknij rolety o 22
-trigger:
-  - platform: time
-    at: "22:00:00"
-action:
-  - service: cover.close_cover
-    target:
-      entity_id: cover.salon_rolety
+service: sinum.upload_mqtt_bridge
+data:
+  mqtt_scene_id: 1    # ID sceny w centrali do nadpisania
+  mqtt_client_id: 1   # ID klienta MQTT z web UI Sinum
+  dry_run: false      # true = podgląd skryptu Lua bez wgrywania
 ```
 
 ---
 
 ## Testowane centrale
 
-Projekt jest walidowany na żywych centralach WTP i SBUS. Aktualny plan testów oraz notatki walidacyjne znajdują się w [HARDWARE_TEST_PLAN.md](HARDWARE_TEST_PLAN.md).
+| Centrala | Model | API | Firmware | Virtual | WTP | SBUS | Encje HA |
+|---|---|---|---|---|---|---|---|
+| tablica-wtp | sinum\_plus | 1.4 | 1.24.0-alpha.2 | 28 | 254 | 8 | 1 084 |
+| sinum-tablica-sbus-1 | sinum\_lite | 1.4 | 1.24.0-alpha.3 | 169 | 35 | 436 | 1 497 |
 
-Przed wydaniem wersji wykonywane są testy jednostkowe, walidacja integracji oraz smoke testy sprzętowe na centralach.
+**Łącznie: 2 581 encji** zweryfikowanych na żywym sprzęcie (2026-06-24).
+
+`tablica-wtp` (instalacja WTP-heavy): 108 przekaźników WTP, 18 sterowników rolet, 15 regulatorów temperatury, 28 przycisków, pełny zestaw czujników (temperatura/wilgotność/CO₂/IAQ/ciśnienie/światło/ruch/zalanie), 1 fan coil, 1 licznik energii.
+
+`sinum-tablica-sbus-1` (instalacja SBUS-heavy): 83 termostaty wirtualne, 51 regulatorów SBUS, 69 przekaźników SBUS, 38 ściemniaczy SBUS, 6 sterowników RGB SBUS, 30 przycisków SBUS, 134 czujniki temperatury SBUS, 46 czujników wilgotności SBUS, 1 manager pompy ciepła.
 
 ---
 
 ## Znane ograniczenia
 
-- Część funkcji zależy od wersji firmware centrali Sinum.
-- WebSocket może nie być dostępny w starszych wersjach firmware.
-- MQTT wymaga poprawnie skonfigurowanego klienta MQTT w centrali oraz brokera w Home Assistant.
-- Niektóre urządzenia wirtualne mogą nie raportować pełnego feedbacku pozycji lub stanu.
-- Operacje zapisu zależą od tego, czy dana magistrala i urządzenie akceptują komendę w API Sinum.
+| Ograniczenie | Szczegóły |
+|---|---|
+| **Typ akcji przycisku SBUS bez transportu push** | Centrala SBUS zeruje pole `action` od razu po naciśnięciu. Naciśnięcie jest wykrywane przez `buttons_count`, ale `action` będzie `None` bez WebSocket/MQTT. |
+| **Typ wirtualny `custom_device`** | Kontrakty Lua różnią się między instalacjami — nie mapowany na encje HA. Używaj scen i automatyzacji. |
+| **`thermostat_output_group`** | Tylko diagnostyczny sensor (liczba wyjść), bez encji sterujących. |
+| **WTP RGB w trybie temperatury barwowej** | Firmware centrali ignoruje wartości koloru gdy aktywny jest tryb color-temperature. Działa tylko `color_temp_kelvin`. |
+| **Integratory rolet wirtualnych** | Raportują `position = None` gdy brak podłączonych sterowników fizycznych (kwestia konfiguracji centrali). |
+| **Energy Center** | Sensory pojawiają się tylko gdy firmware eksponuje `/api/v1/energy-center/*`. |
+| **Harmonogramy** | Tylko odczyt + usługa `sinum.update_schedule`. Pełny edytor UI harmonogramów nie jest zaimplementowany. |
+| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Urządzenia SLINK nie są mapowane. Streamy wideo wymagają bezpośrednich danych RTSP — użyj Generic Camera HA. |
+| **Błędy 408 firmware alpha** | Sporadyczne przy odpytywaniu magistral. Integracja ponawia raz, potem serwuje stan z cache. |
 
 ---
 
 ## Bezpieczeństwo
 
-- Nie wystawiaj centrali Sinum bezpośrednio do internetu.
-- Najlepiej trzymaj Home Assistant i centralę Sinum w tej samej zaufanej sieci lokalnej lub VLAN.
-- Używaj tokena API zamiast hasła, jeśli to możliwe.
-- Nie publikuj tokena w logach, screenach ani zgłoszeniach.
-- Jeśli token wycieknie, usuń go w web UI Sinum i utwórz nowy.
-- Przy dostępie zdalnym używaj VPN albo bezpiecznego tunelu, nie przekierowania portów centrali.
+Centrala komunikuje się po HTTP w sieci lokalnej.
+
+- **Sieć**: umieść centralę na dedykowanym VLAN IoT. Zezwól tylko HA na dostęp do portu 80. Zablokuj bezpośredni dostęp z internetu.
+- **Token zamiast hasła**: wygeneruj dedykowany token API dla integracji HA. Jest ograniczony zakresem, nie daje dostępu do powłoki i można go odwołać niezależnie.
+- **Nie ujawniaj**: nie wklejaj tokena do zgłoszeń GitHub, logów, zrzutów ekranu ani wiadomości. Integracja usuwa go z diagnostyki HA.
+- **TLS (opcjonalnie)**: umieść odwrotne proxy nginx lub Caddy na tym samym VLAN, które terminuje TLS i przekierowuje do centrali.
+- **Ochrona reautoryzacji**: integracja blokuje reautoryzację po 5 kolejnych nieudanych próbach na 5 minut.
+
+Szczegóły: [SECURITY.md](SECURITY.md)
 
 ---
 
-## Wycofanie zmian
+## Informacja prawna
 
-Jeśli po aktualizacji integracja działa niepoprawnie:
-
-1. Wyłącz integrację Sinum w Home Assistant.
-2. W HACS wróć do poprzedniej wersji albo przy instalacji ręcznej przywróć poprzedni katalog `custom_components/sinum`.
-3. Zrestartuj Home Assistant.
-4. Jeśli problem dotyczy tokena, utwórz nowy token w web UI Sinum i wykonaj reautoryzację integracji.
+To nieoficjalny projekt społecznościowy. Nie jest powiązany z TECH Sterowniki, autoryzowany przez nich ani przez nich utrzymywany. Nazwy „TECH", „Sinum" oraz powiązane oznaczenia mogą być znakami towarowymi ich właścicieli. Integracja korzysta z lokalnego API centrali do sterowania urządzeniami we własnej instalacji użytkownika. Użytkownik odpowiada za zgodność użycia z prawem i regulaminami dostawcy.
 
 ---
 
 ## Licencja
 
-Kod jest udostępniony zgodnie z [LICENSE](LICENSE). Integracja jest projektem nieoficjalnym i nie jest produktem TECH Sterowniki.
+**Source Available — Ograniczone użycie komercyjne**
+
+© 2026 Tomasz Panek · Wszelkie prawa zastrzeżone
+
+Użytek osobisty i niekomercyjna automatyka domowa: **bezpłatne**.  
+Wdrożenie komercyjne, organizacyjne lub produktowe: **wymagana licencja** — kontakt: zaba9214@gmail.com.
+
+Pełne warunki: [LICENSE](LICENSE)

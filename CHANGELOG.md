@@ -25,10 +25,25 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [0.5.5] — 2026-06-26
 
-### Documentation
-- Refreshed setup screenshots for language consistency (EN/PL split maintained).
-- Re-captured MQTT setup visuals to ensure stable rendering and dark-theme consistency.
-- Updated token and MQTT client ID setup steps with clearer, release-ready screenshots.
+### Quality — Code & Tests
+- **CC zero-legacy**: all 19 previously exempted functions refactored to CC ≤ 4. `_LEGACY_ALLOWANCE = {}` — no exemptions remain.
+  - `alarm_control_panel`: extracted `_format_alarm_inputs` helper
+  - `binary_sensor`: extracted `_fan_coil_gear_active` helper
+  - `camera`: extracted `_camera_base_attrs` + `_CAMERA_BASE_KEYS` constant
+  - `cover`: extracted `_apply_restored_position`, `_apply_restored_tilt`, `_compare_target_current`, `_sbus_blind_features`, `_sbus_blind_device_info`
+  - `light`: 13 new module-level helpers/constants (rgb detection, color mode, restore state, Lua command builders)
+- **WebSocket edge tests** (+19 tests): PING dispatch, `source` field fallback, auth-fail `PermissionError`, reconnect exception handling, stop-event exit
+- **Stale device cleanup**: coordinator tracks `removed_ids` per bus after each refresh; `__init__.py` registers a listener that removes entity registry entries for disappeared device IDs. Protects against accidental removal on API failures.
+- **Stale cleanup tests** (+10 tests): `_stale_uid_prefixes`, `_is_stale_entity`, `_cleanup_stale_entities` coverage
+- **Total: 1 481 tests** across 44 files (~8 s runtime)
+
+### Documentation — Full Overhaul
+- **README.md**: rewritten as a compact, scannable landing page with architecture diagram, entity table, tested hubs matrix, all docs linked
+- **README.pl.md**: full Polish translation matching EN structure (previously incomplete)
+- **docs/installation.md**: step-by-step guide with all setup screenshots, troubleshooting table, rollback instructions
+- **docs/entities.md**: complete entity reference — all platforms, attributes, availability semantics, automation examples
+- **docs/real-time.md**: WebSocket + MQTT transport guide with architecture diagrams and troubleshooting tables
+- **docs/development.md**: developer guide — project structure, CC rules, adding new sensors/platforms/virtual types, test patterns, live hub debugging
 
 ## [0.3.9] — 2026-06-25
 
