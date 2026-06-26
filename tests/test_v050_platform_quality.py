@@ -68,7 +68,7 @@ class TestParallelUpdates:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _make_gate_cover(device_data: dict[str, Any]) -> "SinumGateCover":
+def _make_gate_cover(device_data: dict[str, Any]):
     from custom_components.sinum.cover import SinumGateCover
 
     coordinator = MagicMock()
@@ -153,7 +153,7 @@ class TestGateCover:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _make_blind_cover(device_data: dict[str, Any]) -> "SinumBlindCover":
+def _make_blind_cover(device_data: dict[str, Any]):
     from custom_components.sinum.cover import SinumBlindCover
 
     coordinator = MagicMock()
@@ -236,7 +236,7 @@ class TestVirtualBlindCover:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _make_sbus_blind(device_data: dict[str, Any]) -> "SinumSbusBlindCover":
+def _make_sbus_blind(device_data: dict[str, Any]):
     from custom_components.sinum.cover import SinumSbusBlindCover
 
     coordinator = MagicMock()

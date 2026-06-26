@@ -20,7 +20,6 @@ from custom_components.sinum.websocket import (
     _ws_should_continue,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def _coordinator() -> MagicMock:
@@ -346,20 +345,18 @@ async def test_ws_bridge_async_stop_sets_stop_event():
     cancelled_task = asyncio.create_task(asyncio.sleep(100))
 
     async def _noop_run():
-        try:
+        import contextlib
+        with contextlib.suppress(asyncio.CancelledError):
             await asyncio.sleep(100)
-        except asyncio.CancelledError:
-            pass
 
     bridge._task = asyncio.create_task(_noop_run())
     await bridge.async_stop()
     assert bridge._stop_event.is_set()
     assert bridge._task is None
     cancelled_task.cancel()
-    try:
+    import contextlib
+    with contextlib.suppress(asyncio.CancelledError):
         await cancelled_task
-    except asyncio.CancelledError:
-        pass
 
 
 @pytest.mark.asyncio

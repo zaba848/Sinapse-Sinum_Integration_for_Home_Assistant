@@ -303,6 +303,28 @@
           "description": "Partial schedule payload accepted by the Sinum API."
         }
       }
+    },
+    "upload_mqtt_bridge": {
+      "name": "Upload MQTT bridge",
+      "description": "Renders the Lua MQTT bridge script and uploads it to a Sinum hub scene. Use this instead of manually editing the Lua code.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Required when more than one Sinum hub is loaded."
+        },
+        "mqtt_scene_id": {
+          "name": "Scene ID",
+          "description": "ID of the scene on the hub to overwrite with the Lua bridge script. Create an empty scene first in the Sinum web UI."
+        },
+        "mqtt_client_id": {
+          "name": "MQTT client ID",
+          "description": "MQTT client index (1-based) configured in the Sinum hub web UI under Settings → System → Integrations → MQTT client."
+        },
+        "dry_run": {
+          "name": "Dry run",
+          "description": "If true, log the rendered Lua script without uploading it to the hub."
+        }
+      }
     }
   }
 }

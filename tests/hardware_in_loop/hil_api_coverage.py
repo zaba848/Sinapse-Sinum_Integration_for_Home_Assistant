@@ -19,7 +19,7 @@ import asyncio
 import sys
 
 
-async def run_hil(host: str, token: str) -> bool:
+async def run_hil(host: str, token: str) -> bool:  # noqa: C901
     try:
         import aiohttp
     except ImportError:

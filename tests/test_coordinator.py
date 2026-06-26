@@ -398,7 +398,6 @@ class TestSinumCoordinator:
 
     @pytest.mark.asyncio
     async def test_safe_fetch_reraises_sinum_auth_error(self, mock_client):
-        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         from custom_components.sinum.api import SinumAuthError
         from custom_components.sinum.coordinator import _safe_fetch

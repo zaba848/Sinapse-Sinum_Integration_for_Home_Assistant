@@ -303,6 +303,28 @@
           "description": "Częściowy payload harmonogramu akceptowany przez API Sinum."
         }
       }
+    },
+    "upload_mqtt_bridge": {
+      "name": "Wgraj most MQTT",
+      "description": "Renderuje skrypt Lua mostu MQTT i wgrywa go do sceny centrali Sinum. Zastępuje ręczną edycję kodu Lua.",
+      "fields": {
+        "entry_id": {
+          "name": "ID wpisu konfiguracji",
+          "description": "Wymagane, gdy załadowana jest więcej niż jedna centrala Sinum."
+        },
+        "mqtt_scene_id": {
+          "name": "ID sceny",
+          "description": "ID sceny na centrali do nadpisania skryptem Lua mostu. Wcześniej utwórz pustą scenę w web UI Sinum."
+        },
+        "mqtt_client_id": {
+          "name": "ID klienta MQTT",
+          "description": "Indeks klienta MQTT (od 1) skonfigurowanego w web UI centrali Sinum (Ustawienia → System → Integracje → Klient MQTT)."
+        },
+        "dry_run": {
+          "name": "Tryb podglądu",
+          "description": "Jeśli true, wyświetla wyrenderowany skrypt Lua w logu bez wgrywania do centrali."
+        }
+      }
     }
   }
 }

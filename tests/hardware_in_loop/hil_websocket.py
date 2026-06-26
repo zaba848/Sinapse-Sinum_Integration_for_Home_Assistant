@@ -22,7 +22,7 @@ import sys
 from collections import Counter
 
 
-async def run_hil(host: str, token: str, timeout: float) -> bool:
+async def run_hil(host: str, token: str, timeout: float) -> bool:  # noqa: C901
     try:
         import aiohttp
     except ImportError:

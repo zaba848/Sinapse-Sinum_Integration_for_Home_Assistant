@@ -11,15 +11,12 @@ Note: These tests change device state; run in test environments only.
 """
 
 import asyncio
-import json
 import os
-from datetime import datetime
-from typing import Any
 
 import aiohttp
 import pytest
 
-from custom_components.sinum.api import SinumClient, SinumConnectionError
+from custom_components.sinum.api import SinumClient
 
 
 @pytest.mark.asyncio

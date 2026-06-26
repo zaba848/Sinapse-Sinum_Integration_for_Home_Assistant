@@ -18,12 +18,13 @@ def _make_coordinator(modbus: dict | None = None) -> MagicMock:
 
 
 def _make_entity(field_path: str, device: dict | None = None):
+    from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+    from homeassistant.const import UnitOfPower
+
     from custom_components.sinum.sensor_modbus import (
         SinumModbusSensor,
         SinumModbusSensorDescription,
     )
-    from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-    from homeassistant.const import UnitOfPower
 
     dev = dict(device or FIXTURES["modbus_energy_meter"])
     coordinator = _make_coordinator(modbus={18: dev})
@@ -65,11 +66,12 @@ class TestSinumModbusSensor:
         assert entity.native_value is None
 
     def test_native_value_with_scale(self):
+        from homeassistant.components.sensor import SensorStateClass
+
         from custom_components.sinum.sensor_modbus import (
             SinumModbusSensor,
             SinumModbusSensorDescription,
         )
-        from homeassistant.components.sensor import SensorStateClass
 
         dev = dict(FIXTURES["modbus_energy_meter"])
         coordinator = _make_coordinator(modbus={18: dev})

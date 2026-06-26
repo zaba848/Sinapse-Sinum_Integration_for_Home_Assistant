@@ -38,9 +38,8 @@ def _collect_violations() -> list[tuple[str, str, int, int]]:
         except SyntaxError:
             continue
         for block in blocks:
-            if block.complexity > _MAX_CC:
-                if not _is_legacy_allowed(py_file.name, block.name, block.complexity):
-                    violations.append((py_file.name, block.name, block.complexity, block.lineno))
+            if block.complexity > _MAX_CC and not _is_legacy_allowed(py_file.name, block.name, block.complexity):
+                violations.append((py_file.name, block.name, block.complexity, block.lineno))
     return violations
 
 

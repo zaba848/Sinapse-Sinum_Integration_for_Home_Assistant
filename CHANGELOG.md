@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.7] — 2026-06-26
+
+### Documentation
+- **PL docs complete**: added `docs/installation.pl.md`, `docs/entities.pl.md`, `docs/real-time.pl.md`, `docs/development.pl.md` — full Polish translations of all 4 docs files; README.pl.md now links to `.pl.md` versions
+- **EN↔PL language switchers**: all 4 EN docs now include `· Polski` links; all PL docs link back to EN
+- **Official Sinum resources section**: added to both READMEs with links to `apidocs.sinum.tech`, Lua scripting manual PDF, Sinum FAQ, knowledge base, and Google Home integration guide
+- **Translations `upload_mqtt_bridge`**: service added to both `translations/en.json` and `translations/pl.json` (was missing)
+
+### Code Quality
+- **Ruff lint clean**: 32 ruff errors fixed (22 auto-fixed + 10 manual): import sorting, unused imports, `SIM117`/`SIM105`/`SIM102` simplifications, F821 forward refs removed, HIL `C901` suppressed
+
 ## [0.5.6] — 2026-06-26
 
 ### Quality — Code & Tests

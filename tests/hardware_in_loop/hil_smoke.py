@@ -54,15 +54,14 @@ async def check_websocket(base: str, token: str) -> bool:
     import aiohttp
     ws_url = f"{base.replace('http://', 'ws://')}/api/v1/ws?access_token={token}"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(ws_url, heartbeat=5, ssl=False) as ws:
-                received = 0
-                async with asyncio.timeout(8):
-                    async for msg in ws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            received += 1
-                            if received >= 2:
-                                break
+        async with aiohttp.ClientSession() as session, session.ws_connect(ws_url, heartbeat=5, ssl=False) as ws:
+            received = 0
+            async with asyncio.timeout(8):
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        received += 1
+                        if received >= 2:
+                            break
         print(f"  [OK ] websocket: received {received} message(s)")
         return True
     except TimeoutError:

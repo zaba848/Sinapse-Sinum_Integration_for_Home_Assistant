@@ -1,6 +1,6 @@
 # Real-Time Transports — Sinapse / Sinum Integration
 
-**[← Back to README](../README.md)**
+**[← Back to README](../README.md)** · **[Polski](real-time.pl.md)**
 
 ---
 

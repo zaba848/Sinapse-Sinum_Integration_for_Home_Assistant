@@ -1,6 +1,6 @@
 # Development Guide — Sinapse / Sinum Integration
 
-**[← Back to README](../README.md)**
+**[← Back to README](../README.md)** · **[Polski](development.pl.md)**
 
 ---
 

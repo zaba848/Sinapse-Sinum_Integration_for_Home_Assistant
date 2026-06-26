@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -71,7 +70,7 @@ _CAMERA_OFFLINE = {
 _FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 
 
-def _make_camera(device_data: dict) -> "SinumCamera":
+def _make_camera(device_data: dict):
     from custom_components.sinum.camera import SinumCamera
 
     coordinator = MagicMock()

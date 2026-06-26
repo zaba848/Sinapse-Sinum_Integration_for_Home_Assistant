@@ -1,6 +1,6 @@
 # Installation Guide — Sinapse / Sinum Integration
 
-**[← Back to README](../README.md)** · [Polski](installation.pl.md)
+**[← Back to README](../README.md)** · **[Polski](installation.pl.md)**
 
 ---
 
@@ -92,8 +92,10 @@ You can review or revoke tokens later under **Settings → System → Integratio
 > **Security**: Never paste the token into GitHub issues, log files, screenshots, or chat messages. If the token is exposed, create a new one and revoke the old one in the Sinum web UI.
 
 **Official Sinum resources from TECH Sterowniki:**
+- REST API reference: <https://apidocs.sinum.tech/>
+- Lua scripting manual: <https://www.techsterowniki.pl/!uploads/SINUM/LUA_user_manual.pdf>
 - Knowledge base: <https://www.techsterowniki.pl/blog/kategoria/sinum>
-- FAQ: <https://www.techsterowniki.pl/serwis/faq>
+- Sinum FAQ: <https://www.techsterowniki.pl/blog/system-sinum-najczesciej-zadawane-pytania>
 
 ---
 

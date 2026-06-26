@@ -10,11 +10,10 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import voluptuous as vol
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lua template rendering
@@ -84,11 +83,9 @@ def _make_service_call(call_data: dict) -> MagicMock:
 async def _invoke_upload(hass: MagicMock, call_data: dict, coordinator: MagicMock) -> None:
     """Simulate calling handle_upload_mqtt_bridge via __init__ service registration."""
     from custom_components.sinum import (
-        UPLOAD_MQTT_BRIDGE_SCHEMA,
         _render_mqtt_bridge_lua,
     )
     from custom_components.sinum.const import (
-        ATTR_ENTRY_ID,
         ATTR_MQTT_CLIENT_ID,
         ATTR_MQTT_DRY_RUN,
         ATTR_MQTT_SCENE_ID,

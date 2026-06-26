@@ -8,7 +8,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/testy-1498%20OK-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-%E2%89%A44%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/wersja-0.5.6-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/wersja-0.5.7-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/licencja-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -19,7 +19,7 @@
 - **11 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
 - **4 magistrale**: Virtual, WTP, SBUS, LoRa — odpytywane równolegle co 30 s
 - **Aktualizacje w czasie rzeczywistym** przez WebSocket (opóźnienie \< 1 s), most MQTT jako wariant awaryjny
-- **1 481 testów** w 44 plikach, CC ≤ 4 w każdej funkcji, czysty mypy
+- **1 498 testów** w 44 plikach, CC ≤ 4 w każdej funkcji, czysty mypy
 
 ---
 
@@ -38,7 +38,7 @@
 4. Settings → … → Sinum → Configure → włącz WebSocket real-time transport
 ```
 
-→ **[Pełny przewodnik instalacji ze zrzutami ekranu](docs/installation.md)**
+→ **[Pełny przewodnik instalacji ze zrzutami ekranu](docs/installation.pl.md)**
 
 ---
 
@@ -46,10 +46,10 @@
 
 | Dokument | Zawartość |
 |---|---|
-| [Przewodnik instalacji](docs/installation.md) | HACS, instalacja ręczna, generowanie tokena, zrzuty ekranu |
-| [Referencja encji](docs/entities.md) | Wszystkie platformy, atrybuty, przykłady automatyzacji |
-| [Transport czasu rzeczywistego](docs/real-time.md) | Konfiguracja WebSocket + most MQTT (wariant awaryjny) |
-| [Przewodnik developera](docs/development.md) | Środowisko, testy, reguły CC, nowe typy urządzeń |
+| [Przewodnik instalacji](docs/installation.pl.md) | HACS, instalacja ręczna, generowanie tokena, zrzuty ekranu |
+| [Referencja encji](docs/entities.pl.md) | Wszystkie platformy, atrybuty, przykłady automatyzacji |
+| [Transport czasu rzeczywistego](docs/real-time.pl.md) | Konfiguracja WebSocket + most MQTT (wariant awaryjny) |
+| [Przewodnik developera](docs/development.pl.md) | Środowisko, testy, reguły CC, nowe typy urządzeń |
 | [Historia zmian](CHANGELOG.md) | Pełna historia wersji |
 | [Bezpieczeństwo](SECURITY.md) | Zgłaszanie podatności |
 | [Wkład w projekt](CONTRIBUTING.md) | Jak współtworzyć, styl kodu, lista kontrolna PR |
@@ -225,6 +225,19 @@ Centrala komunikuje się po HTTP w sieci lokalnej.
 - **Ochrona reautoryzacji**: integracja blokuje reautoryzację po 5 kolejnych nieudanych próbach na 5 minut.
 
 Szczegóły: [SECURITY.md](SECURITY.md)
+
+---
+
+## Oficjalne zasoby Sinum
+
+| Zasób | URL |
+|---|---|
+| Dokumentacja REST API Sinum | <https://apidocs.sinum.tech/> |
+| Podręcznik skryptowania Lua | <https://www.techsterowniki.pl/!uploads/SINUM/LUA_user_manual.pdf> |
+| FAQ Sinum | <https://www.techsterowniki.pl/blog/system-sinum-najczesciej-zadawane-pytania> |
+| Baza wiedzy | <https://www.techsterowniki.pl/blog/kategoria/sinum> |
+| Integracja z Google Home | <https://www.techsterowniki.pl/blog/polaczenie-centrali-sinum-z-usluga-google-home> |
+| Aplikacja Sinum Cloud | <https://sinum.tech/sign-in> |
 
 ---
 

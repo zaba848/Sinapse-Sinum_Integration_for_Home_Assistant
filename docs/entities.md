@@ -1,6 +1,6 @@
 # Entity Reference — Sinapse / Sinum Integration
 
-**[← Back to README](../README.md)**
+**[← Back to README](../README.md)** · **[Polski](entities.pl.md)**
 
 ---
 
