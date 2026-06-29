@@ -427,7 +427,12 @@ def _remove_entry_runtime_data(hass: HomeAssistant, entry_id: str) -> None:
 def _remove_domain_services_if_no_coordinators(hass: HomeAssistant) -> None:
     if _coordinators(hass):
         return
-    for svc in (SERVICE_SEND_NOTIFICATION, SERVICE_UPDATE_SCHEDULE, SERVICE_UPLOAD_MQTT_BRIDGE):
+    for svc in (
+        SERVICE_SEND_NOTIFICATION,
+        SERVICE_UPDATE_SCHEDULE,
+        SERVICE_UPLOAD_MQTT_BRIDGE,
+        SERVICE_RUN_SCENE,
+    ):
         if hass.services.has_service(DOMAIN, svc):
             hass.services.async_remove(DOMAIN, svc)
 

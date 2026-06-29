@@ -23,6 +23,25 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.10] — 2026-06-29
+
+### New Features
+- **`sinum.run_scene` service**: trigger a Sinum hub Lua scene by numeric ID from HA automations and scripts. Complements the existing scene button entities. Registered with the same `entry_id` routing pattern as other multi-hub services. EN + PL translations added.
+
+### Bug Fixes
+- **`sinum.run_scene` unload**: service is now correctly removed when the last Sinum config entry is unloaded (was missing from the cleanup loop).
+
+### Improvements
+- **Diagnostics**: video devices (cameras) are now included in HA diagnostic reports. Camera credentials (`login`, `password`) are redacted to `**REDACTED**`. `video_count` added to bus counts.
+- **Docs**: camera section updated in `entities.md` and `entities.pl.md` — live RTSP streaming is supported (previously incorrectly stated as unavailable).
+
+### Tests
+- **notify platform**: 18 new tests — `async_send_message`, default title, `SinumNotSupportedError` → `HomeAssistantError`, setup, hub info edge cases.
+- **camera live updates**: 4 tests verifying that `SinumCamera` properties reflect coordinator changes pushed via WebSocket without HA lifecycle overhead.
+- **diagnostics**: video device redaction tests + fixture alignment.
+- **`sinum.run_scene`**: 2 integration tests (single hub, explicit `entry_id`).
+- **Total: 1 546 tests** across 46 files
+
 ## [0.5.9] — 2026-06-29
 
 ### New Features
