@@ -354,7 +354,9 @@ def _stale_uid_prefixes(entry_id: str, removed_ids: dict[str, frozenset[int]]) -
     return prefixes
 
 
-def _stale_identifiers(entry_id: str, removed_ids: dict[str, frozenset[int]]) -> set[tuple[str, str]]:
+def _stale_identifiers(
+    entry_id: str, removed_ids: dict[str, frozenset[int]]
+) -> set[tuple[str, str]]:
     return {
         (DOMAIN, f"{entry_id}_{bus}_{device_id}")
         for bus, ids in removed_ids.items()

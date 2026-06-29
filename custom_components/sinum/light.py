@@ -207,11 +207,7 @@ def _rgb_by_label_or_type(device: dict[str, Any]) -> bool:
 
 def _supports_rgb(device: dict[str, Any]) -> bool:
     mode = str(device.get("color_mode", "")).lower()
-    return (
-        "led_color" in device
-        or mode in _RGB_COLOR_MODES
-        or _rgb_by_label_or_type(device)
-    )
+    return "led_color" in device or mode in _RGB_COLOR_MODES or _rgb_by_label_or_type(device)
 
 
 def _supports_color_temperature(device: dict[str, Any]) -> bool:
@@ -464,7 +460,9 @@ class SinumBusDimmerLight(
         self.async_write_ha_state()
 
 
-def _sbus_temp_lua(prefix: str, device: dict[str, Any], kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def _sbus_temp_lua(
+    prefix: str, device: dict[str, Any], kwargs: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
     kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
     current_pct = device.get("brightness") or 80
     line = f'{prefix}:call("set_temperature",{{{kelvin},{current_pct}}})'
