@@ -144,24 +144,35 @@ class SinumWebSocketBridge:
     def _handle_video_stream_message(self, data: dict[str, Any]) -> None:
         payload = data.get("payload", {})
         inner = payload.get("data", {})
-        device_id = _as_int(inner.get("from"))
-        if device_id is None:
+        session_id = inner.get("session_id", "")
+        if not session_id:
             return
-        msg_type = payload.get("type")
-        if msg_type == "answer":
-            self._handle_video_answer(device_id, inner)
-        elif msg_type in ("bye", "error"):
-            self._handle_video_bye(device_id, inner, msg_type)
+        self._dispatch_video_message(payload.get("type"), session_id, inner)
 
-    def _handle_video_answer(self, device_id: int, inner: dict[str, Any]) -> None:
+    def _dispatch_video_message(
+        self, msg_type: str | None, session_id: str, inner: dict[str, Any]
+    ) -> None:
+        if msg_type == "answer":
+            self._handle_video_answer(session_id, inner)
+        elif msg_type == "candidate":
+            self._handle_video_candidate(session_id, inner)
+        elif msg_type in ("bye", "error"):
+            self._handle_video_bye(session_id, inner, msg_type)
+
+    def _handle_video_answer(self, session_id: str, inner: dict[str, Any]) -> None:
         sdp = inner.get("description", {}).get("sdp", "")
         if sdp:
-            self._coordinator.resolve_webrtc_answer(device_id, sdp)
+            self._coordinator.dispatch_webrtc_answer(session_id, sdp)
 
-    def _handle_video_bye(self, device_id: int, inner: dict[str, Any], msg_type: str) -> None:
+    def _handle_video_candidate(self, session_id: str, inner: dict[str, Any]) -> None:
+        candidate_dict = inner.get("candidate", {})
+        if candidate_dict:
+            self._coordinator.dispatch_webrtc_candidate(session_id, candidate_dict)
+
+    def _handle_video_bye(self, session_id: str, inner: dict[str, Any], msg_type: str) -> None:
         reason = inner.get("reason", msg_type)
-        _LOGGER.debug("WebRTC %s for device %d: %s", msg_type, device_id, reason)
-        self._coordinator.reject_webrtc_answer(device_id, reason)
+        _LOGGER.debug("WebRTC %s session %s: %s", msg_type, session_id, reason)
+        self._coordinator.dispatch_webrtc_error(session_id, msg_type, reason)
 
     def _mark_auth_failed(self) -> None:
         self._auth_failed = True

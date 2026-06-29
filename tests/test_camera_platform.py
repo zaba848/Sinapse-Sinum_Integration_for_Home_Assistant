@@ -493,56 +493,63 @@ class TestCameraLiveUpdate:
 
 
 class TestCameraWebRtc:
-    def test_frontend_stream_type_is_webrtc(self):
-        from homeassistant.components.camera.const import StreamType
+    def test_has_native_webrtc_impl(self):
+        """HA detects native WebRTC by checking if method is overridden."""
+        from custom_components.sinum.camera import SinumCamera
+        from homeassistant.components.camera import Camera
+
+        assert SinumCamera.async_handle_async_webrtc_offer is not Camera.async_handle_async_webrtc_offer
+
+    def test_stream_feature_enabled(self):
+        from homeassistant.components.camera import CameraEntityFeature
 
         cam = _make_camera(_CAMERA_RTSP)
-        assert cam._attr_frontend_stream_type == StreamType.WEB_RTC
+        assert cam.supported_features & CameraEntityFeature.STREAM
 
     @pytest.mark.asyncio
-    async def test_webrtc_offer_resolved_by_coordinator(self):
+    async def test_offer_registers_session_and_posts(self):
         cam = _make_camera(_CAMERA_RTSP)
-        captured: list = []
-
-        def _capture_future(device_id, future):
-            captured.append(future)
-
-        cam.coordinator.register_webrtc_future.side_effect = _capture_future
-
-        async def _resolve_after_post(*args, **kwargs):
-            captured[0].set_result("v=0\r\n...answer sdp...")
-
-        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=_resolve_after_post)
-        result = await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")
-        assert result == "v=0\r\n...answer sdp..."
-
-    @pytest.mark.asyncio
-    async def test_webrtc_timeout_raises_ha_error(self):
-        from homeassistant.exceptions import HomeAssistantError
-
-        cam = _make_camera(_CAMERA_RTSP)
-        cam._WEBRTC_TIMEOUT = 0.01
+        send_message = MagicMock()
         cam.coordinator.client.post_video_stream_offer = AsyncMock(return_value=None)
 
-        with pytest.raises(HomeAssistantError, match="timeout"):
-            await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")
+        await cam.async_handle_async_webrtc_offer("v=0\r\noffer", "sess-123", send_message)
+
+        cam.coordinator.register_webrtc_session.assert_called_once_with("sess-123", 27, send_message)
+        cam.coordinator.client.post_video_stream_offer.assert_called_once_with(27, "v=0\r\noffer", "sess-123")
 
     @pytest.mark.asyncio
-    async def test_webrtc_bye_rejects_future(self):
-        from homeassistant.exceptions import HomeAssistantError
-
+    async def test_offer_post_failure_dispatches_error(self):
         cam = _make_camera(_CAMERA_RTSP)
-        captured: list = []
+        send_message = MagicMock()
+        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=Exception("hub down"))
 
-        def _capture_future(device_id, future):
-            captured.append(future)
+        await cam.async_handle_async_webrtc_offer("v=0\r\noffer", "sess-456", send_message)
 
-        cam.coordinator.register_webrtc_future.side_effect = _capture_future
+        cam.coordinator.dispatch_webrtc_error.assert_called_once_with("sess-456", "post_failed", "hub down")
 
-        async def _reject_after_post(*args, **kwargs):
-            captured[0].set_exception(Exception("webrtc: camera offline"))
+    @pytest.mark.asyncio
+    async def test_on_candidate_forwards_to_api(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        candidate = MagicMock()
+        candidate.candidate = "candidate:1 1 udp 2113937151 192.168.1.1 54321 typ host"
+        candidate.sdp_mid = "0"
+        candidate.sdp_m_line_index = 0
+        cam.coordinator.client.post_video_candidate = AsyncMock(return_value=None)
 
-        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=_reject_after_post)
+        await cam.async_on_webrtc_candidate("sess-123", candidate)
 
-        with pytest.raises(HomeAssistantError, match="camera offline"):
-            await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")
+        cam.coordinator.client.post_video_candidate.assert_called_once_with(27, "sess-123", candidate)
+
+    @pytest.mark.asyncio
+    async def test_on_candidate_ignores_api_error(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        candidate = MagicMock()
+        cam.coordinator.client.post_video_candidate = AsyncMock(side_effect=Exception("hub down"))
+
+        # Should not raise
+        await cam.async_on_webrtc_candidate("sess-123", candidate)
+
+    def test_close_session_delegates_to_coordinator(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.close_webrtc_session("sess-abc")
+        cam.coordinator.close_webrtc_session.assert_called_once_with("sess-abc")

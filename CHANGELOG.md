@@ -23,6 +23,21 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.13] — 2026-06-29
+
+### Fixed / Improved
+- **WebRTC streaming — trickle ICE support**: updated to HA 2026.6 native WebRTC API (`async_handle_async_webrtc_offer` + `send_message` callback). Hub uses **go2rtc** internally and sends ICE candidates via trickle ICE (separate `candidate` WS messages). The integration now forwards each candidate to the HA frontend via `WebRTCCandidate`, enabling proper peer-to-peer connection setup and smoother streaming.
+- **ICE server format fix**: hub rejects external STUN servers — changed `ice_servers` in SDP offer from `[{urls: stun:...}]` to `[]`. Hub manages ICE internally.
+- **Browser → hub ICE forwarding**: `async_on_webrtc_candidate` now posts browser ICE candidates back to hub via `POST /api/v1/devices/video/{id}/stream` with `type: candidate`.
+- **Session tracking**: WebRTC sessions are now keyed by `session_id` (string UUID) rather than `device_id` (int), allowing multiple simultaneous sessions and proper cleanup via `close_webrtc_session`.
+- **Bug fix in coordinator**: stray `self.removed_ids = {}` inside `reject_webrtc_answer` (which reset stale-device tracking on every WebRTC rejection) moved to `__init__`.
+
+### Internal
+- `coordinator.py`: replaced `_webrtc_futures` (Future-based) with `_webrtc_sessions` dict and `dispatch_webrtc_answer/candidate/error` + `close_webrtc_session`.
+- `websocket.py`: added `_dispatch_video_message` + `_handle_video_candidate` for trickle ICE; updated all handlers to use `session_id`.
+- `camera.py`: removed old `async_handle_web_rtc_offer → str`; added `async_handle_async_webrtc_offer`, `async_on_webrtc_candidate`, `close_webrtc_session`.
+- `api.py`: `post_video_candidate()` for forwarding browser ICE candidates; `post_video_stream_offer` now sends empty `ice_servers`.
+
 ## [0.5.12] — 2026-06-29
 
 ### New Features

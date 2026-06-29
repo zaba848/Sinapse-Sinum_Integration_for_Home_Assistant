@@ -717,8 +717,25 @@ class SinumClient:
                 "from": "ha-client",
                 "to": str(device_id),
                 "description": {
-                    "ice_servers": [{"urls": "stun:stun.l.google.com:19302"}],
+                    "ice_servers": [],  # hub uses go2rtc internally; no external STUN needed
                     "sdp": offer_sdp,
+                },
+            },
+        }
+        await self._request("POST", API_VIDEO_STREAM.format(id=device_id), json=payload)
+
+    async def post_video_candidate(self, device_id: int, session_id: str, candidate: Any) -> None:
+        """Forward a browser ICE candidate to the hub."""
+        payload = {
+            "type": "candidate",
+            "data": {
+                "session_id": session_id,
+                "from": "ha-client",
+                "to": str(device_id),
+                "candidate": {
+                    "candidate": candidate.candidate,
+                    "sdp_m_line_index": candidate.sdp_m_line_index if candidate.sdp_m_line_index is not None else 0,
+                    "sdp_mid": candidate.sdp_mid or "",
                 },
             },
         }

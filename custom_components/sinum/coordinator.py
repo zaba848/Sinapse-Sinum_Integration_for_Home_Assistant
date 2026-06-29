@@ -48,21 +48,41 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
-        self._webrtc_futures: dict[int, asyncio.Future[str]] = {}
+        self.removed_ids: dict[str, frozenset[int]] = {}
+        self._webrtc_sessions: dict[str, tuple[int, Any]] = {}  # session_id → (device_id, send_message)
 
-    def register_webrtc_future(self, device_id: int, future: asyncio.Future[str]) -> None:
-        self._webrtc_futures[device_id] = future
+    def register_webrtc_session(self, session_id: str, device_id: int, send_message: Any) -> None:
+        self._webrtc_sessions[session_id] = (device_id, send_message)
 
-    def resolve_webrtc_answer(self, device_id: int, answer_sdp: str) -> None:
-        fut = self._webrtc_futures.pop(device_id, None)
-        if fut and not fut.done():
-            fut.set_result(answer_sdp)
+    def dispatch_webrtc_answer(self, session_id: str, answer_sdp: str) -> None:
+        session = self._webrtc_sessions.get(session_id)
+        if session:
+            from homeassistant.components.camera.webrtc import WebRTCAnswer  # lazy — avoids import at module load
 
-    def reject_webrtc_answer(self, device_id: int, reason: str) -> None:
-        fut = self._webrtc_futures.pop(device_id, None)
-        if fut and not fut.done():
-            fut.set_exception(Exception(reason))
-        self.removed_ids: dict[str, frozenset[int]] = {}  # bus → device IDs gone after last refresh
+            session[1](WebRTCAnswer(answer=answer_sdp))
+
+    def dispatch_webrtc_candidate(self, session_id: str, candidate_dict: dict[str, Any]) -> None:
+        session = self._webrtc_sessions.get(session_id)
+        if session:
+            from homeassistant.components.camera.webrtc import WebRTCCandidate
+            from webrtc_models import RTCIceCandidateInit
+
+            candidate = RTCIceCandidateInit(
+                candidate=candidate_dict.get("candidate", ""),
+                sdp_mid=candidate_dict.get("sdp_mid") or None,
+                sdp_m_line_index=candidate_dict.get("sdp_m_line_index"),
+            )
+            session[1](WebRTCCandidate(candidate=candidate))
+
+    def dispatch_webrtc_error(self, session_id: str, code: str, message: str) -> None:
+        session = self._webrtc_sessions.pop(session_id, None)
+        if session:
+            from homeassistant.components.camera.webrtc import WebRTCError
+
+            session[1](WebRTCError(code=code, message=message))
+
+    def close_webrtc_session(self, session_id: str) -> None:
+        self._webrtc_sessions.pop(session_id, None)
 
     def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
         if hub_info is not None:
