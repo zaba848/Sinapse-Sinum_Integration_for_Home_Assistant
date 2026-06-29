@@ -125,8 +125,8 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
         return self.coordinator.video_devices.get(self._device_id, {})
 
     @property
-    def name(self) -> str:
-        return self._device.get("name", f"Camera {self._device_id}")
+    def name(self) -> str | None:
+        return None
 
     @property
     def is_on(self) -> bool:
@@ -195,12 +195,9 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
     @property
     def device_info(self) -> dict[str, Any]:
         dev = self._device
-        info: dict[str, Any] = {
+        return {
             "identifiers": {("sinum", f"{self._entry_id}_video_{self._device_id}")},
             "name": dev.get("name", f"Sinum Camera {self._device_id}"),
             "manufacturer": "Sinum",
             "model": dev.get("type", "ip_camera"),
         }
-        if dev.get("mac"):
-            info["connections"] = {("mac", dev["mac"])}
-        return info

@@ -107,13 +107,13 @@ def _make_camera(device_data: dict):
 
 
 class TestSinumCameraProperties:
-    def test_name_from_device(self):
+    def test_name_is_none(self):
         cam = _make_camera(_CAMERA_RTSP)
-        assert cam.name == "rejestrator 1"
+        assert cam.name is None
 
-    def test_name_onvif(self):
+    def test_name_onvif_is_none(self):
         cam = _make_camera(_CAMERA_ONVIF)
-        assert cam.name == "NIEE 1"
+        assert cam.name is None
 
     def test_is_on_when_online(self):
         cam = _make_camera(_CAMERA_RTSP)
@@ -251,9 +251,9 @@ class TestSinumCameraDeviceInfo:
         cam = _make_camera(_CAMERA_RTSP)
         assert cam.device_info["model"] == "ip_camera"
 
-    def test_mac_in_connections(self):
+    def test_no_connections(self):
         cam = _make_camera(_CAMERA_RTSP)
-        assert ("mac", "00:8e:5a:7e:9a:f3") in cam.device_info["connections"]
+        assert "connections" not in cam.device_info
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -466,12 +466,12 @@ class TestCameraLiveUpdate:
         cam.coordinator.video_devices[27]["status"] = "offline"
         assert cam.is_on is False
 
-    def test_name_reflects_live_rename(self):
+    def test_device_info_name_reflects_live_rename(self):
         cam = _make_camera(_CAMERA_RTSP)
-        assert cam.name == "rejestrator 1"
+        assert cam.device_info["name"] == "rejestrator 1"
 
         cam.coordinator.video_devices[27]["name"] = "Renamed Cam"
-        assert cam.name == "Renamed Cam"
+        assert cam.device_info["name"] == "Renamed Cam"
 
     def test_attributes_reflect_live_ip_change(self):
         cam = _make_camera(_CAMERA_RTSP)
@@ -483,5 +483,5 @@ class TestCameraLiveUpdate:
     def test_device_gone_from_coordinator_returns_empty(self):
         cam = _make_camera(_CAMERA_RTSP)
         del cam.coordinator.video_devices[27]
-        assert cam.name == f"Camera 27"
+        assert cam.name is None
         assert cam.is_on is False

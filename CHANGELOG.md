@@ -23,6 +23,15 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.11] — 2026-06-29
+
+### Bug Fixes
+- **Camera entity naming**: `SinumCamera.name` now returns `None` (entity represents the whole device). Previously the camera name was used for both device name and entity name, causing HA to display it twice (e.g. "rejestrator 1 rejestrator 1"). Now shows correctly as "rejestrator 1".
+- **Camera device merging**: removed MAC address from `device_info["connections"]`. Multiple camera channels on the same DVR share one MAC address; including it caused HA to merge all channels into one device with a wrong name.
+
+### Tests
+- **camera platform**: `test_name_from_device` → `test_name_is_none`, `test_name_reflects_live_rename` → `test_device_info_name_reflects_live_rename`, `test_device_gone_from_coordinator_returns_empty` updated; `test_mac_in_connections` → `test_no_connections`.
+
 ## [0.5.10] — 2026-06-29
 
 ### New Features
