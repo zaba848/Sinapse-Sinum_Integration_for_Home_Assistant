@@ -49,7 +49,9 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
         self.removed_ids: dict[str, frozenset[int]] = {}
-        self._webrtc_sessions: dict[str, tuple[int, Any]] = {}  # session_id → (device_id, send_message)
+        self._webrtc_sessions: dict[
+            str, tuple[int, Any]
+        ] = {}  # session_id → (device_id, send_message)
 
     def register_webrtc_session(self, session_id: str, device_id: int, send_message: Any) -> None:
         self._webrtc_sessions[session_id] = (device_id, send_message)
@@ -96,11 +98,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def video_device_ips(self) -> frozenset[str]:
-        return frozenset(
-            dev["ip"]
-            for dev in self.video_devices.values()
-            if dev.get("ip")
-        )
+        return frozenset(dev["ip"] for dev in self.video_devices.values() if dev.get("ip"))
 
     def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
         if hub_info is not None:

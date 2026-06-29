@@ -708,7 +708,9 @@ class SinumClient:
     async def get_video_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_VIDEO_DEVICE.format(id=device_id))
 
-    async def post_video_stream_offer(self, device_id: int, offer_sdp: str, session_id: str) -> None:
+    async def post_video_stream_offer(
+        self, device_id: int, offer_sdp: str, session_id: str
+    ) -> None:
         """POST a WebRTC SDP offer to the hub for the given camera device."""
         payload = {
             "type": "offer",
@@ -734,7 +736,9 @@ class SinumClient:
                 "to": str(device_id),
                 "candidate": {
                     "candidate": candidate.candidate,
-                    "sdp_m_line_index": candidate.sdp_m_line_index if candidate.sdp_m_line_index is not None else 0,
+                    "sdp_m_line_index": candidate.sdp_m_line_index
+                    if candidate.sdp_m_line_index is not None
+                    else 0,
                     "sdp_mid": candidate.sdp_mid or "",
                 },
             },

@@ -111,6 +111,7 @@ class SinumWebRTCProvider(CameraWebRTCProvider):
     @callback
     def async_is_supported(self, stream_source: str) -> bool:
         from urllib.parse import urlparse
+
         try:
             host = urlparse(stream_source).hostname or ""
         except Exception:
