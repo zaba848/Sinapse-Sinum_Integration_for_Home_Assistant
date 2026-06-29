@@ -14,11 +14,15 @@ Supported camera types: ip_camera (rtsp), onvif_camera (onvif).
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import uuid
 from typing import Any
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
+from homeassistant.components.camera.const import StreamType
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -107,6 +111,9 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
     """
 
     _attr_has_entity_name = True
+    _attr_frontend_stream_type = StreamType.WEB_RTC
+
+    _WEBRTC_TIMEOUT = 12
 
     def __init__(
         self,
@@ -149,9 +156,7 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
 
     @property
     def supported_features(self) -> CameraEntityFeature:
-        if self._device.get("type") in _STREAMABLE_TYPES:
-            return CameraEntityFeature.STREAM
-        return CameraEntityFeature(0)
+        return CameraEntityFeature.STREAM
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -181,6 +186,27 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
         if url is None:
             _LOGGER.debug("Camera %d: password masked by hub, stream unavailable", self._device_id)
         return url
+
+    async def async_handle_web_rtc_offer(self, offer_sdp: str) -> str:
+        """Forward WebRTC SDP offer to hub; await answer delivered via WebSocket."""
+        session_id = str(uuid.uuid4())
+        future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
+        self.coordinator.register_webrtc_future(self._device_id, future)
+        try:
+            await self.coordinator.client.post_video_stream_offer(
+                self._device_id, offer_sdp, session_id
+            )
+            return await asyncio.wait_for(future, timeout=self._WEBRTC_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            self.coordinator.reject_webrtc_answer(self._device_id, "timeout")
+            raise HomeAssistantError(
+                f"WebRTC answer timeout for camera {self._device_id}"
+            ) from exc
+        except Exception as exc:
+            self.coordinator.reject_webrtc_answer(self._device_id, str(exc))
+            raise HomeAssistantError(
+                f"WebRTC error for camera {self._device_id}: {exc}"
+            ) from exc
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None

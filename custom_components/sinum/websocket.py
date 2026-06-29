@@ -127,13 +127,41 @@ class SinumWebSocketBridge:
         data = event.get("data", event)
         if not isinstance(data, dict):
             return False
+        return self._dispatch_event_type(data)
+
+    def _dispatch_event_type(self, data: dict[str, Any]) -> bool:
         evt_type = data.get("type")
         if evt_type == "unauthorized":
             self._mark_auth_failed()
             return False
+        if evt_type == "video_stream_message":
+            self._handle_video_stream_message(data)
+            return False
         if evt_type != "device_state_changed":
             return False
         return self._apply_device_state(data)
+
+    def _handle_video_stream_message(self, data: dict[str, Any]) -> None:
+        payload = data.get("payload", {})
+        inner = payload.get("data", {})
+        device_id = _as_int(inner.get("from"))
+        if device_id is None:
+            return
+        msg_type = payload.get("type")
+        if msg_type == "answer":
+            self._handle_video_answer(device_id, inner)
+        elif msg_type in ("bye", "error"):
+            self._handle_video_bye(device_id, inner, msg_type)
+
+    def _handle_video_answer(self, device_id: int, inner: dict[str, Any]) -> None:
+        sdp = inner.get("description", {}).get("sdp", "")
+        if sdp:
+            self._coordinator.resolve_webrtc_answer(device_id, sdp)
+
+    def _handle_video_bye(self, device_id: int, inner: dict[str, Any], msg_type: str) -> None:
+        reason = inner.get("reason", msg_type)
+        _LOGGER.debug("WebRTC %s for device %d: %s", msg_type, device_id, reason)
+        self._coordinator.reject_webrtc_answer(device_id, reason)
 
     def _mark_auth_failed(self) -> None:
         self._auth_failed = True

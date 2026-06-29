@@ -23,6 +23,21 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.12] — 2026-06-29
+
+### New Features
+- **Camera WebRTC streaming**: clicking play on a Sinum camera now opens a live video stream via WebRTC. The hub exposes a `/api/v1/devices/video/{id}/stream` WebRTC signaling endpoint (POST SDP offer → hub sends SDP answer via WebSocket). HA frontend calls `async_handle_web_rtc_offer()` → integration proxies the signaling → real-time video in the HA dashboard and media browser.
+- All camera entities now declare `CameraEntityFeature.STREAM` (previously only `ip_camera`/`onvif_camera`). `_attr_frontend_stream_type = StreamType.WEB_RTC`.
+
+### Internal
+- `coordinator.py`: `register_webrtc_future`, `resolve_webrtc_answer`, `reject_webrtc_answer` — per-device Future registry for async WebRTC answer delivery.
+- `websocket.py`: handles `video_stream_message` WS events (`type: answer/bye/error`) and resolves/rejects pending WebRTC futures.
+- `api.py`: `post_video_stream_offer()` + `API_VIDEO_STREAM` constant.
+
+### Tests
+- `TestCameraWebRtc` (4 tests): `frontend_stream_type`, offer resolved by coordinator, timeout raises `HomeAssistantError`, bye/error rejects future.
+- `TestCameraFeatures`: all camera types now have `STREAM` feature (was only streamable types).
+
 ## [0.5.11] — 2026-06-29
 
 ### Bug Fixes

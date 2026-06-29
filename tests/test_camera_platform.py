@@ -328,11 +328,11 @@ class TestCameraFeatures:
         cam = _make_camera(_CAMERA_ONVIF)
         assert cam.supported_features & CameraEntityFeature.STREAM
 
-    def test_unknown_type_no_stream_feature(self):
+    def test_unknown_type_has_stream_feature(self):
         from homeassistant.components.camera import CameraEntityFeature
 
         cam = _make_camera(_CAMERA_UNKNOWN_TYPE)
-        assert not (cam.supported_features & CameraEntityFeature.STREAM)
+        assert cam.supported_features & CameraEntityFeature.STREAM
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -485,3 +485,64 @@ class TestCameraLiveUpdate:
         del cam.coordinator.video_devices[27]
         assert cam.name is None
         assert cam.is_on is False
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WebRTC
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCameraWebRtc:
+    def test_frontend_stream_type_is_webrtc(self):
+        from homeassistant.components.camera.const import StreamType
+
+        cam = _make_camera(_CAMERA_RTSP)
+        assert cam._attr_frontend_stream_type == StreamType.WEB_RTC
+
+    @pytest.mark.asyncio
+    async def test_webrtc_offer_resolved_by_coordinator(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        captured: list = []
+
+        def _capture_future(device_id, future):
+            captured.append(future)
+
+        cam.coordinator.register_webrtc_future.side_effect = _capture_future
+
+        async def _resolve_after_post(*args, **kwargs):
+            captured[0].set_result("v=0\r\n...answer sdp...")
+
+        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=_resolve_after_post)
+        result = await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")
+        assert result == "v=0\r\n...answer sdp..."
+
+    @pytest.mark.asyncio
+    async def test_webrtc_timeout_raises_ha_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        cam = _make_camera(_CAMERA_RTSP)
+        cam._WEBRTC_TIMEOUT = 0.01
+        cam.coordinator.client.post_video_stream_offer = AsyncMock(return_value=None)
+
+        with pytest.raises(HomeAssistantError, match="timeout"):
+            await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")
+
+    @pytest.mark.asyncio
+    async def test_webrtc_bye_rejects_future(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        cam = _make_camera(_CAMERA_RTSP)
+        captured: list = []
+
+        def _capture_future(device_id, future):
+            captured.append(future)
+
+        cam.coordinator.register_webrtc_future.side_effect = _capture_future
+
+        async def _reject_after_post(*args, **kwargs):
+            captured[0].set_exception(Exception("webrtc: camera offline"))
+
+        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=_reject_after_post)
+
+        with pytest.raises(HomeAssistantError, match="camera offline"):
+            await cam.async_handle_web_rtc_offer("v=0\r\n...offer...")

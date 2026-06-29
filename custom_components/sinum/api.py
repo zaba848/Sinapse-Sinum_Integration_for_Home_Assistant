@@ -55,6 +55,7 @@ from .const import (
     API_VIDEO_DEVICE,
     API_VIDEO_DEVICES,
     API_VIDEO_SNAPSHOT,
+    API_VIDEO_STREAM,
     API_VIRTUAL_DEVICE,
     API_VIRTUAL_DEVICES,
     API_WEATHER,
@@ -706,6 +707,22 @@ class SinumClient:
 
     async def get_video_device(self, device_id: int) -> dict[str, Any]:
         return await self._request("GET", API_VIDEO_DEVICE.format(id=device_id))
+
+    async def post_video_stream_offer(self, device_id: int, offer_sdp: str, session_id: str) -> None:
+        """POST a WebRTC SDP offer to the hub for the given camera device."""
+        payload = {
+            "type": "offer",
+            "data": {
+                "session_id": session_id,
+                "from": "ha-client",
+                "to": str(device_id),
+                "description": {
+                    "ice_servers": [{"urls": "stun:stun.l.google.com:19302"}],
+                    "sdp": offer_sdp,
+                },
+            },
+        }
+        await self._request("POST", API_VIDEO_STREAM.format(id=device_id), json=payload)
 
     async def get_video_snapshot(self, device_id: int) -> bytes | None:
         """Return raw JPEG bytes from hub snapshot proxy, or None if unavailable."""

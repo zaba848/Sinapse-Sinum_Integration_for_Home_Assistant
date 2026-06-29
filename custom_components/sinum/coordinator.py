@@ -48,6 +48,20 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
+        self._webrtc_futures: dict[int, asyncio.Future[str]] = {}
+
+    def register_webrtc_future(self, device_id: int, future: asyncio.Future[str]) -> None:
+        self._webrtc_futures[device_id] = future
+
+    def resolve_webrtc_answer(self, device_id: int, answer_sdp: str) -> None:
+        fut = self._webrtc_futures.pop(device_id, None)
+        if fut and not fut.done():
+            fut.set_result(answer_sdp)
+
+    def reject_webrtc_answer(self, device_id: int, reason: str) -> None:
+        fut = self._webrtc_futures.pop(device_id, None)
+        if fut and not fut.done():
+            fut.set_exception(Exception(reason))
         self.removed_ids: dict[str, frozenset[int]] = {}  # bus → device IDs gone after last refresh
 
     def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
