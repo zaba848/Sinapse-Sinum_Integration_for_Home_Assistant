@@ -1,6 +1,6 @@
 # Sinapse — Implementation Plan & Critical Review
 
-> Last updated: 2026-06-29 (v0.5.7 — mypy fix, temperature zero fix)
+> Last updated: 2026-06-29 (v0.5.9 — camera platform, RTSP streaming)
 > Verified against two live hubs (firmware `1.24.0-alpha.2`/`alpha.3`, API `1.4`).
 > Credentials and API tokens must never be committed to this repository.
 
@@ -9,12 +9,12 @@
 ## Project Status (2026-06-29)
 
 ```text
-Tests:  1 499 passing, 5 skipped (~8.5 s)
-Ruff:   0 errors
-mypy:   0 errors
+Tests:  1 516 passing, 5 skipped (~8.2 s)
+Ruff:   0 errors (28 files, pinned 0.4.8)
+mypy:   0 errors (28 files)
 CC:     ≤ 4, _LEGACY_ALLOWANCE = {}
 Live:   2 581 entities on 2 hubs (both HA entries, 0 errors)
-Tags:   v0.5.5, v0.5.6, v0.5.7 released
+Tags:   v0.5.7, v0.5.8, v0.5.9 released (v0.5.8/5.9 GitHub Releases TBD)
 HACS:   submission ready pending hassfest validation
 ```
 
@@ -126,6 +126,8 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 | v0.3.x | Failsafe add/reauth flow, retry, host normalization, anti-bruteforce | ✅ |
 | v0.4.x | WS transport, CC gate, modbus energy meter, quality sprint | ✅ |
 | v0.5.x | WS 100%, ConfigEntryAuthFailed, stale cleanup, PL docs, ruff clean | ✅ |
+| v0.5.8 | mypy fix (light.py), temperature-zero → unavailable (WTP regulators) | ✅ |
+| v0.5.9 | Camera platform: snapshot proxy + RTSP streaming for ip_camera/onvif_camera | ✅ |
 
 ---
 
@@ -153,10 +155,13 @@ Or via the GitHub Actions workflow `.github/workflows/validate.yml` if configure
 
 | Item | Priority | Notes |
 |---|---|---|
+| Smoke test v0.5.8/v0.5.9 on live hub | **High** | Camera entity verification, temperature-zero fix |
+| GitHub Releases v0.5.8 + v0.5.9 | **High** | Manual — `gh` not authenticated |
+| Camera: PTZ control (pan/tilt/zoom) | Medium | API endpoint unknown — needs hub investigation |
+| Camera: motion events from hub WebSocket | Medium | Hub may push `motion` events for video devices |
 | LoRa relay live test | Low | No hardware — skip until available |
 | Nightly regression summary in docs | Low | CI artefact, defer until HACS submission |
 | Endpoint matrix in `docs/api_coverage.md` | Low | Dev docs completeness |
-| Smoke test v0.5.6/v0.5.7 on live hub | Medium | ConfigEntryAuthFailed + device registry cleanup |
 | Anti-bruteforce backoff — verify UI message | Low | Already implemented, needs UX test |
 
 ---
