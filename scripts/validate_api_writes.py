@@ -134,8 +134,8 @@ class ApiWriteValidationRunner:
                 test_level = 60 if original_level != 60 else 65
                 try:
                     # Send identical PATCH twice — should not cause errors or spurious updates
-                    r1 = await self.client.patch_sbus_device(device_id, {"target_level": test_level})
-                    r2 = await self.client.patch_sbus_device(device_id, {"target_level": test_level})
+                    await self.client.patch_sbus_device(device_id, {"target_level": test_level})
+                    await self.client.patch_sbus_device(device_id, {"target_level": test_level})
                     fetched = await self.client.get_sbus_device(device_id)
                     actual = fetched.get("target_level")
                     idempotent = actual == test_level
@@ -267,7 +267,7 @@ class ApiWriteValidationRunner:
             # Patch fallback temperature by +10 (raw ×10), then restore
             test_temp = original_temp + 10
             try:
-                updated = await self.client.patch_schedule(
+                await self.client.patch_schedule(
                     sched_id, {"fallback": {"target_temperature": test_temp}}
                 )
                 fetched = await self.client.get_schedule(sched_id)

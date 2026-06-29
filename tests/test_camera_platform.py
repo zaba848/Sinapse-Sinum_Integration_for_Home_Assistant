@@ -17,7 +17,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -272,6 +272,7 @@ class TestCameraSetup:
             33: _CAMERA_ONVIF,
             40: _CAMERA_OFFLINE,
         }
+        coordinator.video_device_ips = frozenset({"192.168.1.131", "192.168.1.180"})
         coordinator.client.get_video_snapshot = AsyncMock(return_value=_FAKE_JPEG)
 
         entry = MagicMock()
@@ -279,7 +280,8 @@ class TestCameraSetup:
         entry.runtime_data = coordinator
 
         added = []
-        await async_setup_entry(MagicMock(), entry, lambda ents: added.extend(ents))
+        with patch("custom_components.sinum.camera.async_register_webrtc_provider", return_value=MagicMock()):
+            await async_setup_entry(MagicMock(), entry, lambda ents: added.extend(ents))
         assert len(added) == 3
 
     @pytest.mark.asyncio
@@ -492,13 +494,24 @@ class TestCameraLiveUpdate:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _make_provider():
+    from custom_components.sinum.camera import SinumWebRTCProvider
+
+    coordinator = MagicMock()
+    coordinator.video_device_ips = frozenset({"192.168.1.131"})
+    coordinator.client.post_video_stream_offer = AsyncMock(return_value=None)
+    coordinator.client.post_video_candidate = AsyncMock(return_value=None)
+    return SinumWebRTCProvider(coordinator), coordinator
+
+
 class TestCameraWebRtc:
-    def test_has_native_webrtc_impl(self):
-        """HA detects native WebRTC by checking if method is overridden."""
-        from custom_components.sinum.camera import SinumCamera
+    def test_provider_is_not_native_override(self):
+        """SinumCamera must NOT override async_handle_async_webrtc_offer so HA adds HLS to capabilities."""
         from homeassistant.components.camera import Camera
 
-        assert SinumCamera.async_handle_async_webrtc_offer is not Camera.async_handle_async_webrtc_offer
+        from custom_components.sinum.camera import SinumCamera
+
+        assert SinumCamera.async_handle_async_webrtc_offer is Camera.async_handle_async_webrtc_offer
 
     def test_stream_feature_enabled(self):
         from homeassistant.components.camera import CameraEntityFeature
@@ -506,50 +519,67 @@ class TestCameraWebRtc:
         cam = _make_camera(_CAMERA_RTSP)
         assert cam.supported_features & CameraEntityFeature.STREAM
 
+    def test_provider_domain(self):
+        provider, _ = _make_provider()
+        assert provider.domain == "sinum"
+
+    def test_provider_is_supported_matching_ip(self):
+        provider, _ = _make_provider()
+        assert provider.async_is_supported("rtsp://admin:pass@192.168.1.131:554/ch01") is True
+
+    def test_provider_not_supported_different_ip(self):
+        provider, _ = _make_provider()
+        assert provider.async_is_supported("rtsp://admin:pass@10.0.0.99:554/ch01") is False
+
+    def test_provider_not_supported_non_rtsp(self):
+        provider, _ = _make_provider()
+        assert provider.async_is_supported("http://example.com/stream") is False
+
     @pytest.mark.asyncio
     async def test_offer_registers_session_and_posts(self):
+        provider, coordinator = _make_provider()
         cam = _make_camera(_CAMERA_RTSP)
+        cam._device_id = 27
         send_message = MagicMock()
-        cam.coordinator.client.post_video_stream_offer = AsyncMock(return_value=None)
+        coordinator.client.post_video_stream_offer = AsyncMock(return_value=None)
 
-        await cam.async_handle_async_webrtc_offer("v=0\r\noffer", "sess-123", send_message)
+        await provider.async_handle_async_webrtc_offer(cam, "v=0\r\noffer", "sess-123", send_message)
 
-        cam.coordinator.register_webrtc_session.assert_called_once_with("sess-123", 27, send_message)
-        cam.coordinator.client.post_video_stream_offer.assert_called_once_with(27, "v=0\r\noffer", "sess-123")
+        coordinator.register_webrtc_session.assert_called_once_with("sess-123", 27, send_message)
+        coordinator.client.post_video_stream_offer.assert_called_once_with(27, "v=0\r\noffer", "sess-123")
 
     @pytest.mark.asyncio
     async def test_offer_post_failure_dispatches_error(self):
+        provider, coordinator = _make_provider()
         cam = _make_camera(_CAMERA_RTSP)
+        cam._device_id = 27
         send_message = MagicMock()
-        cam.coordinator.client.post_video_stream_offer = AsyncMock(side_effect=Exception("hub down"))
+        coordinator.client.post_video_stream_offer = AsyncMock(side_effect=Exception("hub down"))
 
-        await cam.async_handle_async_webrtc_offer("v=0\r\noffer", "sess-456", send_message)
+        await provider.async_handle_async_webrtc_offer(cam, "v=0\r\noffer", "sess-456", send_message)
 
-        cam.coordinator.dispatch_webrtc_error.assert_called_once_with("sess-456", "post_failed", "hub down")
-
-    @pytest.mark.asyncio
-    async def test_on_candidate_forwards_to_api(self):
-        cam = _make_camera(_CAMERA_RTSP)
-        candidate = MagicMock()
-        candidate.candidate = "candidate:1 1 udp 2113937151 192.168.1.1 54321 typ host"
-        candidate.sdp_mid = "0"
-        candidate.sdp_m_line_index = 0
-        cam.coordinator.client.post_video_candidate = AsyncMock(return_value=None)
-
-        await cam.async_on_webrtc_candidate("sess-123", candidate)
-
-        cam.coordinator.client.post_video_candidate.assert_called_once_with(27, "sess-123", candidate)
+        coordinator.dispatch_webrtc_error.assert_called_once_with("sess-456", "post_failed", "hub down")
 
     @pytest.mark.asyncio
-    async def test_on_candidate_ignores_api_error(self):
-        cam = _make_camera(_CAMERA_RTSP)
-        candidate = MagicMock()
-        cam.coordinator.client.post_video_candidate = AsyncMock(side_effect=Exception("hub down"))
+    async def test_offer_skips_camera_without_device_id(self):
+        provider, coordinator = _make_provider()
+        cam = MagicMock(spec=[])  # no _device_id attribute
 
-        # Should not raise
-        await cam.async_on_webrtc_candidate("sess-123", candidate)
+        await provider.async_handle_async_webrtc_offer(cam, "v=0\r\n", "sess-999", MagicMock())
+
+        coordinator.register_webrtc_session.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_on_candidate_delegates_to_coordinator(self):
+        provider, coordinator = _make_provider()
+        candidate = MagicMock()
+        coordinator.forward_webrtc_candidate = AsyncMock()
+
+        await provider.async_on_webrtc_candidate("sess-123", candidate)
+
+        coordinator.forward_webrtc_candidate.assert_called_once_with("sess-123", candidate)
 
     def test_close_session_delegates_to_coordinator(self):
-        cam = _make_camera(_CAMERA_RTSP)
-        cam.close_webrtc_session("sess-abc")
-        cam.coordinator.close_webrtc_session.assert_called_once_with("sess-abc")
+        provider, coordinator = _make_provider()
+        provider.async_close_session("sess-abc")
+        coordinator.close_webrtc_session.assert_called_once_with("sess-abc")

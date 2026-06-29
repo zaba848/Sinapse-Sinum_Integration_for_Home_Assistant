@@ -19,6 +19,10 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.components.camera.const import StreamType
+from homeassistant.components.camera.webrtc import (
+    CameraWebRTCProvider,
+    async_register_webrtc_provider,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -89,6 +93,56 @@ def _build_rtsp_url(dev: dict[str, Any]) -> str | None:
     return f"rtsp://{authority}"
 
 
+class SinumWebRTCProvider(CameraWebRTCProvider):
+    """Routes WebRTC signaling through the Sinum hub's go2rtc server.
+
+    Registered as a provider (instead of native camera override) so that
+    cameras expose both HLS and WebRTC stream types in their capabilities,
+    allowing playback on Chromecast and other HLS-only players.
+    """
+
+    def __init__(self, coordinator: SinumCoordinator) -> None:
+        self._coordinator = coordinator
+
+    @property
+    def domain(self) -> str:
+        return "sinum"
+
+    @callback
+    def async_is_supported(self, stream_source: str) -> bool:
+        from urllib.parse import urlparse
+        try:
+            host = urlparse(stream_source).hostname or ""
+        except Exception:
+            return False
+        return host in self._coordinator.video_device_ips
+
+    async def async_handle_async_webrtc_offer(
+        self,
+        camera: Camera,
+        offer_sdp: str,
+        session_id: str,
+        send_message: WebRTCSendMessage,
+    ) -> None:
+        device_id: int | None = getattr(camera, "_device_id", None)
+        if device_id is None:
+            return
+        self._coordinator.register_webrtc_session(session_id, device_id, send_message)
+        try:
+            await self._coordinator.client.post_video_stream_offer(device_id, offer_sdp, session_id)
+        except Exception as exc:
+            self._coordinator.dispatch_webrtc_error(session_id, "post_failed", str(exc))
+
+    async def async_on_webrtc_candidate(
+        self, session_id: str, candidate: RTCIceCandidateInit
+    ) -> None:
+        await self._coordinator.forward_webrtc_candidate(session_id, candidate)
+
+    @callback
+    def async_close_session(self, session_id: str) -> None:
+        self._coordinator.close_webrtc_session(session_id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SinumConfigEntry,
@@ -101,6 +155,8 @@ async def async_setup_entry(
     ]
     if entities:
         _LOGGER.debug("Setting up %d Sinum camera entities", len(entities))
+        provider = SinumWebRTCProvider(coordinator)
+        entry.async_on_unload(async_register_webrtc_provider(hass, provider))
     async_add_entities(entities)
 
 
@@ -185,34 +241,6 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
         if url is None:
             _LOGGER.debug("Camera %d: password masked by hub, stream unavailable", self._device_id)
         return url
-
-    async def async_handle_async_webrtc_offer(
-        self, offer_sdp: str, session_id: str, send_message: "WebRTCSendMessage"
-    ) -> None:
-        """Forward WebRTC SDP offer to hub; answer arrives via WebSocket as callbacks."""
-        self.coordinator.register_webrtc_session(session_id, self._device_id, send_message)
-        try:
-            await self.coordinator.client.post_video_stream_offer(
-                self._device_id, offer_sdp, session_id
-            )
-        except Exception as exc:
-            self.coordinator.dispatch_webrtc_error(session_id, "post_failed", str(exc))
-
-    async def async_on_webrtc_candidate(
-        self, session_id: str, candidate: "RTCIceCandidateInit"
-    ) -> None:
-        """Forward browser ICE candidate to hub."""
-        try:
-            await self.coordinator.client.post_video_candidate(
-                self._device_id, session_id, candidate
-            )
-        except Exception as exc:
-            _LOGGER.debug("Cannot forward ICE candidate to hub: %s", exc)
-
-    @callback
-    def close_webrtc_session(self, session_id: str) -> None:
-        """Clean up WebRTC session state."""
-        self.coordinator.close_webrtc_session(session_id)
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None

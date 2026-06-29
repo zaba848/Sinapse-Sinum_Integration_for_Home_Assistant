@@ -23,6 +23,13 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.14] — 2026-06-29
+
+### Fixed / Improved
+- **Camera: HLS + WebRTC both available** — refactored camera WebRTC from native entity override to a registered `SinumWebRTCProvider`. Cameras now expose both HLS and WebRTC in their `camera_capabilities`, eliminating the "N elements incompatible with selected player" message when using Chromecast or other HLS-only players. WebRTC is still preferred for low-latency in-browser viewing.
+- **Lint cleanup** — fixed ruff F841/F401/F541/E702/E741 errors in `scripts/validate_api_writes.py` and `scripts/validate_v040_features.py`.
+- **API test coverage** — added tests for `post_video_stream_offer` and `post_video_candidate` (payload structure, `ice_servers: []`, ICE candidate forwarding, `sdp_m_line_index=None` default).
+
 ## [0.5.13] — 2026-06-29
 
 ### Fixed / Improved

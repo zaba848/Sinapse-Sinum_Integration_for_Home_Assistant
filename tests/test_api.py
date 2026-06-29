@@ -424,6 +424,55 @@ class TestVideoEndpoints:
         ):
             await client.get_video_snapshot(3)
 
+    @pytest.mark.asyncio
+    async def test_post_video_stream_offer_sends_correct_payload(self, session):
+        resp = make_response(200, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.post_video_stream_offer(7, "v=0\r\n", "sess-abc")
+        _, kwargs = session.request.call_args
+        body = kwargs["json"]
+        assert body["type"] == "offer"
+        assert body["data"]["session_id"] == "sess-abc"
+        assert body["data"]["description"]["sdp"] == "v=0\r\n"
+        assert body["data"]["description"]["ice_servers"] == []
+
+    @pytest.mark.asyncio
+    async def test_post_video_candidate_sends_correct_payload(self, session):
+        from unittest.mock import MagicMock
+        resp = make_response(200, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        candidate = MagicMock()
+        candidate.candidate = "candidate:1 1 UDP 2122252543 192.168.1.1 50000 typ host"
+        candidate.sdp_m_line_index = 0
+        candidate.sdp_mid = "0"
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.post_video_candidate(7, "sess-abc", candidate)
+        _, kwargs = session.request.call_args
+        body = kwargs["json"]
+        assert body["type"] == "candidate"
+        assert body["data"]["session_id"] == "sess-abc"
+        assert body["data"]["candidate"]["candidate"] == candidate.candidate
+        assert body["data"]["candidate"]["sdp_m_line_index"] == 0
+
+    @pytest.mark.asyncio
+    async def test_post_video_candidate_none_sdp_m_line_index_defaults_to_zero(self, session):
+        from unittest.mock import MagicMock
+        resp = make_response(200, {})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        candidate = MagicMock()
+        candidate.candidate = "candidate:1 1 UDP 2122252543 192.168.1.2 50001 typ host"
+        candidate.sdp_m_line_index = None
+        candidate.sdp_mid = ""
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.post_video_candidate(7, "sess-abc", candidate)
+        _, kwargs = session.request.call_args
+        body = kwargs["json"]
+        assert body["data"]["candidate"]["sdp_m_line_index"] == 0
+
 
 class TestSceneScheduleEndpoints:
     @pytest.mark.asyncio

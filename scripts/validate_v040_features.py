@@ -19,7 +19,6 @@ import asyncio
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -60,8 +59,8 @@ async def test_a_zero_target_temp(client) -> tuple[str, str]:
     return "PASS", (
         f"Found {len(zero_devs)} thermostat(s) with target_temperature=0.\n"
         + "\n".join(lines)
-        + f"\n  → In HA these will show target=None (not 0.0°C). "
-        + f"Devices with both temp+target=0: {len(no_sensor_devs)}"
+        + "\n  → In HA these will show target=None (not 0.0°C). "
+        + f"Devices with both temp+target=0: {len(no_sensor_devs)}"  # noqa: E501
     )
 
 
@@ -163,7 +162,6 @@ async def test_c_gate_field_survey(client) -> tuple[str, str]:
 async def test_d_modbus_energy(client) -> tuple[str, str]:
     """Verify modbus energy meter returns non-None values for key sensors."""
     try:
-        from custom_components.sinum.api import SinumNotSupportedError
         devices = await client.get_modbus_devices()
     except Exception as e:
         if "404" in str(e) or "not found" in str(e).lower():
@@ -204,10 +202,11 @@ async def main() -> None:
     args = parser.parse_args()
 
     if not args.password and not args.token:
-        print("ERROR: provide --password or --token"); sys.exit(1)
+        print("ERROR: provide --password or --token")
+        sys.exit(1)
 
     lines: list[str] = [
-        f"# Sinum v0.4.1 feature validation",
+        "# Sinum v0.4.1 feature validation",
         f"# Hub: {args.host}",
         f"# Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
@@ -239,7 +238,7 @@ async def main() -> None:
     out = Path("docs/live_v041_validation.md")
     out.write_text(report)
     print(f"\nReport written to {out}")
-    if any("[FAIL]" in l or "[ERROR]" in l for l in lines):
+    if any("[FAIL]" in line or "[ERROR]" in line for line in lines):
         sys.exit(1)
 
 

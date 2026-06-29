@@ -57,7 +57,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def dispatch_webrtc_answer(self, session_id: str, answer_sdp: str) -> None:
         session = self._webrtc_sessions.get(session_id)
         if session:
-            from homeassistant.components.camera.webrtc import WebRTCAnswer  # lazy — avoids import at module load
+            from homeassistant.components.camera.webrtc import WebRTCAnswer
 
             session[1](WebRTCAnswer(answer=answer_sdp))
 
@@ -83,6 +83,24 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def close_webrtc_session(self, session_id: str) -> None:
         self._webrtc_sessions.pop(session_id, None)
+
+    async def forward_webrtc_candidate(self, session_id: str, candidate: Any) -> None:
+        session = self._webrtc_sessions.get(session_id)
+        if session is None:
+            return
+        device_id, _ = session
+        try:
+            await self.client.post_video_candidate(device_id, session_id, candidate)
+        except Exception as exc:
+            _LOGGER.debug("Cannot forward ICE candidate to hub: %s", exc)
+
+    @property
+    def video_device_ips(self) -> frozenset[str]:
+        return frozenset(
+            dev["ip"]
+            for dev in self.video_devices.values()
+            if dev.get("ip")
+        )
 
     def _apply_hub_metadata(self, hub_info: Any, lua_info: Any) -> None:
         if hub_info is not None:
