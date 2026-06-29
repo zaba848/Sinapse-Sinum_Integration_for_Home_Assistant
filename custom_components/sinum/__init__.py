@@ -29,6 +29,7 @@ from .const import (
     ATTR_NOTIFICATION_MESSAGE,
     ATTR_NOTIFICATION_TITLE,
     ATTR_PAYLOAD,
+    ATTR_RUN_SCENE_ID,
     ATTR_SCHEDULE_ID,
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
@@ -45,6 +46,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_WS_PATH,
     DOMAIN,
+    SERVICE_RUN_SCENE,
     SERVICE_SEND_NOTIFICATION,
     SERVICE_UPDATE_SCHEDULE,
     SERVICE_UPLOAD_MQTT_BRIDGE,
@@ -96,6 +98,13 @@ UPLOAD_MQTT_BRIDGE_SCHEMA = vol.Schema(
         vol.Optional(ATTR_MQTT_SCENE_ID): cv.positive_int,
         vol.Optional(ATTR_MQTT_CLIENT_ID): cv.positive_int,
         vol.Optional(ATTR_MQTT_DRY_RUN, default=False): cv.boolean,
+    }
+)
+
+RUN_SCENE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Required(ATTR_RUN_SCENE_ID): cv.positive_int,
     }
 )
 
@@ -278,6 +287,12 @@ def _register_services(hass: HomeAssistant) -> None:
         _merge_schedule(coordinator, schedule_id, updated or payload)
         _publish_schedule_update(coordinator)
 
+    async def handle_run_scene(call: ServiceCall) -> None:
+        coordinator = _select_coordinator(hass, call.data.get(ATTR_ENTRY_ID))
+        scene_id = int(call.data[ATTR_RUN_SCENE_ID])
+        await coordinator.client.run_scene(scene_id)
+        _LOGGER.debug("Triggered Sinum scene %d via service", scene_id)
+
     async def handle_upload_mqtt_bridge(call: ServiceCall) -> None:
         coordinator = _select_coordinator(hass, call.data.get(ATTR_ENTRY_ID))
         opts = coordinator.config_entry.options
@@ -331,6 +346,12 @@ def _register_services(hass: HomeAssistant) -> None:
         SERVICE_UPLOAD_MQTT_BRIDGE,
         handle_upload_mqtt_bridge,
         UPLOAD_MQTT_BRIDGE_SCHEMA,
+    )
+    _register_service_if_missing(
+        hass,
+        SERVICE_RUN_SCENE,
+        handle_run_scene,
+        RUN_SCENE_SCHEMA,
     )
 
 

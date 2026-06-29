@@ -12,6 +12,7 @@ from custom_components.sinum.const import (
     ATTR_NOTIFICATION_MESSAGE,
     ATTR_NOTIFICATION_TITLE,
     ATTR_PAYLOAD,
+    ATTR_RUN_SCENE_ID,
     ATTR_SCHEDULE_ID,
     AUTH_MODE_PASSWORD,
     AUTH_MODE_TOKEN,
@@ -23,6 +24,7 @@ from custom_components.sinum.const import (
     CONF_WS_PATH,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    SERVICE_RUN_SCENE,
     SERVICE_SEND_NOTIFICATION,
     SERVICE_UPDATE_SCHEDULE,
 )
@@ -794,6 +796,84 @@ class TestStaleEntityCleanup:
             await _cleanup_stale_entities(hass, "e1", {"sbus": frozenset({7})})
 
         mock_reg.async_remove.assert_called_once_with("switch.stale")
+
+
+class TestRunSceneService:
+    @pytest.mark.asyncio
+    async def test_run_scene_triggers_hub_scene(self, hass):
+        from custom_components.sinum import async_setup_entry
+
+        mock_client = MagicMock()
+        mock_client.login = AsyncMock()
+        mock_client.run_scene = AsyncMock()
+
+        coordinator = MagicMock()
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+        coordinator.client = mock_client
+        coordinator.hub_info = {"name": "Hub A"}
+        coordinator.mqtt_bridge = None
+        coordinator.data = {}
+
+        entry = MagicMock()
+        entry.entry_id = "hub_a"
+        entry.title = "Sinum (Hub A)"
+        entry.options = {}
+        entry.data = {"host": "10.0.61.132", "auth_mode": "token", "api_token": "tok"}
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator", return_value=coordinator),
+            patch("custom_components.sinum.SinumClient", return_value=mock_client),
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            await async_setup_entry(hass, entry)
+
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RUN_SCENE,
+            {ATTR_RUN_SCENE_ID: 7},
+            blocking=True,
+        )
+
+        mock_client.run_scene.assert_awaited_once_with(7)
+
+    @pytest.mark.asyncio
+    async def test_run_scene_with_explicit_entry_id(self, hass):
+        from custom_components.sinum import async_setup_entry
+
+        mock_client = MagicMock()
+        mock_client.login = AsyncMock()
+        mock_client.run_scene = AsyncMock()
+
+        coordinator = MagicMock()
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+        coordinator.client = mock_client
+        coordinator.hub_info = {"name": "Hub B"}
+        coordinator.mqtt_bridge = None
+        coordinator.data = {}
+
+        entry = MagicMock()
+        entry.entry_id = "hub_b"
+        entry.title = "Sinum (Hub B)"
+        entry.options = {}
+        entry.data = {"host": "10.0.62.1", "auth_mode": "token", "api_token": "tok2"}
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator", return_value=coordinator),
+            patch("custom_components.sinum.SinumClient", return_value=mock_client),
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            await async_setup_entry(hass, entry)
+
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RUN_SCENE,
+            {ATTR_RUN_SCENE_ID: 3, ATTR_ENTRY_ID: "hub_b"},
+            blocking=True,
+        )
+
+        mock_client.run_scene.assert_awaited_once_with(3)
 
 
 class TestStaleDeviceRegistryCleanup:

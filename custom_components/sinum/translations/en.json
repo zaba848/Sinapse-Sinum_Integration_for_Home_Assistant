@@ -325,6 +325,20 @@
           "description": "If true, log the rendered Lua script without uploading it to the hub."
         }
       }
+    },
+    "run_scene": {
+      "name": "Run scene",
+      "description": "Triggers a Sinum hub Lua scene by its numeric ID.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Required when more than one Sinum hub is loaded."
+        },
+        "scene_id": {
+          "name": "Scene ID",
+          "description": "Numeric ID of the Sinum scene to trigger."
+        }
+      }
     }
   }
 }

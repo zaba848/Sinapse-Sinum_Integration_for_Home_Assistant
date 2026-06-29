@@ -325,6 +325,20 @@
           "description": "Jeśli true, wyświetla wyrenderowany skrypt Lua w logu bez wgrywania do centrali."
         }
       }
+    },
+    "run_scene": {
+      "name": "Uruchom scenę",
+      "description": "Uruchamia scenę Lua centrali Sinum na podstawie jej numerycznego ID.",
+      "fields": {
+        "entry_id": {
+          "name": "ID wpisu konfiguracji",
+          "description": "Wymagane, gdy załadowana jest więcej niż jedna centrala Sinum."
+        },
+        "scene_id": {
+          "name": "ID sceny",
+          "description": "Numeryczny identyfikator sceny Sinum do uruchomienia."
+        }
+      }
     }
   }
 }

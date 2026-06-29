@@ -45,6 +45,26 @@ update_schedule:
       selector:
         object:
 
+run_scene:
+  name: Run scene
+  description: Triggers a Sinum hub Lua scene by its numeric ID.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Required when more than one Sinum hub is loaded.
+      required: false
+      selector:
+        text:
+    scene_id:
+      name: Scene ID
+      description: Numeric ID of the Sinum scene to trigger.
+      required: true
+      example: 5
+      selector:
+        number:
+          min: 1
+          mode: box
+
 upload_mqtt_bridge:
   name: Upload MQTT bridge
   description: >
