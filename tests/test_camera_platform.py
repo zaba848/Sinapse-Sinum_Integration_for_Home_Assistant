@@ -450,3 +450,38 @@ class TestBuildRtspUrl:
 
         dev = {"login": "", "password": "pass", "ip": "10.0.1.1", "port": 8554, "url": "/stream"}
         assert _build_rtsp_url(dev) == "rtsp://10.0.1.1:8554/stream"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CoordinatorEntity live-update path — simulates WebSocket push
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCameraLiveUpdate:
+    def test_is_on_reflects_live_status_change(self):
+        """Camera picks up status changes pushed by coordinator (WS path)."""
+        cam = _make_camera(_CAMERA_RTSP)
+        assert cam.is_on is True
+
+        cam.coordinator.video_devices[27]["status"] = "offline"
+        assert cam.is_on is False
+
+    def test_name_reflects_live_rename(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        assert cam.name == "rejestrator 1"
+
+        cam.coordinator.video_devices[27]["name"] = "Renamed Cam"
+        assert cam.name == "Renamed Cam"
+
+    def test_attributes_reflect_live_ip_change(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        assert cam.extra_state_attributes["ip"] == "192.168.1.131"
+
+        cam.coordinator.video_devices[27]["ip"] = "10.0.50.99"
+        assert cam.extra_state_attributes["ip"] == "10.0.50.99"
+
+    def test_device_gone_from_coordinator_returns_empty(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        del cam.coordinator.video_devices[27]
+        assert cam.name == f"Camera 27"
+        assert cam.is_on is False
