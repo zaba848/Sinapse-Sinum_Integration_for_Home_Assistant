@@ -5,10 +5,10 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.api import SinumNotSupportedError
 from custom_components.sinum.notify import SinumNotifyEntity, async_setup_entry
-from homeassistant.exceptions import HomeAssistantError
 
 
 def _make_coordinator(hub_name="TestHub", hub_model="sinum_lite"):
