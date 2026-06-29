@@ -8,6 +8,11 @@ Covers:
 - device_info structure
 - PARALLEL_UPDATES = 0
 - async_setup_entry creates entities from coordinator.video_devices
+- supported_features: STREAM for ip_camera/onvif_camera, 0 for others
+- stream_source: builds rtsp:// URL from individual device endpoint
+- stream_source: returns None when password is masked
+- stream_source: returns None on API error
+- CoordinatorEntity: available reflects coordinator last_update_success
 """
 
 from __future__ import annotations
@@ -70,12 +75,27 @@ _CAMERA_OFFLINE = {
 _FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 
 
+_CAMERA_RTSP_FULL_CREDS = {
+    **_CAMERA_RTSP,
+    "password": "secret123",
+}
+
+_CAMERA_UNKNOWN_TYPE = {
+    **_CAMERA_RTSP,
+    "id": 99,
+    "type": "nvr",
+    "video_type": "nvr",
+}
+
+
 def _make_camera(device_data: dict):
     from custom_components.sinum.camera import SinumCamera
 
     coordinator = MagicMock()
     coordinator.video_devices = {device_data["id"]: device_data}
+    coordinator.last_update_success = True
     coordinator.client.get_video_snapshot = AsyncMock(return_value=_FAKE_JPEG)
+    coordinator.client.get_video_device = AsyncMock(return_value=device_data)
     entity = SinumCamera(coordinator, device_data["id"], "entry_abc")
     entity.hass = MagicMock()
     return entity
@@ -196,12 +216,12 @@ class TestSinumCameraSnapshot:
         cam = _make_camera(_CAMERA_RTSP)
         result = await cam.async_camera_image()
         assert result == _FAKE_JPEG
-        cam._coordinator.client.get_video_snapshot.assert_called_once_with(27)
+        cam.coordinator.client.get_video_snapshot.assert_called_once_with(27)
 
     @pytest.mark.asyncio
     async def test_returns_none_on_exception(self):
         cam = _make_camera(_CAMERA_RTSP)
-        cam._coordinator.client.get_video_snapshot = AsyncMock(side_effect=Exception("timeout"))
+        cam.coordinator.client.get_video_snapshot = AsyncMock(side_effect=Exception("timeout"))
         result = await cam.async_camera_image()
         assert result is None
 
@@ -209,7 +229,7 @@ class TestSinumCameraSnapshot:
     async def test_snapshot_uses_correct_device_id(self):
         cam = _make_camera(_CAMERA_ONVIF)
         await cam.async_camera_image()
-        cam._coordinator.client.get_video_snapshot.assert_called_once_with(33)
+        cam.coordinator.client.get_video_snapshot.assert_called_once_with(33)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -286,4 +306,147 @@ class TestCameraSetup:
 class TestCameraParallelUpdates:
     def test_parallel_updates_is_zero(self):
         import custom_components.sinum.camera as cam_mod
+
         assert cam_mod.PARALLEL_UPDATES == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# supported_features
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCameraFeatures:
+    def test_ip_camera_has_stream_feature(self):
+        from homeassistant.components.camera import CameraEntityFeature
+
+        cam = _make_camera(_CAMERA_RTSP)
+        assert cam.supported_features & CameraEntityFeature.STREAM
+
+    def test_onvif_camera_has_stream_feature(self):
+        from homeassistant.components.camera import CameraEntityFeature
+
+        cam = _make_camera(_CAMERA_ONVIF)
+        assert cam.supported_features & CameraEntityFeature.STREAM
+
+    def test_unknown_type_no_stream_feature(self):
+        from homeassistant.components.camera import CameraEntityFeature
+
+        cam = _make_camera(_CAMERA_UNKNOWN_TYPE)
+        assert not (cam.supported_features & CameraEntityFeature.STREAM)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# stream_source
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCameraStreamSource:
+    @pytest.mark.asyncio
+    async def test_returns_rtsp_url_with_credentials(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=_CAMERA_RTSP_FULL_CREDS)
+        url = await cam.stream_source()
+        assert url == "rtsp://admin:secret123@192.168.1.131:554/ch01"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_password_masked(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=_CAMERA_RTSP)
+        url = await cam.stream_source()
+        assert url is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_api_error(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(
+            side_effect=Exception("connection refused")
+        )
+        url = await cam.stream_source()
+        assert url is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_non_streamable_type(self):
+        cam = _make_camera(_CAMERA_UNKNOWN_TYPE)
+        cam.coordinator.client.get_video_device = AsyncMock(
+            return_value={**_CAMERA_UNKNOWN_TYPE, "password": "secret"}
+        )
+        url = await cam.stream_source()
+        assert url is None
+
+    @pytest.mark.asyncio
+    async def test_onvif_returns_rtsp_url(self):
+        cam = _make_camera(_CAMERA_ONVIF)
+        cam.coordinator.client.get_video_device = AsyncMock(
+            return_value={**_CAMERA_ONVIF, "password": "pass456"}
+        )
+        url = await cam.stream_source()
+        assert url == "rtsp://admin:pass456@192.168.1.180:8554/ch01"
+
+    @pytest.mark.asyncio
+    async def test_calls_individual_device_endpoint(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=_CAMERA_RTSP)
+        await cam.stream_source()
+        cam.coordinator.client.get_video_device.assert_called_once_with(27)
+
+    @pytest.mark.asyncio
+    async def test_url_without_login(self):
+        dev = {**_CAMERA_RTSP_FULL_CREDS, "login": ""}
+        cam = _make_camera(dev)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=dev)
+        url = await cam.stream_source()
+        assert url == "rtsp://192.168.1.131:554/ch01"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CoordinatorEntity — availability
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCameraAvailability:
+    def test_available_when_coordinator_success(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.last_update_success = True
+        assert cam.available is True
+
+    def test_unavailable_when_coordinator_failed(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.last_update_success = False
+        assert cam.available is False
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# _build_rtsp_url helper
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestBuildRtspUrl:
+    def test_full_credentials(self):
+        from custom_components.sinum.camera import _build_rtsp_url
+
+        dev = {"login": "admin", "password": "pass", "ip": "10.0.1.1", "port": 554, "url": "/ch01"}
+        assert _build_rtsp_url(dev) == "rtsp://admin:pass@10.0.1.1:554/ch01"
+
+    def test_masked_password_returns_none(self):
+        from custom_components.sinum.camera import _build_rtsp_url
+
+        dev = {"login": "admin", "password": "*******", "ip": "10.0.1.1", "port": 554, "url": ""}
+        assert _build_rtsp_url(dev) is None
+
+    def test_empty_password_returns_none(self):
+        from custom_components.sinum.camera import _build_rtsp_url
+
+        dev = {"login": "admin", "password": "", "ip": "10.0.1.1", "port": 554, "url": ""}
+        assert _build_rtsp_url(dev) is None
+
+    def test_missing_ip_returns_none(self):
+        from custom_components.sinum.camera import _build_rtsp_url
+
+        dev = {"login": "admin", "password": "pass", "ip": "", "port": 554, "url": ""}
+        assert _build_rtsp_url(dev) is None
+
+    def test_no_login(self):
+        from custom_components.sinum.camera import _build_rtsp_url
+
+        dev = {"login": "", "password": "pass", "ip": "10.0.1.1", "port": 8554, "url": "/stream"}
+        assert _build_rtsp_url(dev) == "rtsp://10.0.1.1:8554/stream"

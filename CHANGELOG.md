@@ -23,6 +23,18 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.9] — 2026-06-29
+
+### New Features
+- **Camera support**: IP cameras and ONVIF cameras configured in the Sinum hub are now exposed as HA `camera` entities.
+  - Snapshots fetched via hub proxy endpoint (`/api/v1/devices/video/{id}/snapshot`).
+  - Live streaming (`CameraEntityFeature.STREAM`) enabled for `ip_camera` and `onvif_camera` types — HA proxies RTSP via its internal stream engine; the URL is never sent to the browser.
+  - `stream_source()` calls the individual device endpoint to obtain unmasked credentials (the list endpoint masks passwords as `*******`); returns `None` when hub still masks credentials, HA falls back to snapshot-only mode.
+  - Camera attributes exposed: `video_type`, `ip`, `port`, `url_path`, `mac`, `status`, `purpose`, `room_id` (passwords and login credentials never exposed in entity state).
+  - Brand populated from hub `variant` field (e.g. `hikvision`); `generic` variants return `None`.
+  - Availability follows coordinator `last_update_success` (standard `CoordinatorEntity` pattern).
+- **Total: 1 516 tests** across 45 files
+
 ## [0.5.8] — 2026-06-29
 
 ### Bug Fixes
