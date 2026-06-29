@@ -257,6 +257,7 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         scale=0.1,
         suggested_display_precision=1,
         translation_key="regulator_temperature",
+        zero_is_unavailable=True,
     ),
     SinumSensorDescription(
         key="target_temperature",

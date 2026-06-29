@@ -171,6 +171,16 @@ class TestPhase7BTemperatureRegulators:
         attrs = entity.extra_state_attributes
         assert len(attrs) == 0  # No mode, parent_id, etc. in partial device
 
+    def test_regulator_temperature_zero_returns_none(self):
+        """Hub sends temperature: 0 when no physical sensor — must show unavailable, not 0.0°C."""
+        device = {**FIXTURES["wtp_temperature_regulator_full"], "temperature": 0}
+        coordinator = self._make_wtp_coordinator(100, device)
+        entity = SinumTemperatureRegulatorSensor(
+            coordinator, 100, self._wtp_regulator_description("temperature"), "test_entry"
+        )
+
+        assert entity.native_value is None
+
     def test_target_temperature_mode_passthrough_for_non_dict(self):
         assert SinumTemperatureRegulatorSensor._target_temperature_mode("constant") == "constant"
 

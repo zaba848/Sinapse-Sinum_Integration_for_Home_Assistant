@@ -23,6 +23,15 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.8] — 2026-06-29
+
+### Bug Fixes
+- **WTP temperature regulator sensor: 0.0°C → unavailable**: regulators without a physical sensor previously showed `0.0°C`; now correctly report "Unavailable" when the hub sends `temperature: 0`. Achieved by setting `zero_is_unavailable=True` on the `wtp_regulator` temperature sensor description.
+
+### Code Quality
+- **mypy clean**: fixed `light._is_button_with_color` signature — `dev_type: str` widened to `str | None` (was flagged by mypy as incompatible with `device.get("type")` return type).
+- **Total: 1 499 tests** across 44 files
+
 ## [0.5.7] — 2026-06-26
 
 ### Documentation

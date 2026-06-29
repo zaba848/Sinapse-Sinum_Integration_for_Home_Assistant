@@ -1,63 +1,21 @@
 # Sinapse — Implementation Plan & Critical Review
 
-> Last updated: 2026-06-25 (v0.4.0 — modbus energy meter, notify 404 fix, live-write validation executed)
+> Last updated: 2026-06-29 (v0.5.7 — mypy fix, temperature zero fix)
 > Verified against two live hubs (firmware `1.24.0-alpha.2`/`alpha.3`, API `1.4`).
 > Credentials and API tokens must never be committed to this repository.
 
-## 2026-06-25 Hardening Sprint ✅ (Completed & Released as v0.3.9)
-
-### A. Live Validation (hardware + API + server)
-
-- [x] Run live read-only hardware smoke against both hubs (`10.0.61.132`, `10.0.62.167`).
-- [x] Verify core endpoints `/api/v1/info`, `/devices/wtp`, `/devices/sbus`, `/devices/virtual` return HTTP 200.
-- [x] Verify API/config/retry test suites pass locally.
-- [x] Verify release gate on GitHub Actions (`CI`, `Lint`, `CodeQL`, `HACS`).
-
-### B. Failsafe/Fallback in Add/Reconfigure/Reauth Flow
-
-- [x] Reject malformed host input in GUI flow (path/query/fragment, empty host).
-- [x] Add transient connection retry for add/reconfigure credential probes.
-- [x] Add password-mode fallback when login succeeds but `/info` is temporarily unavailable.
-- [x] Add user-facing translation for `invalid_host` and update docs/screenshots.
-
-### C. Security and UX Hardening (GUI + runtime)
-
-- [x] Validate and normalize MQTT topic prefix; block wildcard injection.
-- [x] Keep token/password auth-mode split explicit in GUI steps.
-- [ ] Add anti-bruteforce/backoff policy for repeated failed reauth attempts.
-- [ ] Add secure defaults guidance in README (network segmentation, least privilege API token, TLS proxy option).
-- [x] `notify.py` — graceful `SinumNotSupportedError` (404) on sinum_lite; `api.py` 404 → `SinumNotSupportedError` (distinct from connection errors).
-
-### D. API Coverage and HA Mapping Plan
-
-- [x] Keep current coverage map in `docs/api_coverage.md` synchronized with implemented endpoints.
-- [ ] Add endpoint-by-endpoint matrix: implemented in HA entity/service vs helper-only vs intentionally excluded.
-- [ ] Prioritize remaining live-write validations (LoRa relay patch, RGB/dimmer idempotency, heat_pump_manager mode matrix).
-
-### E. Quality Gates and Engineering Practices
-
-- [x] 100% line coverage for `custom_components/sinum` maintained in local run.
-- [x] Require `ruff check`, `ruff format --check`, `mypy`, and targeted+full tests before release.
-- [ ] Add nightly regression summary to docs with trend (pass rate, duration, flaky tests).
-- [ ] Keep cyclomatic complexity guard (`C901`, max-complexity=4) enforced for modified files.
-
 ---
 
-## Current Reality
+## Project Status (2026-06-29)
 
 ```text
-Home Assistant
-  └─ custom_components/sinum
-       ├─ REST discovery and polling (30 s default)
-       ├─ optional MQTT push bridge from Lua script on hub
-       └─ optional Lua HTTP extension for extra hub diagnostics
-
-Sinum EH-01 hub
-  ├─ /api/v1/info, /api/v1/rooms, /api/v1/floors
-  ├─ /api/v1/devices/virtual, /wtp, /sbus, /lora
-  ├─ /api/v1/parent-devices
-  ├─ /api/v1/schedules, /api/v1/scenes
-  └─ Lua API v1.24+: HTTP server, MQTT client, buses, statistics, Energy Center
+Tests:  1 499 passing, 5 skipped (~8.5 s)
+Ruff:   0 errors
+mypy:   0 errors
+CC:     ≤ 4, _LEGACY_ALLOWANCE = {}
+Live:   2 581 entities on 2 hubs (both HA entries, 0 errors)
+Tags:   v0.5.5, v0.5.6, v0.5.7 released
+HACS:   submission ready pending hassfest validation
 ```
 
 ---
@@ -133,37 +91,13 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 | `temperature_regulator` | WTP / SBUS | `target_temperature: int×10` | — |
 | `fan_coil` | SBUS | `work_mode: str`, `target_temperature: int×10`, `fan_speed: str` | — |
 
-### Bugs Fixed in Phase 14 (this branch)
+### Known Hardware Limitations
 
-- ✅ `SinumDimmerLight`: was sending `{"state": "on"/"off"}` string — API requires boolean
-- ✅ `SinumBusRgbLight`: was trying to send brightness/color — always 422; now ONOFF-only
-- ✅ `available_work_modes: []` (empty list from fan coil) returned `[OFF]` only instead of inferring
-- ✅ `button.py` hardcoded `model="Sinum EH-01"` — now uses `coordinator.hub_info`
-- ✅ Child devices on WTP/SBUS/LoRa buses had no `via_device` in HA Device Registry
-- ✅ `_build_parent_maps` now returns `(model_maps, class_maps)` tuple; coordinator injects `_parent_class` + `_parent_id` for `via_device_for` helper
-
-### Remaining Code Quality Issues
-
-1. **`sensor.py` split completed** — platform setup/re-export remains in `sensor.py`; entity logic moved to
-   `sensor_virtual.py`, `sensor_bus.py`, `sensor_schedule.py`.
-2. **`climate.py` mixin added** — WTP/SBUS fan coil and temperature regulator now share bus-store,
-   setpoint, min/max, HVAC mode and PATCH helpers.
-3. **`SinumVariableNumber`** now extends `CoordinatorEntity`, reads `coordinator.variables`, and uses
-   `hub_info` for model selection.
-4. **`state_class` coverage is now guarded by tests** for measurements and totals.
-5. **Test badge in README** reflects current full test count (866 passing).
-
-### HA Compliance Gaps
-
-| Requirement | Status |
+| Issue | Status |
 |---|---|
-| `hacs.json` | ✅ Present |
-| `manifest.json` `homeassistant` min version | ✅ Present |
-| `state_class` on measurement sensors | ✅ Present + unit-tested |
-| `hassfest` validation | ❌ Not run |
-| Translation keys complete | ⚠️ Partial |
-| `brands/` folder (official HA listing) | ❌ Missing |
-| `entity_category` on all diagnostic entities | ⚠️ Partial |
+| Virtual cover integrators (roletki): state=unknown, no position feedback | Accepted — hardware limitation; state restores from HA after first command |
+| WTP rgb_controller: Lua not supported — REST only, limited control in temperature mode | Accepted — firmware limitation |
+| LoRa relay PATCH endpoint | Untested — no LoRa hardware available on either hub |
 
 ---
 
@@ -182,56 +116,48 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 | 10 | SBUS motion sensor; illuminance/analog_input/impulse_meter sensors | ✅ |
 | 11 | Sensor bug fixes: flood, aq PM, iaq, energy_meter fields | ✅ |
 | 12 | valve_pump/common_valve switch; analog_output number; heat_pump_manager | ✅ |
-| 13 | HA event entity; DHW switch; target_reached binary_sensor; 552 tests, 93% | ✅ |
-| 14 | Boolean state fix, RGB ONOFF-only, via_device hierarchy, critical review | 🔄 |
+| 13 | HA event entity; DHW switch; target_reached binary_sensor; 552 tests | ✅ |
+| 14 | Boolean state fix, RGB ONOFF-only, via_device hierarchy, critical review | ✅ |
+| 15A | HA compliance: state_class, homeassistant min version, hacs.json | ✅ |
+| 15B | Code quality: sensor.py split, climate mixin, SinumVariableNumber | ✅ |
+| 15C | Test coverage: MQTT routing, multi-hub, event types | ✅ |
+| 15D | New features: api_coverage, energy center, schedules, modbus | ✅ |
+| 15E | HACS prep: brands/, translation keys, CONTRIBUTING.md | ✅ (except hassfest) |
+| v0.3.x | Failsafe add/reauth flow, retry, host normalization, anti-bruteforce | ✅ |
+| v0.4.x | WS transport, CC gate, modbus energy meter, quality sprint | ✅ |
+| v0.5.x | WS 100%, ConfigEntryAuthFailed, stale cleanup, PL docs, ruff clean | ✅ |
 
 ---
 
-## Remaining Work (Phase 15+)
+## Remaining Work
 
-### Phase 15A — HA compliance (next sprint)
+### Next: HACS Submission
 
-- [x] Add `state_class = SensorStateClass.MEASUREMENT` to temp/humidity/illuminance/CO₂/pressure
-- [x] Add `state_class = SensorStateClass.TOTAL_INCREASING` to energy/impulse meter sensors
-- [x] Add `"homeassistant": "2024.1.0"` to `manifest.json`
-- [x] Create `hacs.json`
-- [x] Update README test badge/count to 880 passing
+- [ ] **hassfest validation** — run via Docker or CI (blocked locally: requires Python 3.12+
+  environment with `homeassistant` package). See [hassfest Docker](#hassfest-docker) below.
+- [ ] Submit PR to [hacs/default](https://github.com/hacs/default) once hassfest is clean.
 
-### Phase 15B — Code quality
+#### hassfest Docker
 
-- [x] Split `sensor.py` into `sensor_virtual.py`, `sensor_bus.py`, `sensor_schedule.py`
-- [x] Extract shared base mixin for fan coil and temperature regulator climate entities
-- [x] Fix `SinumVariableNumber` to extend `CoordinatorEntity` and use `hub_info` for model
-- [x] Remove `_is_rgbww_animation_device` (dead code — all bus RGB is ONOFF-only now)
+```bash
+docker run \
+  --rm \
+  -v $(pwd)/custom_components/sinum:/github/workspace/custom_components/sinum \
+  ghcr.io/home-assistant/hassfest \
+  --integration-path /github/workspace/custom_components/sinum
+```
 
-### Phase 15C — Missing test coverage
+Or via the GitHub Actions workflow `.github/workflows/validate.yml` if configured.
 
-- [x] MQTT: WTP vs SBUS source routing test
-- [x] MQTT: multi-field payload (temperature + state in one message)
-- [x] MQTT: event type variety (button_press, heartbeat, unknown)
-- [x] MQTT: missing `source` field → fallback to virtual store
-- [x] Multi-hub: two entries with same device IDs don't collide
-- [x] Multi-hub: service registration with N hubs
+### Backlog
 
-### Phase 15D — New features
-
-- [x] API coverage audit against saved Sinum Swagger docs — see `docs/api_coverage.md`
-- [x] `thermostat_output_group`: disabled-by-default diagnostic sensor
-- [x] Automations: read-only API helpers and disabled-by-default status diagnostics
-- [x] Schedules: explicit `sinum.update_schedule` PATCH service with multi-hub routing guard
-- [x] Energy Center: `/energy-center/*` API helpers and disabled-by-default status diagnostic
-- [ ] `LoRa` relay: verify `patch_lora_device` endpoint on live hub — **NO HARDWARE** (0 LoRa devices on both hubs 2026-06-25); code is in api.py but untested
-- [x] `SBUS analog_input`: confirm read-only sensor coverage
-- [x] RGB/dimmer idempotent live write check — **PASS** (2026-06-25, SBUS dimmers 121 + 122, idempotent=True)
-- [x] `heat_pump_manager` heating/cooling mode — **CONFIRMED** valid modes: `heating`, `cooling`, `automatic` via `work_mode` PATCH; `off` → 422 (use `enabled: false` instead)
-- [x] Modbus energy meter (`/api/v1/devices/modbus`) — 15 sensors per device, disabled_by_default, variant=p1 (DSMR P1)
-
-### Phase 15E — HACS submission prep (do not start process yet)
-
-- [x] Create `brands/sinum/` folder with `icon.png` and `icon@2x.png`
-- [x] Complete translation keys in `strings.json`, `en.json`, and `pl.json`
-- [ ] Run `hassfest` validation and fix all warnings (blocked locally: hassfest not installed and network install escalation rejected)
-- [x] Add CONTRIBUTING.md
+| Item | Priority | Notes |
+|---|---|---|
+| LoRa relay live test | Low | No hardware — skip until available |
+| Nightly regression summary in docs | Low | CI artefact, defer until HACS submission |
+| Endpoint matrix in `docs/api_coverage.md` | Low | Dev docs completeness |
+| Smoke test v0.5.6/v0.5.7 on live hub | Medium | ConfigEntryAuthFailed + device registry cleanup |
+| Anti-bruteforce backoff — verify UI message | Low | Already implemented, needs UX test |
 
 ---
 
@@ -242,4 +168,5 @@ Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
 - Prefer read-only discovery first, then test write payloads on non-critical devices.
 - Keep REST polling as the baseline; MQTT is an optimization, not a dependency.
 - All new device types require a fixture + ≥1 unit test before merging.
-- `ruff check` and `ruff format --check` must pass on every commit.
+- `ruff check`, `ruff format --check`, and `mypy` must pass on every commit.
+- CC ≤ 4, `_LEGACY_ALLOWANCE = {}` — no exemptions.

@@ -61,7 +61,7 @@ def _add_bus_lights(
             entities.append(entity)
 
 
-def _is_button_with_color(dev_type: str, button_type: str, device: dict[str, Any]) -> bool:
+def _is_button_with_color(dev_type: str | None, button_type: str, device: dict[str, Any]) -> bool:
     return dev_type == button_type and "color" in device
 
 
