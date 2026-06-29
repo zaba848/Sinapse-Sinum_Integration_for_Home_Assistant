@@ -37,6 +37,7 @@ def _bus_snapshots(coordinator: Any) -> dict[str, Any]:
         "wtp_devices": _snapshot_store(coordinator.wtp_devices),
         "sbus_devices": _snapshot_store(coordinator.sbus_devices),
         "lora_devices": _snapshot_store(coordinator.lora_devices),
+        "video_devices": _snapshot_video_store(coordinator.video_devices),
         "parent_devices": [_sanitize_device(d) for d in coordinator.parent_devices],
         "floors": _snapshot_store(coordinator.floors),
     }
@@ -49,12 +50,26 @@ def _bus_counts(coordinator: Any) -> dict[str, Any]:
         "wtp_count": len(coordinator.wtp_devices),
         "sbus_count": len(coordinator.sbus_devices),
         "lora_count": len(coordinator.lora_devices),
+        "video_count": len(coordinator.video_devices),
         "parent_count": len(coordinator.parent_devices),
     }
 
 
 def _snapshot_store(store: dict[Any, dict[str, Any]]) -> dict[str, Any]:
     return {str(dev_id): _sanitize_device(dev) for dev_id, dev in store.items()}
+
+
+def _snapshot_video_store(store: dict[Any, dict[str, Any]]) -> dict[str, Any]:
+    """Sanitize video devices — strip credentials before including in diagnostics."""
+    return {str(dev_id): _sanitize_video_device(dev) for dev_id, dev in store.items()}
+
+
+def _sanitize_video_device(device: dict[str, Any]) -> dict[str, Any]:
+    sanitized = _sanitize_device(device)
+    for key in ("password", "login"):
+        if key in sanitized:
+            sanitized[key] = "**REDACTED**"
+    return sanitized
 
 
 def _sanitize_device(device: dict[str, Any]) -> dict[str, Any]:

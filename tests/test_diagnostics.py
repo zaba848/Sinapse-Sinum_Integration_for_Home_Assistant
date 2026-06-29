@@ -9,6 +9,7 @@ import pytest
 from custom_components.sinum.const import CONF_API_TOKEN, CONF_PASSWORD
 from custom_components.sinum.diagnostics import (
     _sanitize_device,
+    _sanitize_video_device,
     async_get_config_entry_diagnostics,
 )
 
@@ -21,12 +22,20 @@ def _make_entry(data: dict, runtime_data=None) -> MagicMock:
 
 
 def _make_coordinator(
-    virtual=None, wtp=None, sbus=None, parent_devices=None, floors=None
+    virtual=None,
+    wtp=None,
+    sbus=None,
+    lora=None,
+    video=None,
+    parent_devices=None,
+    floors=None,
 ) -> MagicMock:
     coord = MagicMock()
     coord.virtual_devices = virtual or {}
     coord.wtp_devices = wtp or {}
     coord.sbus_devices = sbus or {}
+    coord.lora_devices = lora or {}
+    coord.video_devices = video or {}
     coord.parent_devices = parent_devices or []
     coord.floors = floors or {}
     coord.hub_info = {"version": "1.24.0"}
@@ -123,3 +132,49 @@ class TestDiagnosticsRedaction:
         entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert "1" in result["floors"]
+
+    @pytest.mark.asyncio
+    async def test_video_devices_included(self):
+        coord = _make_coordinator(
+            video={27: {"id": 27, "name": "Cam 1", "type": "ip_camera", "password": "secret"}}
+        )
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert "27" in result["video_devices"]
+
+    @pytest.mark.asyncio
+    async def test_video_count_included(self):
+        coord = _make_coordinator(
+            video={
+                27: {"id": 27, "name": "Cam 1", "type": "ip_camera"},
+                33: {"id": 33, "name": "Cam 2", "type": "onvif_camera"},
+            }
+        )
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["video_count"] == 2
+
+
+class TestSanitizeVideoDevice:
+    def test_password_redacted(self):
+        dev = {"id": 27, "name": "Cam", "password": "secret123", "login": "admin"}
+        result = _sanitize_video_device(dev)
+        assert result["password"] == "**REDACTED**"
+        assert result["login"] == "**REDACTED**"
+
+    def test_non_credential_fields_kept(self):
+        dev = {"id": 27, "name": "Cam", "ip": "192.168.1.10", "password": "s", "login": "a"}
+        result = _sanitize_video_device(dev)
+        assert result["ip"] == "192.168.1.10"
+        assert result["name"] == "Cam"
+
+    def test_internal_keys_removed(self):
+        dev = {"id": 27, "password": "x", "_internal": "removed"}
+        result = _sanitize_video_device(dev)
+        assert "_internal" not in result
+
+    def test_no_password_key_unchanged(self):
+        dev = {"id": 27, "name": "Cam", "type": "ip_camera"}
+        result = _sanitize_video_device(dev)
+        assert "password" not in result
+        assert result["name"] == "Cam"
