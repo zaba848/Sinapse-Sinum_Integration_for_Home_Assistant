@@ -380,11 +380,14 @@ Dostępny tylko gdy centrala ma system alarmowy (`/api/v1/devices/alarm-system` 
 
 ## Camera — kamera
 
-Kamery IP i ONVIF skonfigurowane w Sinum są eksponowane jako encje kamery HA. Snapshoty są pobierane przez endpoint proxy centrali `/api/v1/devices/video/{id}/snapshot`.
+Kamery IP i ONVIF (`ip_camera`, `onvif_camera`) skonfigurowane w Sinum są eksponowane jako encje kamery HA.
 
-- **Transmisja na żywo**: niedostępna — hasła RTSP są maskowane przez API centrali. Do strumieniowania użyj integracji Generic Camera HA z bezpośrednimi danymi RTSP.
-- **Status**: `is_on = True` gdy status kamery to `"online"`
-- **Dodatkowe atrybuty**: `video_type`, `ip`, `port`, `url_path`, `mac`, `status`, `purpose`, `room_id`
+- **Snapshoty**: pobierane przez endpoint proxy centrali `/api/v1/devices/video/{id}/snapshot` (JPEG odkodowany z base64).
+- **Transmisja na żywo**: włączona dla typów `ip_camera` i `onvif_camera` przez `CameraEntityFeature.STREAM`. HA obsługuje połączenie RTSP wewnętrznie — adres URL nie jest przesyłany do przeglądarki. Przy starcie transmisji odpytywany jest endpoint `/api/v1/devices/video/{id}` celem pobrania niezamaskowanych danych uwierzytelniających. Jeśli centrala nadal maskuje hasło, HA wraca do trybu snapshot.
+- **Status**: `is_on = True` gdy status kamery to `"online"`.
+- **Marka**: pobierana z pola `variant` centrali (np. `hikvision`); typ `generic` nie wyświetla marki.
+- **Dodatkowe atrybuty**: `video_type`, `ip`, `port`, `url_path`, `mac`, `status`, `purpose`, `room_id` — dane uwierzytelniające nigdy nie są eksponowane.
+- **Dostępność**: wynika z `CoordinatorEntity.available` (flaga `last_update_success` koordynatora).
 
 ---
 

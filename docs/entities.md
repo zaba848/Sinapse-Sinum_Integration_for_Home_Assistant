@@ -380,11 +380,14 @@ Present only when the hub has an alarm system (`/api/v1/devices/alarm-system` re
 
 ## Camera
 
-IP and ONVIF cameras configured in Sinum are exposed as HA camera entities. Snapshots are fetched through the hub's proxy endpoint `/api/v1/devices/video/{id}/snapshot`.
+IP and ONVIF cameras (`ip_camera`, `onvif_camera`) configured in Sinum are exposed as HA camera entities.
 
-- **Live streaming**: not available — RTSP passwords are masked by the hub API. For streaming, use HA's Generic Camera integration with direct RTSP credentials.
-- **Status**: `is_on = True` when camera status is `"online"`
-- **Extra attributes**: `video_type`, `ip`, `port`, `url_path`, `mac`, `status`, `purpose`, `room_id`
+- **Snapshots**: fetched through the hub's proxy endpoint `/api/v1/devices/video/{id}/snapshot` (JPEG decoded from base64).
+- **Live streaming**: enabled for `ip_camera` and `onvif_camera` types via `CameraEntityFeature.STREAM`. HA's internal stream proxy handles the RTSP connection — the URL is never sent to the browser. The individual device endpoint `/api/v1/devices/video/{id}` is queried for unmasked credentials at stream start. If the hub still masks the password, HA falls back to snapshot-only mode.
+- **Status**: `is_on = True` when camera status is `"online"`.
+- **Brand**: populated from hub `variant` field (e.g. `hikvision`); `generic` variants show no brand.
+- **Extra attributes**: `video_type`, `ip`, `port`, `url_path`, `mac`, `status`, `purpose`, `room_id` — credentials are never exposed.
+- **Availability**: follows `CoordinatorEntity.available` (coordinator `last_update_success`).
 
 ---
 
