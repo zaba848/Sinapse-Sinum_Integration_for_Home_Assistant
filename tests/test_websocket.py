@@ -632,3 +632,124 @@ def test_handle_event_non_dict_data_returns_false():
 def test_apply_device_state_non_dict_payload_returns_false():
     bridge, _hass, _coordinator = _bridge()
     assert bridge._apply_device_state({"payload": "not-a-dict"}) is False
+
+
+# ── WebRTC / video stream message handling ───────────────────────────────────
+
+def _video_event(msg_type: str, payload_data: dict) -> dict:
+    return {
+        "type": "video_stream_message",
+        "payload": {
+            "type": msg_type,
+            "data": {"session_id": "sess-1", **payload_data},
+        },
+    }
+
+
+def test_dispatch_event_type_video_stream_returns_false():
+    """Lines 137-139: video_stream_message returns False (no coordinator update)."""
+    bridge, _hass, coordinator = _bridge()
+    result = bridge._dispatch_event_type(_video_event("answer", {"description": {"sdp": ""}}))
+    assert result is False
+
+
+def test_handle_video_stream_message_skips_when_no_session_id():
+    """Line 148-149: early return when session_id missing."""
+    bridge, _hass, coordinator = _bridge()
+    data = {"type": "video_stream_message", "payload": {"type": "answer", "data": {}}}
+    bridge._handle_video_stream_message(data)
+    coordinator.dispatch_webrtc_answer.assert_not_called()
+
+
+def test_handle_video_answer_dispatches_sdp():
+    """Lines 162-165: answer message with SDP calls dispatch_webrtc_answer."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_answer = MagicMock()
+    inner = {"session_id": "s1", "description": {"sdp": "v=0\r\n"}}
+    bridge._handle_video_answer("s1", inner)
+    coordinator.dispatch_webrtc_answer.assert_called_once_with("s1", "v=0\r\n")
+
+
+def test_handle_video_answer_skips_when_sdp_empty():
+    """Line 164: empty SDP does not call dispatch."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_answer = MagicMock()
+    bridge._handle_video_answer("s1", {"description": {"sdp": ""}})
+    coordinator.dispatch_webrtc_answer.assert_not_called()
+
+
+def test_handle_video_candidate_dispatches():
+    """Lines 167-170: candidate message calls dispatch_webrtc_candidate."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_candidate = MagicMock()
+    candidate = {"candidate": "a=candidate:...", "sdpMid": "0"}
+    bridge._handle_video_candidate("s1", {"candidate": candidate})
+    coordinator.dispatch_webrtc_candidate.assert_called_once_with("s1", candidate)
+
+
+def test_handle_video_candidate_skips_when_empty():
+    """Line 169: empty candidate dict does not call dispatch."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_candidate = MagicMock()
+    bridge._handle_video_candidate("s1", {"candidate": {}})
+    coordinator.dispatch_webrtc_candidate.assert_not_called()
+
+
+def test_handle_video_bye_dispatches_error():
+    """Lines 172-175: bye message calls dispatch_webrtc_error with reason."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_error = MagicMock()
+    bridge._handle_video_bye("s1", {"reason": "closed"}, "bye")
+    coordinator.dispatch_webrtc_error.assert_called_once_with("s1", "bye", "closed")
+
+
+def test_handle_video_bye_uses_msg_type_as_default_reason():
+    """Line 173: reason defaults to msg_type when missing from inner."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_error = MagicMock()
+    bridge._handle_video_bye("s1", {}, "error")
+    coordinator.dispatch_webrtc_error.assert_called_once_with("s1", "error", "error")
+
+
+def test_dispatch_video_message_answer():
+    """Line 155-156: 'answer' routes to _handle_video_answer."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_answer = MagicMock()
+    inner = {"session_id": "s1", "description": {"sdp": "v=0\r\n"}}
+    bridge._dispatch_video_message("answer", "s1", inner)
+    coordinator.dispatch_webrtc_answer.assert_called_once()
+
+
+def test_dispatch_video_message_candidate():
+    """Lines 157-158: 'candidate' routes to _handle_video_candidate."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_candidate = MagicMock()
+    inner = {"candidate": {"candidate": "a=candidate:..."}}
+    bridge._dispatch_video_message("candidate", "s1", inner)
+    coordinator.dispatch_webrtc_candidate.assert_called_once()
+
+
+def test_dispatch_video_message_error():
+    """Lines 159-160: 'error' routes to _handle_video_bye."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_error = MagicMock()
+    bridge._dispatch_video_message("error", "s1", {"reason": "timeout"})
+    coordinator.dispatch_webrtc_error.assert_called_once_with("s1", "error", "timeout")
+
+
+def test_full_video_stream_message_via_handle_payload():
+    """Integration: full WS payload with video answer flows end-to-end."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.dispatch_webrtc_answer = MagicMock()
+    payload = json.dumps([{
+        "data": {
+            "type": "video_stream_message",
+            "payload": {
+                "type": "answer",
+                "data": {"session_id": "s42", "description": {"sdp": "v=0\r\n"}},
+            },
+        }
+    }])
+    bridge._handle_payload(payload)
+    coordinator.dispatch_webrtc_answer.assert_called_once_with("s42", "v=0\r\n")
+    coordinator.async_set_updated_data.assert_not_called()
