@@ -1,8 +1,8 @@
-"""Device triggers for Sinum button devices.
+"""Device triggers for Sinum button devices and scenes.
 
-Exposes button presses as Device Triggers in the HA automation editor so
-users can pick "Sinum button pressed" directly from the device card without
-manually writing event entity trigger configs.
+Exposes button presses and scene activations as Device Triggers in the HA
+automation editor so users can pick "Sinum button pressed" or "scene activated"
+directly from the device card without manually writing event trigger configs.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
 from homeassistant.components.event import DOMAIN as EVENT_DOMAIN
+from homeassistant.components.scene import DOMAIN as SCENE_DOMAIN
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -21,7 +22,8 @@ from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from .const import DOMAIN
 
 TRIGGER_TYPE_PRESSED = "pressed"
-TRIGGER_TYPES = {TRIGGER_TYPE_PRESSED}
+TRIGGER_TYPE_SCENE_ACTIVATED = "scene_activated"
+TRIGGER_TYPES = {TRIGGER_TYPE_PRESSED, TRIGGER_TYPE_SCENE_ACTIVATED}
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend({vol.Required(CONF_TYPE): vol.In(TRIGGER_TYPES)})
 
@@ -33,18 +35,39 @@ async def async_validate_trigger_config(
 
 
 async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict[str, Any]]:
-    """Return a 'pressed' trigger for each Sinum button event entity on this device."""
+    """Return triggers for each Sinum button and scene entity on this device."""
     ent_reg = er.async_get(hass)
-    return [
-        {
-            CONF_PLATFORM: "device",
-            CONF_DOMAIN: DOMAIN,
-            CONF_DEVICE_ID: device_id,
-            CONF_TYPE: TRIGGER_TYPE_PRESSED,
-        }
-        for entry in er.async_entries_for_device(ent_reg, device_id)
-        if entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
-    ]
+    triggers = []
+
+    # Button triggers
+    triggers.extend(
+        [
+            {
+                CONF_PLATFORM: "device",
+                CONF_DOMAIN: DOMAIN,
+                CONF_DEVICE_ID: device_id,
+                CONF_TYPE: TRIGGER_TYPE_PRESSED,
+            }
+            for entry in er.async_entries_for_device(ent_reg, device_id)
+            if entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
+        ]
+    )
+
+    # Scene triggers
+    triggers.extend(
+        [
+            {
+                CONF_PLATFORM: "device",
+                CONF_DOMAIN: DOMAIN,
+                CONF_DEVICE_ID: device_id,
+                CONF_TYPE: TRIGGER_TYPE_SCENE_ACTIVATED,
+            }
+            for entry in er.async_entries_for_device(ent_reg, device_id)
+            if entry.domain == SCENE_DOMAIN and entry.platform == DOMAIN
+        ]
+    )
+
+    return triggers
 
 
 def _event_entity_ids_for_device(hass: HomeAssistant, device_id: str) -> set[str]:
@@ -56,15 +79,37 @@ def _event_entity_ids_for_device(hass: HomeAssistant, device_id: str) -> set[str
     }
 
 
-def _trigger_payload(config: dict[str, Any], new_state: Any) -> dict[str, Any]:
+def _scene_entity_ids_for_device(hass: HomeAssistant, device_id: str) -> set[str]:
+    ent_reg = er.async_get(hass)
     return {
-        "trigger": {
-            **config,
-            "description": f"button pressed on {new_state.entity_id}",
-        },
-        "action": new_state.attributes.get("action"),
-        "entity_id": new_state.entity_id,
+        entry.entity_id
+        for entry in er.async_entries_for_device(ent_reg, device_id)
+        if entry.domain == SCENE_DOMAIN and entry.platform == DOMAIN
     }
+
+
+def _trigger_payload(config: dict[str, Any], new_state: Any) -> dict[str, Any]:
+    trigger_type = config.get(CONF_TYPE)
+
+    if trigger_type == TRIGGER_TYPE_PRESSED:
+        return {
+            "trigger": {
+                **config,
+                "description": f"button pressed on {new_state.entity_id}",
+            },
+            "action": new_state.attributes.get("action"),
+            "entity_id": new_state.entity_id,
+        }
+    elif trigger_type == TRIGGER_TYPE_SCENE_ACTIVATED:
+        return {
+            "trigger": {
+                **config,
+                "description": f"scene activated: {new_state.entity_id}",
+            },
+            "entity_id": new_state.entity_id,
+        }
+
+    return {"trigger": config, "entity_id": new_state.entity_id}
 
 
 def _new_state_for_trigger(event: Event, event_entity_ids: set[str]) -> Any | None:
@@ -99,12 +144,19 @@ async def async_attach_trigger(
     action: TriggerActionType,
     trigger_info: TriggerInfo,
 ) -> CALLBACK_TYPE:
-    """Attach a trigger that fires when any Sinum button on the device is pressed."""
+    """Attach a trigger that fires when Sinum button is pressed or scene is activated."""
     device_id = config[CONF_DEVICE_ID]
-    event_entity_ids = _event_entity_ids_for_device(hass, device_id)
+    trigger_type = config.get(CONF_TYPE)
 
-    if not event_entity_ids:
+    if trigger_type == TRIGGER_TYPE_PRESSED:
+        entity_ids = _event_entity_ids_for_device(hass, device_id)
+    elif trigger_type == TRIGGER_TYPE_SCENE_ACTIVATED:
+        entity_ids = _scene_entity_ids_for_device(hass, device_id)
+    else:
+        entity_ids = set()
+
+    if not entity_ids:
         return lambda: None
 
-    state_changed = partial(_handle_state_changed_event, hass, config, action, event_entity_ids)
+    state_changed = partial(_handle_state_changed_event, hass, config, action, entity_ids)
     return hass.bus.async_listen("state_changed", state_changed)
