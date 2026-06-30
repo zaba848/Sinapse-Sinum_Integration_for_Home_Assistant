@@ -23,6 +23,24 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-30
+
+### Added
+- **Camera motion events via WebSocket** — `motion_detected` WS event type is now dispatched from the WebSocket bridge to the coordinator and surfaced as a Home Assistant `EventEntity` on video camera devices. Automations can trigger on camera motion without polling.
+- **SBUS blind position feedback via WebSocket** — `device_state_changed` events now update `current_opening` and `current_tilt` fields on SBUS blind controller entities in real time, eliminating the poll-interval lag for cover position.
+- **Alarm ARM_HOME and ARM_NIGHT modes** — `SinumAlarmZone` now supports `ARM_HOME` and `ARM_NIGHT` in addition to the existing `ARM_AWAY`. The correct `mode` field (`home`/`night`/`away`) is included in every arm command.
+- **Zone bypass / unbypass** — `async_bypass_zone` and `async_unbypass_zone` service calls let automations temporarily disable alarm zone sensors with a PIN. Bypassed zones are exposed in `extra_state_attributes`.
+- **Scene device triggers** — Sinum scenes are now exposed as HA Scene entities and appear as `scene_activated` Device Triggers in the automation editor, alongside the existing `pressed` button triggers.
+
+### Fixed
+- `_motion_events` is now initialized in `SinumCoordinator.__init__` instead of lazily guarded by `hasattr`, fixing a mypy type error and making the attribute visible to static analysis.
+- `_handle_special_event` now accepts `str | None` as the event type parameter, matching the actual return type of `dict.get("type")` and eliminating the mypy `[arg-type]` error.
+
+### Quality
+- 1671 tests passing (↑ 4 over v0.6.0 pre-release; ↑ 23 over v0.6.0 tag).
+- 4 new unit tests for P5.2 camera motion WS event routing in `test_websocket.py`.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.6.0] — 2026-07-01
 
 ### Added

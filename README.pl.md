@@ -6,9 +6,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/testy-1648%20OK-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/testy-1671%20OK-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-%E2%89%A44%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/wersja-0.6.0-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/wersja-0.7.0-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/licencja-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -19,7 +19,7 @@
 - **12 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
 - **7 lokalnych powierzchni API**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — odpytywane równolegle co 30 s
 - **Aktualizacje w czasie rzeczywistym** przez WebSocket (opóźnienie \< 1 s), most MQTT jako wariant awaryjny
-- **1 648 przechodzących testów** w 46 plikach, CC ≤ 4 w każdej funkcji, czysty ruff i mypy
+- **1 671 przechodzących testów** w 46 plikach, CC ≤ 4 w każdej funkcji, czysty ruff i mypy
 
 ---
 

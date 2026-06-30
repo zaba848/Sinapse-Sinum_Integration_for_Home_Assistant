@@ -135,7 +135,7 @@ class SinumWebSocketBridge:
             return False
         return self._dispatch_event_type(data)
 
-    def _handle_special_event(self, evt_type: str, data: dict[str, Any]) -> bool | None:
+    def _handle_special_event(self, evt_type: str | None, data: dict[str, Any]) -> bool | None:
         """Handle special (non-state) event types. Returns bool or None if unhandled."""
         if evt_type == "unauthorized":
             self._mark_auth_failed()

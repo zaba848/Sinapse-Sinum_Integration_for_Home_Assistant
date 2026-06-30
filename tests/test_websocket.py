@@ -828,7 +828,7 @@ def test_blind_position_updates_via_full_ws_payload():
     """P5.3 Integration: full WS payload with blind position update."""
     bridge, _hass, coordinator = _bridge()
     coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
-    
+
     payload = json.dumps([{
         "data": {
             "type": "device_state_changed",
@@ -841,9 +841,57 @@ def test_blind_position_updates_via_full_ws_payload():
             }
         }
     }])
-    
+
     bridge._handle_payload(payload)
-    
+
     assert coordinator.sbus_devices[15]["current_opening"] == 85
     assert coordinator.sbus_devices[15]["current_tilt"] == 30
     coordinator.async_set_updated_data.assert_called()
+
+
+# ─── Camera Motion Events via WebSocket (P5.2) ───────────────────────────────
+
+def test_handle_motion_detected_dispatches_to_coordinator():
+    """P5.2: motion_detected WS event dispatches to coordinator."""
+    bridge, _hass, coordinator = _bridge()
+    payload = {"device_id": 42, "timestamp": "2026-07-01T10:00:00Z"}
+
+    bridge._handle_motion_detected({"payload": payload})
+
+    coordinator.dispatch_motion_detected.assert_called_once_with(42, payload)
+
+
+def test_handle_motion_detected_missing_device_id_is_ignored():
+    """P5.2: motion_detected without device_id is silently dropped."""
+    bridge, _hass, coordinator = _bridge()
+
+    bridge._handle_motion_detected({"payload": {"timestamp": "2026-07-01T10:00:00Z"}})
+
+    coordinator.dispatch_motion_detected.assert_not_called()
+
+
+def test_dispatch_event_type_routes_motion_detected():
+    """P5.2: full WS payload with type=motion_detected reaches _handle_motion_detected."""
+    bridge, _hass, coordinator = _bridge()
+    payload = json.dumps([{
+        "data": {
+            "type": "motion_detected",
+            "payload": {"device_id": 7, "timestamp": "2026-07-01T09:00:00Z"},
+        }
+    }])
+
+    bridge._handle_payload(payload)
+
+    coordinator.dispatch_motion_detected.assert_called_once_with(
+        7, {"device_id": 7, "timestamp": "2026-07-01T09:00:00Z"}
+    )
+
+
+def test_dispatch_event_type_motion_returns_false():
+    """P5.2: motion_detected event returns False (no coordinator data update via return)."""
+    bridge, _hass, coordinator = _bridge()
+    data = {"type": "motion_detected", "payload": {"device_id": 5, "timestamp": "t"}}
+
+    result = bridge._dispatch_event_type(data)
+
+    assert result is False

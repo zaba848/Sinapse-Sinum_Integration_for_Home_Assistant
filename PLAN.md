@@ -1,7 +1,7 @@
 # Sinapse - Implementation Plan & Status
 
-> Last updated: 2026-07-01 (released: v0.6.0 ✅)
-> Current manifest version: v0.6.0 (production)
+> Last updated: 2026-06-30 (released: v0.7.0 ✅)
+> Current manifest version: v0.7.0 (production)
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 648 passing, 5 skipped (~10 s)
+Tests:  1 671 passing, 5 skipped (~10 s)
 Ruff:   0 errors
 mypy:   0 errors
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
@@ -23,7 +23,7 @@ python3 -m pytest -q
 /opt/homebrew/bin/ruff check custom_components/
 /opt/homebrew/bin/ruff format --check custom_components/
 /opt/homebrew/bin/mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages
-.venv/bin/python -m pytest -q tests/test_code_quality.py
+python3 -m pytest -q tests/test_code_quality.py
 ```
 
 ---
@@ -98,6 +98,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.5.17-v0.5.19 | multi-hub device name prefixes and entity-id collision fixes | 1 616 |
 | v0.5.20 | api.py/coordinator.py/websocket.py coverage sweep | 1 648 |
 | v0.6.0 | WS hardening (exponential backoff), WS default enabled, README IP removal | 1 648 |
+| v0.7.0 | Camera motion events, SBUS blind position WS, alarm ARM_HOME/NIGHT, zone bypass, scene triggers | 1 671 |
 
 ---
 
@@ -171,7 +172,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
    - `/opt/homebrew/bin/ruff check custom_components/`
    - `/opt/homebrew/bin/ruff format --check custom_components/`
    - `/opt/homebrew/bin/mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages`
-   - `.venv/bin/python -m pytest -q tests/test_code_quality.py`
+   - `python3 -m pytest -q tests/test_code_quality.py`
 3. Run final hardware tests:
    - read-only smoke against known hubs;
    - live-write validation only with explicit safe env vars and no alarm operation unless `SINUM_ALARM_TEST_PIN` is set.
