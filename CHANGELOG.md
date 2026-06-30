@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.18] — 2026-06-30
+
+### Fixed
+- **Per-phase sensor names** — `phase_voltage`, `phase_current`, `phase_active_power` translation keys replaced by unique per-phase keys (`phase_1_voltage`, `phase_2_voltage`, `phase_3_voltage`, etc.). Eliminates 30 within-device entity_id collisions for 3-phase energy meters.
+
+### Added
+- 9 new translation keys per-phase (L1/L2/L3) in PL (Napięcie L1…) and EN (Phase L1 Voltage…)
+
+### Migration — entity registry cleanup
+After deploying v0.5.18, run `scripts/migrate_entity_registry.py` on the RPi host to remove stale `_2`/`_3` collision entries from the entity registry. HA will regenerate them with clean entity_ids on next restart. **Backup is created automatically.**
+
 ## [0.5.17] — 2026-06-30
 
 ### Fixed

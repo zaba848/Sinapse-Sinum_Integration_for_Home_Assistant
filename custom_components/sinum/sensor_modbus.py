@@ -91,7 +91,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         entity_registry_enabled_default=False,
         translation_key="energy_fed_total",
     ),
-    # Per-phase sensors
+    # Per-phase sensors — unique translation_key per phase to avoid entity_id collision
     SinumModbusSensorDescription(
         key="phase_1_voltage",
         field_path="phase_1.voltage",
@@ -100,7 +100,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,
-        translation_key="phase_voltage",
+        translation_key="phase_1_voltage",
     ),
     SinumModbusSensorDescription(
         key="phase_2_voltage",
@@ -110,7 +110,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,
-        translation_key="phase_voltage",
+        translation_key="phase_2_voltage",
     ),
     SinumModbusSensorDescription(
         key="phase_3_voltage",
@@ -120,7 +120,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,
-        translation_key="phase_voltage",
+        translation_key="phase_3_voltage",
     ),
     SinumModbusSensorDescription(
         key="phase_1_current",
@@ -130,7 +130,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
-        translation_key="phase_current",
+        translation_key="phase_1_current",
     ),
     SinumModbusSensorDescription(
         key="phase_2_current",
@@ -140,7 +140,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
-        translation_key="phase_current",
+        translation_key="phase_2_current",
     ),
     SinumModbusSensorDescription(
         key="phase_3_current",
@@ -150,7 +150,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
-        translation_key="phase_current",
+        translation_key="phase_3_current",
     ),
     SinumModbusSensorDescription(
         key="phase_1_active_power",
@@ -160,7 +160,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         suggested_display_precision=0,
         entity_registry_enabled_default=False,
-        translation_key="phase_active_power",
+        translation_key="phase_1_active_power",
     ),
     SinumModbusSensorDescription(
         key="phase_2_active_power",
@@ -170,7 +170,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         suggested_display_precision=0,
         entity_registry_enabled_default=False,
-        translation_key="phase_active_power",
+        translation_key="phase_2_active_power",
     ),
     SinumModbusSensorDescription(
         key="phase_3_active_power",
@@ -180,7 +180,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         suggested_display_precision=0,
         entity_registry_enabled_default=False,
-        translation_key="phase_active_power",
+        translation_key="phase_3_active_power",
     ),
     SinumModbusSensorDescription(
         key="tariff_indicator",

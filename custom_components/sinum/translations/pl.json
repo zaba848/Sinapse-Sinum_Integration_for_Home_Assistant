@@ -230,14 +230,32 @@
       "energy_fed_total": {
         "name": "Energia oddana do sieci"
       },
-      "phase_voltage": {
-        "name": "Napięcie fazowe"
+      "phase_1_voltage": {
+        "name": "Napięcie L1"
       },
-      "phase_current": {
-        "name": "Prąd fazowy"
+      "phase_2_voltage": {
+        "name": "Napięcie L2"
       },
-      "phase_active_power": {
-        "name": "Moc czynna fazy"
+      "phase_3_voltage": {
+        "name": "Napięcie L3"
+      },
+      "phase_1_current": {
+        "name": "Prąd L1"
+      },
+      "phase_2_current": {
+        "name": "Prąd L2"
+      },
+      "phase_3_current": {
+        "name": "Prąd L3"
+      },
+      "phase_1_active_power": {
+        "name": "Moc czynna L1"
+      },
+      "phase_2_active_power": {
+        "name": "Moc czynna L2"
+      },
+      "phase_3_active_power": {
+        "name": "Moc czynna L3"
       },
       "tariff_indicator": {
         "name": "Wskaźnik taryfy"

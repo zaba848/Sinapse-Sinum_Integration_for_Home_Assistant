@@ -230,14 +230,32 @@
       "energy_fed_total": {
         "name": "Energy fed to grid"
       },
-      "phase_voltage": {
-        "name": "Phase voltage"
+      "phase_1_voltage": {
+        "name": "Phase 1 Voltage"
       },
-      "phase_current": {
-        "name": "Phase current"
+      "phase_2_voltage": {
+        "name": "Phase 2 Voltage"
       },
-      "phase_active_power": {
-        "name": "Phase active power"
+      "phase_3_voltage": {
+        "name": "Phase 3 Voltage"
+      },
+      "phase_1_current": {
+        "name": "Phase 1 Current"
+      },
+      "phase_2_current": {
+        "name": "Phase 2 Current"
+      },
+      "phase_3_current": {
+        "name": "Phase 3 Current"
+      },
+      "phase_1_active_power": {
+        "name": "Phase 1 Active Power"
+      },
+      "phase_2_active_power": {
+        "name": "Phase 2 Active Power"
+      },
+      "phase_3_active_power": {
+        "name": "Phase 3 Active Power"
       },
       "tariff_indicator": {
         "name": "Tariff indicator"
