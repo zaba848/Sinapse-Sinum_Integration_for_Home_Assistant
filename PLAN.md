@@ -1,7 +1,7 @@
 # Sinapse - Implementation Plan & Status
 
-> Last updated: 2026-07-01 (target: v0.6.0)
-> Current manifest version: v0.6.0.
+> Last updated: 2026-07-01 (released: v0.6.0 ✅)
+> Current manifest version: v0.6.0 (production)
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -188,6 +188,20 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | Virtual cover integrators | Virtual | no position feedback when no physical controller is linked |
 | LoRa relay PATCH | LoRa | implemented but untested without hardware |
 | Alarm arm/disarm | alarm-system | destructive; requires explicit PIN and owner approval |
+
+---
+
+## v0.7.0+ Backlog
+
+| Feature | Priority | Effort | Status | Notes |
+|---|---|---|---|---|
+| **P4 — IAQ/AQ Live Probe** | Medium | 15 min | Pending | Confirm live WTP payload format for `iaq_sensor`, `aq_sensor`, `air_quality_sensor` |
+| **P5 — Scene device_trigger** | Medium | 1-2 h | Pending | Enable scenes to trigger automations via device_trigger (UI integration) |
+| **Camera motion events** | Medium | 2-3 h | Pending | Parse motion event payloads from WS; requires live video WS traffic |
+| **SBUS blind position feedback** | Medium | 2-3 h | Pending | Implement blind position state updates (API endpoint TBD) |
+| **Alarm modes & bypass** | Low | 2-3 h | Pending | Add arm/disarm modes, zone bypass (requires destructive write testing) |
+| **LoRa relay live test** | Low | 1 h | Blocked | No LoRa hardware on known hubs; waiting for LoRa-equipped hub |
+| **Performance metrics** | Low | 3-4 h | Future | Add WS uptime/reconnect rate dashboard; integration health metrics |
 
 ---
 
