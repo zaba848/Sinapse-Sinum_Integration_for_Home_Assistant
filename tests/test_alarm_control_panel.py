@@ -176,7 +176,12 @@ class TestAlarmZoneIdentity:
 
         zone = _make_zone()
         entity = _make_entity(zone)
-        assert entity.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
+        expected = (
+            AlarmControlPanelEntityFeature.ARM_AWAY
+            | AlarmControlPanelEntityFeature.ARM_HOME
+            | AlarmControlPanelEntityFeature.ARM_NIGHT
+        )
+        assert entity.supported_features == expected
 
     def test_coordinator_update_writes_state(self):
         zone = _make_zone()
@@ -188,3 +193,180 @@ class TestAlarmZoneIdentity:
         zone = _make_zone()
         entity = _make_entity(zone)
         assert entity.icon == "mdi:shield-home"
+
+
+class TestAlarmModes:
+    """Test ARM_HOME, ARM_NIGHT, and ARM_AWAY modes."""
+
+    def test_supported_features_include_all_modes(self):
+        from homeassistant.components.alarm_control_panel import AlarmControlPanelEntityFeature
+
+        zone = _make_zone()
+        entity = _make_entity(zone)
+        features = entity.supported_features
+        assert features & AlarmControlPanelEntityFeature.ARM_AWAY
+        assert features & AlarmControlPanelEntityFeature.ARM_HOME
+        assert features & AlarmControlPanelEntityFeature.ARM_NIGHT
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_away_with_mode(self):
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        await entity.async_alarm_arm_away("1234")
+
+        coordinator.client.command_alarm_device.assert_called_once_with(
+            1, "arm", {"arm": "1234", "mode": "away"}
+        )
+        coordinator.async_request_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_home_mode(self):
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        await entity.async_alarm_arm_home("1234")
+
+        coordinator.client.command_alarm_device.assert_called_once_with(
+            1, "arm", {"arm": "1234", "mode": "home"}
+        )
+        coordinator.async_request_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_night_mode(self):
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        await entity.async_alarm_arm_night("1234")
+
+        coordinator.client.command_alarm_device.assert_called_once_with(
+            1, "arm", {"arm": "1234", "mode": "night"}
+        )
+        coordinator.async_request_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_home_without_code_raises_error(self):
+        zone = _make_zone(zone_id=1)
+        entity = _make_entity(zone)
+        from homeassistant.exceptions import HomeAssistantError
+
+        with pytest.raises(HomeAssistantError, match="PIN code is required"):
+            await entity.async_alarm_arm_home(None)
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_night_without_code_raises_error(self):
+        zone = _make_zone(zone_id=1)
+        entity = _make_entity(zone)
+        from homeassistant.exceptions import HomeAssistantError
+
+        with pytest.raises(HomeAssistantError, match="PIN code is required"):
+            await entity.async_alarm_arm_night(None)
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_home_connection_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock(
+            side_effect=SinumConnectionError("Connection lost")
+        )
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        with pytest.raises(HomeAssistantError, match="Cannot arm alarm in home mode"):
+            await entity.async_alarm_arm_home("1234")
+
+
+class TestAlarmBypass:
+    """Test zone bypass and unbypass functionality."""
+
+    @pytest.mark.asyncio
+    async def test_bypass_zone(self):
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.patch_alarm_device = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        await entity.async_bypass_zone("1234")
+
+        coordinator.client.patch_alarm_device.assert_called_once_with(
+            1, {"bypassed": True, "pin": "1234"}
+        )
+        coordinator.async_request_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unbypass_zone(self):
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.patch_alarm_device = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        await entity.async_unbypass_zone("1234")
+
+        coordinator.client.patch_alarm_device.assert_called_once_with(
+            1, {"bypassed": False, "pin": "1234"}
+        )
+        coordinator.async_request_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_bypass_zone_without_code_raises_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        entity = _make_entity(zone)
+
+        with pytest.raises(HomeAssistantError, match="PIN code is required to bypass zone"):
+            await entity.async_bypass_zone(None)
+
+    @pytest.mark.asyncio
+    async def test_bypass_zone_connection_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.patch_alarm_device = AsyncMock(
+            side_effect=SinumConnectionError("Connection lost")
+        )
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        with pytest.raises(HomeAssistantError, match="Cannot bypass zone"):
+            await entity.async_bypass_zone("1234")
+
+    def test_attributes_with_armed_mode(self):
+        zone = _make_zone(zone_id=1, armed_mode="home")
+        entity = _make_entity(zone)
+        attrs = entity.extra_state_attributes
+        assert attrs.get("armed_mode") == "home"
+
+    def test_attributes_with_bypassed_zones(self):
+        zone = _make_zone(zone_id=1)
+        zone["bypassed_inputs"] = [{"class": "sbus", "id": 5}, {"class": "sbus", "id": 10}]
+        entity = _make_entity(zone)
+        attrs = entity.extra_state_attributes
+        assert "bypassed_zones" in attrs
+        assert attrs["bypassed_zones"] == ["sbus/5", "sbus/10"]
+
+    def test_no_bypassed_zones_omits_key(self):
+        zone = _make_zone(zone_id=1)
+        zone["bypassed_inputs"] = []
+        entity = _make_entity(zone)
+        attrs = entity.extra_state_attributes
+        assert "bypassed_zones" not in attrs

@@ -394,7 +394,9 @@ class TestAlarmArmDisarm:
     async def test_arm_away_sends_correct_command(self):
         entity, coordinator = self._make()
         await entity.async_alarm_arm_away(code="1234")
-        coordinator.client.command_alarm_device.assert_awaited_once_with(1, "arm", {"arm": "1234"})
+        coordinator.client.command_alarm_device.assert_awaited_once_with(
+            1, "arm", {"arm": "1234", "mode": "away"}
+        )
 
     @pytest.mark.asyncio
     async def test_disarm_sends_correct_command(self):

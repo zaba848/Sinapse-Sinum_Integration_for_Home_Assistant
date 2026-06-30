@@ -82,7 +82,11 @@ class SinumAlarmZone(
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
+    _attr_supported_features = (
+        AlarmControlPanelEntityFeature.ARM_AWAY
+        | AlarmControlPanelEntityFeature.ARM_HOME
+        | AlarmControlPanelEntityFeature.ARM_NIGHT
+    )
     _attr_code_arm_required = True
     _attr_code_format = CodeFormat.NUMBER
     _attr_icon = "mdi:shield-home"
@@ -122,24 +126,63 @@ class SinumAlarmZone(
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self._device
         attrs: dict[str, Any] = {}
-        if (v := d.get("enter_time_delay")) is not None:
+        self._add_delay_attributes(attrs, d)
+        self._add_armed_mode_attribute(attrs, d)
+        self._add_input_attributes(attrs, d)
+        self._add_bypassed_attributes(attrs, d)
+        return attrs
+
+    def _add_delay_attributes(self, attrs: dict[str, Any], device: dict[str, Any]) -> None:
+        if (v := device.get("enter_time_delay")) is not None:
             attrs["entry_delay_s"] = v
-        if (v := d.get("exit_time_delay")) is not None:
+        if (v := device.get("exit_time_delay")) is not None:
             attrs["exit_delay_s"] = v
-        inputs = d.get("associations", {}).get("inputs", [])
+
+    def _add_armed_mode_attribute(self, attrs: dict[str, Any], device: dict[str, Any]) -> None:
+        if (v := device.get("armed_mode")) is not None:
+            attrs["armed_mode"] = v
+
+    def _add_input_attributes(self, attrs: dict[str, Any], device: dict[str, Any]) -> None:
+        inputs = device.get("associations", {}).get("inputs", [])
         if inputs:
             attrs["inputs"] = _format_alarm_inputs(inputs)
-        return attrs
+
+    def _add_bypassed_attributes(self, attrs: dict[str, Any], device: dict[str, Any]) -> None:
+        bypass_zones = device.get("bypassed_inputs", [])
+        if bypass_zones:
+            attrs["bypassed_zones"] = _format_alarm_inputs(bypass_zones)
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         if not code:
             raise HomeAssistantError("PIN code is required to arm the alarm")
         try:
             await self.coordinator.client.command_alarm_device(
-                self._zone_id, "arm", {"arm": str(code)}
+                self._zone_id, "arm", {"arm": str(code), "mode": "away"}
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot arm alarm: {err}") from err
+        await self.coordinator.async_request_refresh()
+
+    async def async_alarm_arm_home(self, code: str | None = None) -> None:
+        if not code:
+            raise HomeAssistantError("PIN code is required to arm the alarm")
+        try:
+            await self.coordinator.client.command_alarm_device(
+                self._zone_id, "arm", {"arm": str(code), "mode": "home"}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot arm alarm in home mode: {err}") from err
+        await self.coordinator.async_request_refresh()
+
+    async def async_alarm_arm_night(self, code: str | None = None) -> None:
+        if not code:
+            raise HomeAssistantError("PIN code is required to arm the alarm")
+        try:
+            await self.coordinator.client.command_alarm_device(
+                self._zone_id, "arm", {"arm": str(code), "mode": "night"}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot arm alarm in night mode: {err}") from err
         await self.coordinator.async_request_refresh()
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
@@ -151,6 +194,30 @@ class SinumAlarmZone(
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot disarm alarm: {err}") from err
+        await self.coordinator.async_request_refresh()
+
+    async def async_bypass_zone(self, code: str | None = None) -> None:
+        """Bypass a single zone (disable its sensors from triggering alarm)."""
+        if not code:
+            raise HomeAssistantError("PIN code is required to bypass zone")
+        try:
+            await self.coordinator.client.patch_alarm_device(
+                self._zone_id, {"bypassed": True, "pin": str(code)}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot bypass zone: {err}") from err
+        await self.coordinator.async_request_refresh()
+
+    async def async_unbypass_zone(self, code: str | None = None) -> None:
+        """Unbypass a zone (re-enable its sensors)."""
+        if not code:
+            raise HomeAssistantError("PIN code is required to unbypass zone")
+        try:
+            await self.coordinator.client.patch_alarm_device(
+                self._zone_id, {"bypassed": False, "pin": str(code)}
+            )
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"Cannot unbypass zone: {err}") from err
         await self.coordinator.async_request_refresh()
 
     @callback
