@@ -23,6 +23,26 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-01
+
+### Added
+- **WebSocket exponential backoff** — Reconnection now uses exponential delays (5 → 10 → 20 → 40 → 60s max) instead of fixed 5s. Prevents connection storms during hub restart or network flaps.
+- **WebSocket enabled by default** — New installations now have real-time transport enabled automatically (default: `WS_ENABLED: true`). Existing entries may require manual update if pre-0.6.0.
+- **WebSocket debug logging** — Unhandled event types now logged at DEBUG level for observability. Enables passive detection of new WS event types without silent failures.
+- **HACS metadata** — Added `homeassistant: 2024.1.0` field to hacs.json for HACS compliance and visibility.
+
+### Security
+- **README IP removal** — Removed all production hub IP addresses from Tested Hubs table and documentation. Production hub URLs now accessed only via environment variables or CI secrets.
+
+### Changed
+- All 5 tested hubs confirmed stable on WebSocket transport as of 2026-06-30 (smoke, API coverage, HIL, WS checks all PASS).
+- Entity count updated: "over 3 800 Sinum registry entities" (cleaned up v0.5.18/19 collision registry).
+- README Quick Start: Step 4 simplified to "WebSocket real-time transport is enabled by default."
+
+### Quality
+- All 1648 existing tests pass with new exponential backoff and default-true WS behavior.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.5.21] — 2026-06-30
 
 ### Security

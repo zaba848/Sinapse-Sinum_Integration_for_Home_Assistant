@@ -1,7 +1,7 @@
 # Sinapse - Implementation Plan & Status
 
-> Last updated: 2026-06-30 (target: v0.5.21)
-> Current manifest version: v0.5.21.
+> Last updated: 2026-07-01 (target: v0.6.0)
+> Current manifest version: v0.6.0.
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -30,13 +30,13 @@ python3 -m pytest -q
 
 ## Live Hub Inventory
 
-| Hub | IP | Firmware | Status | Key API inventory |
-|---|---|---|---|---|
-| tablica-wtp | 10.0.61.132 | 1.24.0-alpha.2 | smoke/API/HIL PASS | 30 virtual, 254 WTP, 8 SBUS, 2 SLINK, 1 alarm |
-| sinum-tablica-sbus-1 | 10.0.62.167 | 1.24.0-alpha.4 | smoke/API/HIL/WS PASS | 171 virtual, 35 WTP, 436 SBUS, 1 Modbus, 3 alarms |
-| tablica-video-nowa | 10.0.62.117 | 1.24.0-alpha.4 | smoke/API/HIL PASS, snapshot PASS | 6 virtual, 21 WTP, 77 SBUS, 1 Modbus, 6 video |
-| tablicaKlimak | 10.0.61.114 | 1.24.0-alpha.4 | smoke/API/HIL/WS PASS | 13 virtual, 41 WTP, 25 SBUS, 5 Modbus |
-| sinum-tablica-sbus2 | 10.0.62.209 | 1.24.0-alpha.3 | smoke/API/HIL/WS PASS | 29 virtual, 50 WTP, 191 SBUS, 2 SLINK, 3 Modbus, 16 alarms |
+| Hub | Firmware | Status | Key API inventory |
+|---|---|---|---|
+| tablica-wtp | 1.24.0-alpha.2 | smoke/API/HIL PASS | 30 virtual, 254 WTP, 8 SBUS, 2 SLINK, 1 alarm |
+| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | smoke/API/HIL/WS PASS | 171 virtual, 35 WTP, 436 SBUS, 1 Modbus, 3 alarms |
+| tablica-video-nowa | 1.24.0-alpha.4 | smoke/API/HIL PASS, snapshot PASS | 6 virtual, 21 WTP, 77 SBUS, 1 Modbus, 6 video |
+| tablicaKlimak | 1.24.0-alpha.4 | smoke/API/HIL/WS PASS | 13 virtual, 41 WTP, 25 SBUS, 5 Modbus |
+| sinum-tablica-sbus2 | 1.24.0-alpha.3 | smoke/API/HIL/WS PASS | 29 virtual, 50 WTP, 191 SBUS, 2 SLINK, 3 Modbus, 16 alarms |
 
 Hardware config must come from environment variables or GitHub secrets, never from source files.
 
@@ -97,6 +97,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.5.13-v0.5.16 | WebRTC trickle ICE, SLINK, Modbus device families | 1 616 |
 | v0.5.17-v0.5.19 | multi-hub device name prefixes and entity-id collision fixes | 1 616 |
 | v0.5.20 | api.py/coordinator.py/websocket.py coverage sweep | 1 648 |
+| v0.6.0 | WS hardening (exponential backoff), WS default enabled, README IP removal | 1 648 |
 
 ---
 
@@ -120,7 +121,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | Run API coverage HIL on known hubs | Done | 5/5 PASS, no critical failures |
 | Run HIL smoke and camera snapshot | Done | 5/5 PASS; video snapshot device 27 returned 200 |
 | Run WebSocket event-format HIL where traffic exists | Done | 4/4 non-video hubs PASS |
-| Run live-write validation only where safe | Pending explicit approval | writes dimmers/schedules/heat-pump manager; alarm requires `SINUM_ALARM_TEST_PIN` |
+| Run live-write validation only where safe | In Progress | writes dimmers/schedules/heat-pump manager; alarm requires `SINUM_ALARM_TEST_PIN` |
 | Document latest hardware result | Done | final post-deploy smoke 5/5 PASS; `docs/hardware_smoke_latest.md`, `docs/hardware_inventory_latest.md` |
 
 ### P2 - Multi-hub deploy and registry cleanup
