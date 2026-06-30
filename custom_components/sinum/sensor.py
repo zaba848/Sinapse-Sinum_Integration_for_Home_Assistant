@@ -21,7 +21,7 @@ from .sensor_bus import (
     SinumSensorDescription,
     SinumTemperatureRegulatorSensor,
 )
-from .sensor_modbus import build_modbus_sensor_entities
+from .sensor_modbus import build_modbus_sensor_entities, build_slink_sensor_entities
 from .sensor_schedule import (
     SinumScheduleActivePeriodSensor,
     SinumScheduleAssociationCountSensor,
@@ -243,6 +243,7 @@ async def async_setup_entry(
     _add_sbus_sensors(coordinator, entities, entry.entry_id)
     _add_lora_sensors(coordinator, entities, entry.entry_id)
     entities.extend(build_modbus_sensor_entities(coordinator, entry.entry_id))
+    entities.extend(build_slink_sensor_entities(coordinator, entry.entry_id))
     await _add_optional_sensors(coordinator, entities, entry.entry_id)
     _add_schedule_sensors(coordinator, entities, entry.entry_id)
     _add_automation_sensors(coordinator, entities, entry.entry_id)

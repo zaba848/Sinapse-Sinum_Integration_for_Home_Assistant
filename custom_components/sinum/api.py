@@ -50,6 +50,8 @@ from .const import (
     API_SCENES,
     API_SCHEDULE,
     API_SCHEDULES,
+    API_SLINK_DEVICE,
+    API_SLINK_DEVICES,
     API_VARIABLE,
     API_VARIABLES,
     API_VIDEO_DEVICE,
@@ -544,6 +546,18 @@ class SinumClient:
 
     async def patch_sbus_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request("PATCH", API_SBUS_DEVICE.format(id=device_id), json=payload)
+
+    # ---------------------------------------------------------- SLINK devices
+
+    async def get_slink_devices(self) -> list[dict[str, Any]]:
+        result = await self._request("GET", API_SLINK_DEVICES)
+        return _list_result(result, "slink", "devices")
+
+    async def get_slink_device(self, device_id: int) -> dict[str, Any]:
+        return await self._request("GET", API_SLINK_DEVICE.format(id=device_id))
+
+    async def patch_slink_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("PATCH", API_SLINK_DEVICE.format(id=device_id), json=payload)
 
     # --------------------------------------------------------------- scenes
 

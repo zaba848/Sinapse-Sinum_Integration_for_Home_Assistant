@@ -261,3 +261,110 @@ def build_modbus_sensor_entities(
         for desc in descriptions:
             entities.append(SinumModbusSensor(coordinator, device_id, entry_id, desc))
     return entities
+
+
+# ── SLINK energy_meter sensor descriptions ────────────────────────────────────
+
+_SLINK_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="active_power",
+        field_path="active_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+    ),
+    SinumModbusSensorDescription(
+        key="current",
+        field_path="current",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        suggested_display_precision=2,
+    ),
+    SinumModbusSensorDescription(
+        key="energy_consumed_total",
+        field_path="energy_consumed_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+    ),
+    SinumModbusSensorDescription(
+        key="energy_consumed_today",
+        field_path="energy_consumed_today",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_today",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_consumed_yesterday",
+        field_path="energy_consumed_yesterday",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_yesterday",
+    ),
+)
+
+_SLINK_SENSOR_MAP: dict[str, tuple[SinumModbusSensorDescription, ...]] = {
+    "energy_meter": _SLINK_ENERGY_METER_SENSORS,
+}
+
+
+class SinumSlinkSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]):
+    """A single sensor field on a SLINK device."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        entry_id: str,
+        description: SinumModbusSensorDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_slink_{device_id}_{description.key}"
+        device = coordinator.slink_devices.get(device_id, {})
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_slink_{device_id}")},
+            name=device.get("name", f"SLINK {device_id}"),
+            manufacturer="TECH Sterowniki",
+            model="Sinum SLINK Energy Meter",
+            sw_version=device.get("software_version"),
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.slink_devices.get(self._device_id, {})
+
+    @property
+    def native_value(self) -> float | int | str | None:
+        val = _get_field(self._device, self.entity_description.field_path)
+        if val is None:
+            return None
+        scale = self.entity_description.scale
+        if scale != 1.0 and isinstance(val, (int, float)):
+            return round(val * scale, 6)
+        return val
+
+
+def build_slink_sensor_entities(
+    coordinator: SinumCoordinator, entry_id: str
+) -> list[SinumSlinkSensor]:
+    """Create sensor entities for all SLINK devices in the coordinator."""
+    entities: list[SinumSlinkSensor] = []
+    for device_id, device in coordinator.slink_devices.items():
+        dev_type = device.get("type", "")
+        descriptions = _SLINK_SENSOR_MAP.get(dev_type)
+        if descriptions is None:
+            continue
+        for desc in descriptions:
+            entities.append(SinumSlinkSensor(coordinator, device_id, entry_id, desc))
+    return entities

@@ -402,3 +402,139 @@ class TestParentModelHelpers:
         devices = {10: {"parent_id": 1}}
         _inject_parent_models(devices, "sbus", {})
         assert "_parent_model" not in devices[10]
+
+
+# ── WebRTC coordinator methods ─────────────────────────────────────────────────
+
+
+class TestCoordinatorWebRTCMethods:
+    def _make_coordinator(self):
+        from custom_components.sinum.coordinator import SinumCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        client.post_video_candidate = AsyncMock(return_value={})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            return SinumCoordinator(hass, client, scan_interval=30)
+
+    def test_register_webrtc_session_stores_session(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator.register_webrtc_session("sess-1", 42, send_msg)
+        assert coordinator._webrtc_sessions["sess-1"] == (42, send_msg)
+
+    def test_close_webrtc_session_removes_entry(self):
+        coordinator = self._make_coordinator()
+        coordinator._webrtc_sessions["sess-1"] = (42, MagicMock())
+        coordinator.close_webrtc_session("sess-1")
+        assert "sess-1" not in coordinator._webrtc_sessions
+
+    def test_close_webrtc_session_missing_is_noop(self):
+        coordinator = self._make_coordinator()
+        coordinator.close_webrtc_session("nonexistent")  # should not raise
+
+    def test_dispatch_webrtc_answer_calls_send_message(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator._webrtc_sessions["sess-a"] = (10, send_msg)
+
+        from unittest.mock import patch as _patch
+
+        with _patch("homeassistant.components.camera.webrtc.WebRTCAnswer") as MockAnswer:
+            coordinator.dispatch_webrtc_answer("sess-a", "v=0\r\nanswer")
+            send_msg.assert_called_once_with(MockAnswer(answer="v=0\r\nanswer"))
+
+    def test_dispatch_webrtc_answer_missing_session_is_noop(self):
+        coordinator = self._make_coordinator()
+        coordinator.dispatch_webrtc_answer("nonexistent", "sdp")  # should not raise
+
+    def test_dispatch_webrtc_candidate_calls_send_message(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator._webrtc_sessions["sess-b"] = (10, send_msg)
+        candidate_dict = {"candidate": "a=...", "sdp_mid": "0", "sdp_m_line_index": 0}
+
+        from unittest.mock import patch as _patch
+
+        with (
+            _patch("homeassistant.components.camera.webrtc.WebRTCCandidate") as MockCand,
+            _patch("webrtc_models.RTCIceCandidateInit") as MockInit,
+        ):
+            coordinator.dispatch_webrtc_candidate("sess-b", candidate_dict)
+            MockInit.assert_called_once_with(
+                candidate="a=...", sdp_mid="0", sdp_m_line_index=0
+            )
+            send_msg.assert_called_once()
+
+    def test_dispatch_webrtc_candidate_missing_session_is_noop(self):
+        coordinator = self._make_coordinator()
+        coordinator.dispatch_webrtc_candidate("no-session", {})  # should not raise
+
+    def test_dispatch_webrtc_candidate_sdp_mid_none_becomes_none(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator._webrtc_sessions["sess-c"] = (10, send_msg)
+        candidate_dict = {"candidate": "x", "sdp_mid": None, "sdp_m_line_index": 1}
+
+        from unittest.mock import patch as _patch
+
+        with (
+            _patch("homeassistant.components.camera.webrtc.WebRTCCandidate"),
+            _patch("webrtc_models.RTCIceCandidateInit") as MockInit,
+        ):
+            coordinator.dispatch_webrtc_candidate("sess-c", candidate_dict)
+            call_kwargs = MockInit.call_args.kwargs
+            assert call_kwargs["sdp_mid"] is None
+
+    def test_dispatch_webrtc_error_pops_session_and_calls_send_message(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator._webrtc_sessions["sess-d"] = (10, send_msg)
+
+        from unittest.mock import patch as _patch
+
+        with _patch("homeassistant.components.camera.webrtc.WebRTCError") as MockErr:
+            coordinator.dispatch_webrtc_error("sess-d", "post_failed", "hub down")
+            send_msg.assert_called_once_with(MockErr(code="post_failed", message="hub down"))
+        assert "sess-d" not in coordinator._webrtc_sessions
+
+    def test_dispatch_webrtc_error_missing_session_is_noop(self):
+        coordinator = self._make_coordinator()
+        coordinator.dispatch_webrtc_error("gone", "err", "msg")  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_forward_webrtc_candidate_posts_to_hub(self):
+        coordinator = self._make_coordinator()
+        send_msg = MagicMock()
+        coordinator._webrtc_sessions["sess-e"] = (27, send_msg)
+        candidate = MagicMock()
+        await coordinator.forward_webrtc_candidate("sess-e", candidate)
+        coordinator.client.post_video_candidate.assert_awaited_once_with(27, "sess-e", candidate)
+
+    @pytest.mark.asyncio
+    async def test_forward_webrtc_candidate_missing_session_returns_early(self):
+        coordinator = self._make_coordinator()
+        await coordinator.forward_webrtc_candidate("no-sess", MagicMock())
+        coordinator.client.post_video_candidate.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_forward_webrtc_candidate_api_error_is_suppressed(self):
+        coordinator = self._make_coordinator()
+        coordinator._webrtc_sessions["sess-f"] = (10, MagicMock())
+        coordinator.client.post_video_candidate = AsyncMock(side_effect=Exception("hub down"))
+        # Should not raise
+        await coordinator.forward_webrtc_candidate("sess-f", MagicMock())
+
+    def test_video_device_ips_returns_all_ips(self):
+        coordinator = self._make_coordinator()
+        coordinator.video_devices = {
+            1: {"ip": "192.168.1.10"},
+            2: {"ip": "192.168.1.20"},
+            3: {},  # no ip key
+        }
+        assert coordinator.video_device_ips == frozenset({"192.168.1.10", "192.168.1.20"})
+
+    def test_video_device_ips_empty_when_no_devices(self):
+        coordinator = self._make_coordinator()
+        coordinator.video_devices = {}
+        assert coordinator.video_device_ips == frozenset()

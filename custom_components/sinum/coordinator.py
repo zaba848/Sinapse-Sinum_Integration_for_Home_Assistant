@@ -36,6 +36,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.wtp_devices: dict[int, dict[str, Any]] = {}
         self.sbus_devices: dict[int, dict[str, Any]] = {}
         self.lora_devices: dict[int, dict[str, Any]] = {}
+        self.slink_devices: dict[int, dict[str, Any]] = {}
         self.modbus_devices: dict[int, dict[str, Any]] = {}
         self.video_devices: dict[int, dict[str, Any]] = {}
         self.rooms: list[dict[str, Any]] = []
@@ -184,9 +185,19 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         prev_wtp = frozenset(self.wtp_devices)
         prev_sbus = frozenset(self.sbus_devices)
         prev_lora = frozenset(self.lora_devices)
+        prev_slink = frozenset(self.slink_devices)
 
         # ── Group 2: device collections — all fetched in parallel ─────────────
-        virtual, wtp, sbus, lora, alarm_list, modbus_list, video_list = await asyncio.gather(
+        (
+            virtual,
+            wtp,
+            sbus,
+            lora,
+            alarm_list,
+            modbus_list,
+            video_list,
+            slink_list,
+        ) = await asyncio.gather(
             self._fetch_device_collection(
                 "virtual",
                 self.client.get_virtual_devices,
@@ -222,19 +233,21 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
             _safe_fetch(self.client.get_modbus_devices, "modbus devices", default=None),
             _safe_fetch(self.client.get_video_devices, "video devices", default=None),
+            _safe_fetch(self.client.get_slink_devices, "slink devices", default=None),
         )
 
         self.virtual_devices = virtual
         self.wtp_devices = wtp
         self.sbus_devices = sbus
         self.lora_devices = lora
-        _apply_optional_stores(self, alarm_list, modbus_list, video_list)
+        _apply_optional_stores(self, alarm_list, modbus_list, video_list, slink_list)
 
         self.removed_ids = {
             "virtual": prev_virtual - frozenset(virtual),
             "wtp": prev_wtp - frozenset(wtp),
             "sbus": prev_sbus - frozenset(sbus),
             "lora": prev_lora - frozenset(lora),
+            "slink": prev_slink - frozenset(self.slink_devices),
         }
 
         # ── Enrich child devices with parent hardware model and class ─────────
@@ -248,6 +261,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "wtp": wtp,
             "sbus": sbus,
             "lora": lora,
+            "slink": self.slink_devices,
             "modbus": self.modbus_devices,
             "video": self.video_devices,
             "scenes": self.scenes,
@@ -348,16 +362,18 @@ def _apply_optional_stores(
     alarm: list[Any] | None,
     modbus: list[Any] | None,
     video: list[Any] | None,
+    slink: list[Any] | None = None,
 ) -> None:
-    indexed_alarm = _maybe_index_list(alarm)
-    indexed_modbus = _maybe_index_list(modbus)
-    indexed_video = _maybe_index_list(video)
-    if indexed_alarm is not None:
-        coordinator.alarm_zones = indexed_alarm
-    if indexed_modbus is not None:
-        coordinator.modbus_devices = indexed_modbus
-    if indexed_video is not None:
-        coordinator.video_devices = indexed_video
+    updates = {
+        "alarm_zones": alarm,
+        "modbus_devices": modbus,
+        "video_devices": video,
+        "slink_devices": slink,
+    }
+    for attr, raw in updates.items():
+        indexed = _maybe_index_list(raw)
+        if indexed is not None:
+            setattr(coordinator, attr, indexed)
 
 
 async def _safe_fetch(coro_fn: Any, label: str, default: Any = None) -> Any:

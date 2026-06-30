@@ -664,5 +664,29 @@
     "variant": "p1",
     "visible": true,
     "voice_assistant_device_type": "not_set"
+  },
+  "slink_relay": {
+    "id": 1,
+    "name": "SLINK Relay 1",
+    "type": "relay",
+    "state": true,
+    "inverted": false,
+    "startup_state": "off",
+    "status": "online",
+    "room_id": null,
+    "class": "slink"
+  },
+  "slink_energy_meter": {
+    "id": 2,
+    "name": "SLINK Energy Meter",
+    "type": "energy_meter",
+    "active_power": 1500,
+    "current": 6.5,
+    "energy_consumed_total": 54321000,
+    "energy_consumed_today": 12000,
+    "energy_consumed_yesterday": 11000,
+    "status": "online",
+    "room_id": null,
+    "class": "slink"
   }
 }

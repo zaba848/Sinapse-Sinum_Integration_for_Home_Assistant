@@ -81,6 +81,14 @@ def _lora_switch_entity(
     return SinumBusRelaySwitch(coordinator, device_id, entry_id, "lora")
 
 
+def _slink_switch_entity(
+    coordinator: SinumCoordinator, device_id: int, entry_id: str, device: dict[str, Any]
+) -> SwitchEntity | None:
+    if device.get("type") != STYPE_RELAY:
+        return None
+    return SinumBusRelaySwitch(coordinator, device_id, entry_id, "slink")
+
+
 def _bus_switch_entity(
     coordinator: SinumCoordinator,
     device_id: int,
@@ -92,6 +100,7 @@ def _bus_switch_entity(
         "wtp": _wtp_switch_entity,
         "sbus": _sbus_switch_entity,
         "lora": _lora_switch_entity,
+        "slink": _slink_switch_entity,
     }
     handler = handlers.get(bus)
     if handler is None:
@@ -127,6 +136,7 @@ def _add_bus_switches(
     _add_bus_entities_for_store(coordinator, entities, entry_id, "wtp", coordinator.wtp_devices)
     _add_bus_entities_for_store(coordinator, entities, entry_id, "sbus", coordinator.sbus_devices)
     _add_bus_entities_for_store(coordinator, entities, entry_id, "lora", coordinator.lora_devices)
+    _add_bus_entities_for_store(coordinator, entities, entry_id, "slink", coordinator.slink_devices)
 
 
 async def async_setup_entry(
@@ -248,6 +258,8 @@ def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> di
         return coordinator.wtp_devices.get(device_id, {})
     if bus == "sbus":
         return coordinator.sbus_devices.get(device_id, {})
+    if bus == "slink":
+        return coordinator.slink_devices.get(device_id, {})
     return coordinator.lora_devices.get(device_id, {})
 
 
@@ -286,44 +298,38 @@ class SinumBusRelaySwitch(
     def is_on(self) -> bool:
         return bool(self._device.get("state"))
 
+    async def _patch_state(self, state: bool) -> None:
+        if self._bus == "wtp":
+            updated = await self.coordinator.client.patch_wtp_device(
+                self._device_id, {"state": state}
+            )
+            self.coordinator.wtp_devices[self._device_id].update(updated)
+        elif self._bus == "sbus":
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"state": state}
+            )
+            self.coordinator.sbus_devices[self._device_id].update(updated)
+        elif self._bus == "slink":
+            updated = await self.coordinator.client.patch_slink_device(
+                self._device_id, {"state": state}
+            )
+            self.coordinator.slink_devices[self._device_id].update(updated)
+        else:
+            updated = await self.coordinator.client.patch_lora_device(
+                self._device_id, {"state": state}
+            )
+            self.coordinator.lora_devices[self._device_id].update(updated)
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"state": True}
-                )
-                self.coordinator.wtp_devices[self._device_id].update(updated)
-            elif self._bus == "sbus":
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": True}
-                )
-                self.coordinator.sbus_devices[self._device_id].update(updated)
-            else:
-                updated = await self.coordinator.client.patch_lora_device(
-                    self._device_id, {"state": True}
-                )
-                self.coordinator.lora_devices[self._device_id].update(updated)
+            await self._patch_state(True)
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"state": False}
-                )
-                self.coordinator.wtp_devices[self._device_id].update(updated)
-            elif self._bus == "sbus":
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": False}
-                )
-                self.coordinator.sbus_devices[self._device_id].update(updated)
-            else:
-                updated = await self.coordinator.client.patch_lora_device(
-                    self._device_id, {"state": False}
-                )
-                self.coordinator.lora_devices[self._device_id].update(updated)
+            await self._patch_state(False)
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.async_write_ha_state()

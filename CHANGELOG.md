@@ -23,6 +23,21 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.15] — 2026-06-30
+
+### Added
+- **SLINK bus support** — new device bus type discovered on Sinum hubs. Integration now fetches `/api/v1/devices/slink` and exposes:
+  - **`relay`** devices as `switch` entities (on/off via PATCH, identical control path to SBUS/WTP relays)
+  - **`energy_meter`** devices as `sensor` entities: `active_power`, `current`, `energy_consumed_total`, `energy_consumed_today`, `energy_consumed_yesterday`
+  - SLINK devices are fetched in parallel with all other bus collections on every coordinator refresh cycle
+- **Coordinator WebRTC tests** — 15 new unit tests covering all `SinumCoordinator` WebRTC methods: `register_webrtc_session`, `dispatch_webrtc_answer`, `dispatch_webrtc_candidate`, `dispatch_webrtc_error`, `close_webrtc_session`, `forward_webrtc_candidate`, `video_device_ips` — coordinator now at 97% line coverage
+- **SLINK tests** — 30 new tests covering relay switch (turn on/off, availability, error handling), energy_meter sensors (all 5 fields), `build_slink_sensor_entities`, and `_apply_optional_stores` with SLINK data
+
+### Changed
+- `SinumBusRelaySwitch.async_turn_on/off` refactored to single `_patch_state` helper (eliminates duplication, adds SLINK branch)
+- `_apply_optional_stores` refactored to data-driven loop (CC ≤ 4)
+- Test count: 1560 → 1605
+
 ## [0.5.14] — 2026-06-29
 
 ### Fixed / Improved
