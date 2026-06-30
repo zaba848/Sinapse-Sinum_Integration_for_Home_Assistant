@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import SinumAuthError, SinumClient, SinumConnectionError
@@ -96,6 +97,11 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.client.post_video_candidate(device_id, session_id, candidate)
         except Exception as exc:
             _LOGGER.debug("Cannot forward ICE candidate to hub: %s", exc)
+
+    @property
+    def hub_name(self) -> str:
+        """Short name of this hub, used to prefix device names for multi-hub uniqueness."""
+        return self.hub_info.get("name") or self.hub_info.get("hostname") or ""
 
     @property
     def video_device_ips(self) -> frozenset[str]:
@@ -675,7 +681,13 @@ class SinumDeviceAvailableMixin:
 
     Mix in *before* CoordinatorEntity so MRO resolves available here first:
         class MyEntity(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], ...):
+
+    Also injects the hub name as a prefix in device_info.name so that identically-named
+    devices on different hubs get distinct entity_ids in multi-hub setups.
     """
+
+    coordinator: SinumCoordinator
+    _attr_device_info: DeviceInfo | None
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -684,6 +696,17 @@ class SinumDeviceAvailableMixin:
     @property
     def available(self) -> bool:
         return super().available and bool(self._device)  # type: ignore[misc]
+
+    @property
+    def device_info(self) -> DeviceInfo | None:
+        info = self._attr_device_info
+        hub_name = self.coordinator.hub_name
+        if not info or not hub_name:
+            return info
+        raw_name = info.get("name")
+        if not raw_name:
+            return info
+        return DeviceInfo(**{**info, "name": f"{hub_name}: {raw_name}"})
 
 
 def via_device_for(device: dict[str, Any], entry_id: str) -> tuple[str, str] | None:

@@ -215,6 +215,12 @@
       "energy_consumed_yesterday": {
         "name": "Energy yesterday"
       },
+      "active_power": {
+        "name": "Active Power"
+      },
+      "energy_consumed_total": {
+        "name": "Energy Consumed"
+      },
       "power_from_grid": {
         "name": "Power from Grid"
       },

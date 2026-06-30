@@ -23,6 +23,19 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.17] — 2026-06-30
+
+### Fixed
+- **Multi-hub entity_id collisions** — `SinumDeviceAvailableMixin.device_info` now prefixes every device name with the hub name (e.g. `tablica-wtp: Energy Meter 1`), so identical device names on different hubs produce distinct entity_ids without `_2`/`_3` suffixes.
+- **Within-device collision** (`sensor.energy_meter_18_2`) — `total_active_power` and `energy_consumed_total` in `_MODBUS_ENERGY_METER_SENSORS` now have `translation_key` so both sensors get a distinct entity name suffix.
+
+### Added
+- `SinumCoordinator.hub_name` property returning the hub hostname/name from `hub_info`
+- Translation keys `active_power` (PL: Moc aktywna) and `energy_consumed_total` (PL: Energia skumulowana)
+
+### Changed
+- Device names in HA now include hub prefix: "tablica-wtp: Energy Meter 1". Entity_ids stay stable (stored by unique_id).
+
 ## [0.5.16] — 2026-06-30
 
 ### Added

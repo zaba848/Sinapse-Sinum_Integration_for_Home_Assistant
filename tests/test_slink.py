@@ -19,6 +19,7 @@ FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json"
 def _make_coordinator(slink: dict | None = None) -> MagicMock:
     c = MagicMock()
     c.slink_devices = slink or {}
+    c.hub_name = ""
     c.client = MagicMock()
     c.client.patch_slink_device = AsyncMock(return_value={})
     return c

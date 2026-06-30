@@ -49,6 +49,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         suggested_display_precision=0,
         entity_registry_enabled_default=False,
+        translation_key="active_power",
     ),
     SinumModbusSensorDescription(
         key="power_from_grid",
@@ -78,6 +79,7 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         suggested_display_precision=0,
         entity_registry_enabled_default=False,
+        translation_key="energy_consumed_total",
     ),
     SinumModbusSensorDescription(
         key="energy_fed_total",

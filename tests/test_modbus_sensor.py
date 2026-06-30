@@ -14,6 +14,7 @@ FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "sinum_devices.json"
 def _make_coordinator(modbus: dict | None = None) -> MagicMock:
     coordinator = MagicMock()
     coordinator.modbus_devices = modbus or {}
+    coordinator.hub_name = ""
     return coordinator
 
 

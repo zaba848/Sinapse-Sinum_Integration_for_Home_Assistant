@@ -215,6 +215,12 @@
       "energy_consumed_yesterday": {
         "name": "Energia wczoraj"
       },
+      "active_power": {
+        "name": "Moc aktywna"
+      },
+      "energy_consumed_total": {
+        "name": "Energia skumulowana"
+      },
       "power_from_grid": {
         "name": "Moc pobrana z sieci"
       },
