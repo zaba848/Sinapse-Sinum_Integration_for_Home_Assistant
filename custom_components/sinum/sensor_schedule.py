@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, hub_prefixed_name
 
 
 class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
@@ -29,7 +29,9 @@ class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry_id}_schedule_{self._schedule_id}_{unique_suffix}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"schedule_{self._schedule_id}_{entry_id}")},
-            name=f"Sinum Schedule {schedule.get('name', self._schedule_id)}",
+            name=hub_prefixed_name(
+                coordinator, f"Schedule {schedule.get('name', self._schedule_id)}"
+            ),
             manufacturer="TECH Sterowniki",
             model="Schedule",
         )

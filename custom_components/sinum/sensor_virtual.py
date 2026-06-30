@@ -21,7 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import SinumConnectionError, SinumNotSupportedError
 from .const import DOMAIN
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, hub_prefixed_name
 from .sensor_bus import _SENTINEL_INT16, SinumSensorDescription
 
 _LOGGER = logging.getLogger(__name__)
@@ -333,7 +333,7 @@ class SinumThermostatOutputGroupSensor(CoordinatorEntity[SinumCoordinator], Sens
         label = device.get("_device_name") or device.get("name", str(device_id))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
-            name=label,
+            name=hub_prefixed_name(coordinator, label),
             manufacturer="TECH Sterowniki",
             model="Sinum Virtual Device",
         )

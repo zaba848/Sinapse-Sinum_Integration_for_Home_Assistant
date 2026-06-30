@@ -23,6 +23,14 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.19] — 2026-06-30
+
+### Fixed
+- **Hub prefix for remaining platforms** — `camera.py`, `sensor_virtual.py`, `sensor_schedule.py`, `event.py`, `binary_sensor.py`, `update.py` now use `hub_prefixed_name()` for all device names. All entity platforms now produce unique device names across multiple Sinum hubs with no `_2`/`_3` collisions.
+
+### Changed
+- Test count: 1616 (unchanged — existing camera and virtual sensor tests updated with `hub_name = ""` fixture)
+
 ## [0.5.18] — 2026-06-30
 
 ### Fixed

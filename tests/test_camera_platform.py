@@ -92,6 +92,7 @@ def _make_camera(device_data: dict):
     from custom_components.sinum.camera import SinumCamera
 
     coordinator = MagicMock()
+    coordinator.hub_name = ""
     coordinator.video_devices = {device_data["id"]: device_data}
     coordinator.last_update_success = True
     coordinator.client.get_video_snapshot = AsyncMock(return_value=_FAKE_JPEG)

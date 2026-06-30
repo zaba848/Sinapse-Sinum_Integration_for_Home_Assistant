@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, hub_prefixed_name
 
 PARALLEL_UPDATES = 0
 
@@ -43,12 +43,16 @@ def _button_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str
 
 
 def _button_event_device_info(
-    device: dict[str, Any], entry_id: str, bus: str, device_id: int
+    device: dict[str, Any],
+    entry_id: str,
+    bus: str,
+    device_id: int,
+    coordinator: SinumCoordinator,
 ) -> DeviceInfo:
     label = device.get("_device_name") or device.get("name", str(device_id))
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
-        name=label,
+        name=hub_prefixed_name(coordinator, label),
         manufacturer="TECH Sterowniki",
         model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
         suggested_area=device.get("_area") or None,
@@ -118,7 +122,9 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_event"
         device = _button_store(coordinator, bus).get(device_id, {})
-        self._attr_device_info = _button_event_device_info(device, entry_id, bus, device_id)
+        self._attr_device_info = _button_event_device_info(
+            device, entry_id, bus, device_id, coordinator
+        )
         self._prev_action: str | None = device.get("action")
         self._prev_count: int | None = device.get("buttons_count")
 

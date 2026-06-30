@@ -31,7 +31,12 @@ from .const import (
     WTYPE_TEMPERATURE_REGULATOR,
     WTYPE_TWO_STATE_INPUT_SENSOR,
 )
-from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
+from .coordinator import (
+    SinumCoordinator,
+    SinumDeviceAvailableMixin,
+    hub_prefixed_name,
+    via_device_for,
+)
 
 PARALLEL_UPDATES = 0
 
@@ -345,7 +350,7 @@ class SinumParentOnlineSensor(CoordinatorEntity[SinumCoordinator], BinarySensorE
         label = parent.get("name") or f"{parent_class} {self._parent_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, unique_key)},
-            name=label,
+            name=hub_prefixed_name(coordinator, label),
             manufacturer="TECH Sterowniki",
             model=parent.get("model") or parent_class.replace("_", " ").title(),
             sw_version=parent.get("version"),
@@ -400,7 +405,7 @@ class SinumParentErrorSensor(CoordinatorEntity[SinumCoordinator], BinarySensorEn
         label = parent.get("name") or f"{parent_class} {self._parent_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_parent_{parent_class}_{self._parent_id}")},
-            name=label,
+            name=hub_prefixed_name(coordinator, label),
             manufacturer="TECH Sterowniki",
             model=parent.get("model") or parent_class.replace("_", " ").title(),
             sw_version=parent.get("version"),

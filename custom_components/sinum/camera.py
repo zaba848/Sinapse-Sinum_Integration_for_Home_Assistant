@@ -28,7 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, hub_prefixed_name
 
 if TYPE_CHECKING:
     from homeassistant.components.camera.webrtc import WebRTCSendMessage
@@ -256,9 +256,10 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
     @property
     def device_info(self) -> dict[str, Any]:
         dev = self._device
+        name = dev.get("name", f"Sinum Camera {self._device_id}")
         return {
             "identifiers": {("sinum", f"{self._entry_id}_video_{self._device_id}")},
-            "name": dev.get("name", f"Sinum Camera {self._device_id}"),
+            "name": hub_prefixed_name(self.coordinator, name),
             "manufacturer": "Sinum",
             "model": dev.get("type", "ip_camera"),
         }

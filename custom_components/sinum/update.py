@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .const import DOMAIN
-from .coordinator import SinumCoordinator
+from .coordinator import SinumCoordinator, hub_prefixed_name
 
 _UPDATING_STATUSES = {"downloading", "updating"}
 
@@ -54,7 +54,7 @@ class SinumParentDeviceUpdate(CoordinatorEntity[SinumCoordinator], UpdateEntity)
         label = parent.get("name") or f"{parent_class} {self._parent_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, unique_key)},
-            name=label,
+            name=hub_prefixed_name(coordinator, label),
             manufacturer="TECH Sterowniki",
             model=parent.get("model") or parent_class.replace("_", " ").title(),
             sw_version=parent.get("version"),
