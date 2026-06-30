@@ -126,20 +126,23 @@ Click **Submit**. Home Assistant discovers all devices and creates entities auto
 
 ---
 
-## Step 3 — Enable Real-Time Updates
+## Step 3 — Real-Time Updates (Enabled by Default)
 
-Without this step, entity states update every 30 seconds (REST polling). With WebSocket, updates arrive in under 1 second.
+**WebSocket real-time transport is enabled by default** in v0.6.0 and later. Entity states now update in under 1 second instead of every 30 seconds (REST polling).
 
-1. Go to **Settings → Devices & Services** → find **Sinum (Sinapse)** → click **Configure**.
-2. Enable **"Enable WebSocket real-time transport"**.
-3. Leave the path as `/api/v1/ws` (default).
-4. Click **Submit**.
+### Verify WebSocket is working
 
-The bridge connects immediately — no restart needed.
+1. In **Settings → Devices & Services → Sinum (Sinapse) → Options**, confirm **"Enable WebSocket real-time transport"** is ✅ checked.
+2. Open **Developer Tools → Events → Listen to events** and type `sinum_device_state_changed`.
+3. Trigger any state change on the hub (toggle a switch, open a door).
+4. The event should appear in under a second.
 
-**Verify it works:** open **Developer Tools → Events → Listen** and type `sinum_device_state_changed`. Trigger any state change on the hub (toggle a switch, open a door). The event should appear in under a second.
-
-> If your hub firmware doesn't support WebSocket, fall back to the [MQTT bridge](../docs/real-time.md#mqtt-real-time-bridge-legacy).
+> If WebSocket doesn't work or you see frequent reconnects, check:
+> - Hub firmware version (must support `/api/v1/ws`)
+> - API token validity
+> - Network stability
+>
+> Fall back to [MQTT bridge](real-time.md#mqtt-real-time-bridge-legacy) as needed.
 
 ---
 

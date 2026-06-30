@@ -47,12 +47,15 @@ Example hub push payload:
 
 Supported buses: `virtual`, `wtp`, `sbus`, `lora`, `modbus`, `video`.
 
-If the connection drops, the bridge reconnects after 5 seconds automatically.
+If the connection drops, the bridge reconnects automatically using exponential backoff: 5s → 10s → 20s → 40s → 60s (max). On successful reconnect, a full REST refresh ensures no state changes were missed.
 
 ### Setup
 
-1. Go to **Settings → Devices & Services** → find **Sinum (Sinapse)** → click **Configure**.
-2. Enable **"Enable WebSocket real-time transport"**.
+**WebSocket is enabled by default** in v0.6.0+. No action needed for new installations.
+
+For existing installations or if manually disabled:
+1. Go to **Settings → Devices & Services** → find **Sinum (Sinapse)** → click **Options**.
+2. Check **"Enable WebSocket real-time transport"**.
 3. Leave path as `/api/v1/ws` (default — change only if your hub firmware uses a different endpoint).
 4. Click **Submit**.
 
@@ -73,7 +76,14 @@ Open **Developer Tools → Events → Listen to events** and type `sinum_device_
 
 ### WebSocket reconnect behavior
 
-The bridge implements automatic reconnection with a 5-second delay. On reconnect, the coordinator performs an immediate full REST refresh to reconcile any state changes missed during the outage.
+The bridge implements automatic reconnection with exponential backoff:
+- Attempt 1: 5 s delay
+- Attempt 2: 10 s delay
+- Attempt 3: 20 s delay
+- Attempt 4: 40 s delay
+- Attempt 5+: 60 s delay (capped)
+
+On reconnect, the coordinator performs an immediate full REST refresh to reconcile any state changes missed during the outage.
 
 ---
 

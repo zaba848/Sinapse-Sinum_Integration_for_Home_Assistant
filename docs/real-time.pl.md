@@ -47,12 +47,15 @@ Przykład payloadu wysyłanego przez centralę:
 
 Obsługiwane magistrale: `virtual`, `wtp`, `sbus`, `lora`, `modbus`, `video`.
 
-Jeśli połączenie zostanie przerwane, most automatycznie łączy się ponownie po 5 sekundach.
+Jeśli połączenie zostanie przerwane, most automatycznie łączy się ponownie przy użyciu wykładniczego opóźnienia: 5s → 10s → 20s → 40s → 60s (max). Po pomyślnym ponownym połączeniu koordynator wykonuje pełne odświeżenie REST w celu uzgodnienia wszelkich zmian stanu pominiętych podczas awarii.
 
 ### Konfiguracja
 
-1. Przejdź do **Ustawienia → Urządzenia i usługi** → znajdź **Sinum (Sinapse)** → kliknij **Konfiguruj**.
-2. Włącz **„Włącz transport WebSocket w czasie rzeczywistym"**.
+**WebSocket jest domyślnie włączony** w wersji v0.6.0+. Dla nowych instalacji nie jest wymagana żadna akcja.
+
+Dla istniejących instalacji lub jeśli wyłączono ręcznie:
+1. Przejdź do **Ustawienia → Urządzenia i usługi** → znajdź **Sinum (Sinapse)** → kliknij **Opcje**.
+2. Zaznacz **„Włącz transport WebSocket w czasie rzeczywistym"**.
 3. Pozostaw ścieżkę jako `/api/v1/ws` (domyślna — zmień tylko gdy firmware centrali używa innego endpointu).
 4. Kliknij **Zatwierdź**.
 
@@ -73,7 +76,14 @@ Otwórz **Narzędzia deweloperskie → Zdarzenia → Nasłuchuj zdarzeń** i wpi
 
 ### Zachowanie po rekonekcie WebSocket
 
-Most implementuje automatyczne ponowne łączenie z 5-sekundowym opóźnieniem. Po rekonekcie koordynator wykonuje natychmiastowe pełne odświeżenie REST, aby uzgodnić zmiany stanu pominięte podczas przerwy.
+Most implementuje automatyczne ponowne łączenie z wykładniczym opóźnieniem:
+- Próba 1: opóźnienie 5 s
+- Próba 2: opóźnienie 10 s
+- Próba 3: opóźnienie 20 s
+- Próba 4: opóźnienie 40 s
+- Próba 5+: opóźnienie 60 s (max)
+
+Po rekonekcie koordynator wykonuje natychmiastowe pełne odświeżenie REST, aby uzgodnić zmiany stanu pominięte podczas przerwy.
 
 ---
 

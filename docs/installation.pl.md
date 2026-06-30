@@ -126,20 +126,23 @@ Kliknij **Zatwierdź**. Home Assistant wykrywa wszystkie urządzenia i tworzy en
 
 ---
 
-## Krok 3 — Włączenie aktualizacji w czasie rzeczywistym
+## Krok 3 — Aktualizacje w czasie rzeczywistym (domyślnie włączone)
 
-Bez tego kroku stany encji aktualizują się co 30 sekund (odpytywanie REST). Po włączeniu WebSocket aktualizacje docierają w czasie poniżej 1 sekundy.
+**Transport WebSocket jest domyślnie włączony** w wersji v0.6.0+. Stany encji aktualizują się teraz w czasie poniżej 1 sekundy zamiast co 30 sekund (odpytywanie REST).
 
-1. Przejdź do **Ustawienia → Urządzenia i usługi** → znajdź **Sinum (Sinapse)** → kliknij **Konfiguruj**.
-2. Włącz **„Włącz transport WebSocket w czasie rzeczywistym"**.
-3. Pozostaw ścieżkę jako `/api/v1/ws` (domyślna).
-4. Kliknij **Zatwierdź**.
+### Weryfikacja, że WebSocket działa
 
-Most łączy się natychmiast — restart nie jest potrzebny.
+1. W **Ustawienia → Urządzenia i usługi → Sinum (Sinapse) → Opcje**, potwierdź że **„Włącz transport WebSocket w czasie rzeczywistym"** jest ✅ zaznaczone.
+2. Otwórz **Narzędzia deweloperskie → Zdarzenia → Nasłuchuj zdarzenia** i wpisz `sinum_device_state_changed`.
+3. Wywołaj dowolną zmianę stanu w centrali (przełącz przekaźnik, otwórz drzwi).
+4. Zdarzenie powinno pojawić się w czasie poniżej sekundy.
 
-**Weryfikacja:** otwórz **Narzędzia deweloperskie → Zdarzenia → Nasłuchuj** i wpisz `sinum_device_state_changed`. Wywołaj dowolną zmianę stanu w centrali (przełącz przekaźnik, otwórz drzwi). Zdarzenie powinno pojawić się w czasie poniżej sekundy.
-
-> Jeśli firmware centrali nie obsługuje WebSocket, użyj [mostu MQTT](real-time.pl.md#mqtt-most-w-czasie-rzeczywistym-wariant-awaryjny).
+> Jeśli WebSocket nie działa lub widzisz częste rekonekty, sprawdź:
+> - Wersję firmware centrali (musi obsługiwać `/api/v1/ws`)
+> - Ważność tokena API
+> - Stabilność sieci
+>
+> W razie potrzeby użyj [mostu MQTT](real-time.pl.md#mqtt-most-w-czasie-rzeczywistym-wariant-awaryjny).
 
 ---
 
