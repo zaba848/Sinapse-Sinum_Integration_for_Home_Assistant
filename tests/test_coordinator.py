@@ -445,3 +445,88 @@ class TestSinumCoordinator:
         assert devices[1]["_parent_model"] == "Hub X"
         assert devices[1]["_parent_class"] == "wtp_parent_device"
         assert devices[1]["_parent_id"] == 77
+
+    def test_hub_name_returns_name_field(self, mock_client):
+        """Line 104: hub_name returns hub_info['name'] when present."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {"name": "tablica-wtp", "hostname": "192.168.1.1"}
+        assert coordinator.hub_name == "tablica-wtp"
+
+    def test_hub_name_falls_back_to_hostname(self, mock_client):
+        """Line 104: hub_name falls back to hostname when name is absent."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {"hostname": "sinum-box"}
+        assert coordinator.hub_name == "sinum-box"
+
+    def test_hub_name_empty_when_no_name_or_hostname(self, mock_client):
+        """Line 104: hub_name returns '' when hub_info has neither field."""
+        coordinator = self._make_coordinator(mock_client)
+        coordinator.hub_info = {}
+        assert coordinator.hub_name == ""
+
+
+class TestFirstDeviceClassField:
+    def test_returns_empty_string_when_no_class_field(self):
+        """Line 437: _first_device_class_field returns '' when no class/source/bus."""
+        from custom_components.sinum.coordinator import _device_class
+
+        result = _device_class({"id": 1, "name": "Device"})
+        assert result == ""
+
+
+class TestDeviceInfoMixinWithHubPrefix:
+    def _make_mixin_entity(self, hub_name: str, device_info):
+        """Helper: returns a minimal SinumDeviceAvailableMixin instance."""
+        from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+        from custom_components.sinum.coordinator import SinumDeviceAvailableMixin
+
+        coordinator = MagicMock()
+        coordinator.hub_name = hub_name
+
+        class _Entity(SinumDeviceAvailableMixin, CoordinatorEntity):
+            def __init__(self):
+                self.coordinator = coordinator
+                self._attr_device_info = device_info
+
+            @property
+            def _device(self):
+                return {"id": 1}
+
+        return _Entity()
+
+    def test_device_info_prefixes_name_with_hub(self):
+        """Lines 706-709: device_info adds hub prefix to device name."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        entity = self._make_mixin_entity(
+            "tablica-wtp",
+            DeviceInfo(identifiers={("sinum", "e1_wtp_1")}, name="Energy Meter 1"),
+        )
+        info = entity.device_info
+        assert info is not None
+        assert info.get("name") == "tablica-wtp: Energy Meter 1"
+
+    def test_device_info_unchanged_when_hub_name_empty(self):
+        """Lines 704: early return when hub_name is empty."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        entity = self._make_mixin_entity(
+            "",
+            DeviceInfo(identifiers={("sinum", "e1_wtp_1")}, name="Energy Meter 1"),
+        )
+        info = entity.device_info
+        assert info is not None
+        assert info.get("name") == "Energy Meter 1"
+
+    def test_device_info_unchanged_when_device_name_missing(self):
+        """Lines 706-708: skip prefix when device_info has no name field."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        entity = self._make_mixin_entity(
+            "tablica-wtp",
+            DeviceInfo(identifiers={("sinum", "e1_wtp_1")}),
+        )
+        info = entity.device_info
+        assert info is not None
+        assert info.get("name") is None
