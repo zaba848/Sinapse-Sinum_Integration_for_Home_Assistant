@@ -92,8 +92,8 @@ This document provides step-by-step instructions for configuring GitHub security
 **Purpose**: Run actual hardware smoke tests every night on your test hubs.
 
 **Prerequisites**:
-- Two test hubs running (WTP at `10.0.61.132`, SBUS at `10.0.62.167`)
-- macOS or Linux machine that can access both hubs (on same network or VPN)
+- Test hubs running and reachable from the runner LAN/VPN
+- macOS or Linux self-hosted runner with labels `self-hosted` and `sinum-lan`
 
 ### Steps:
 
@@ -105,10 +105,15 @@ This document provides step-by-step instructions for configuring GitHub security
    (Token obtained from **Settings** → **Actions** → **Runners** → **New self-hosted runner**)
 
 2. **Add runner secrets** (Settings → **Secrets and variables** → **Actions**):
-   - Name: `HUB_USERNAME` → Value: `installer` (or your hub login)
-   - Name: `HUB_PASSWORD` → Value: `<your-hub-password>`
+   - Name: `SINUM_USERNAME` → Value: `admin` or your hub login
+   - Name: `SINUM_PASSWORD` → Value: `<your-hub-password>`
+   - Optional per-hub tokens: `SINUM_WTP_TOKEN`, `SINUM_SBUS_TOKEN`, `SINUM_VIDEO_TOKEN`
 
-3. **Verify workflow** is active: 
+3. **Optional repository variable**:
+   - Name: `SINUM_SMOKE_HUBS`
+   - Value example: `WTP=http://10.0.61.132,SBUS=http://10.0.62.167,VIDEO=http://10.0.62.117`
+
+4. **Verify workflow** is active:
    - Go to **.github/workflows/hardware-nightly.yml** (already committed)
    - It runs at 02:00 UTC daily or on manual trigger
 

@@ -1,8 +1,24 @@
 # Plan testów na sprzęcie i napraw
 
-Hub SBUS: http://10.0.62.167 (token statyczny)
-Hub WTP:  http://10.0.61.132 (login admin/admintablica → pole "session")
-HA:       http://homeassistant.local:8123 (token HA)
+Znane huby testowe:
+
+| Hub | Domyślny adres | Uwagi |
+|---|---|---|
+| SBUS | `http://10.0.62.167` | może używać statycznego tokenu API |
+| WTP | `http://10.0.61.132` | login hasłem przez `/api/v1/login` |
+| Video | `http://10.0.62.117` | kamery IP/ONVIF, wymaga osobnej walidacji |
+
+Sekrety nie mogą być zapisane w repozytorium. Testy live uruchamiaj przez env:
+
+```bash
+export SINUM_SMOKE_HUBS="WTP=http://10.0.61.132,SBUS=http://10.0.62.167,VIDEO=http://10.0.62.117"
+export SINUM_USERNAME="admin"
+export SINUM_PASSWORD="<hub-password>"
+python3 scripts/hardware_smoke_check.py
+```
+
+Dla hubów z tokenem można użyć zmiennej per label, np. `SINUM_SBUS_TOKEN`.
+Token HA podawaj wyłącznie poza repo, np. jako sekret CI lub lokalny env.
 
 ---
 
@@ -16,6 +32,27 @@ Read-only test API wykonany na obu hubach (logowanie + odczyt endpointów krytyc
 | `10.0.62.167` (SBUS) | 200 | 200 | 200 | 200 | 200 |
 
 Wniosek: łączność i autoryzacja działają, kluczowe endpointy zwracają poprawne odpowiedzi.
+
+## Smoke test sprzętowy (2026-06-30)
+
+Read-only smoke wykonany na pięciu aktywnych hubach przez `scripts/hardware_smoke_check.py`.
+Źródło: `docs/hardware_smoke_latest.md`.
+
+| Hub | `/api/v1/info` | `/api/v1/devices/wtp` | `/api/v1/devices/sbus` | `/api/v1/devices/virtual` |
+|---|---:|---:|---:|---:|
+| tablica-wtp (`10.0.61.132`) | 200 | 200 | 200 | 200 |
+| sinum-tablica-sbus-1 (`10.0.62.167`) | 200 | 200 | 200 | 200 |
+| tablica-video-nowa (`10.0.62.117`) | 200 | 200 | 200 | 200 |
+| tablicaKlimak (`10.0.61.114`) | 200 | 200 | 200 | 200 |
+| sinum-tablica-sbus2 (`10.0.62.209`) | 200 | 200 | 200 | 200 |
+
+Dodatkowo:
+- HIL API coverage: 5/5 PASS, 0 critical failures.
+- HIL smoke: 5/5 PASS.
+- Kamera `tablica-video-nowa`: snapshot device `27` zwrócił HTTP 200.
+- HIL WebSocket format: 4/4 non-video huby PASS.
+- HA/RPi deploy check: zainstalowany manifest `0.5.21`, 5 config entries Sinum, registry migration przez HA WebSocket API usunęła 322 stare kolizje, pozostałe kandydaty migracji: 0.
+- Finalny post-deploy smoke: 5/5 hubów PASS, źródło `docs/hardware_smoke_latest.md`.
 
 ---
 

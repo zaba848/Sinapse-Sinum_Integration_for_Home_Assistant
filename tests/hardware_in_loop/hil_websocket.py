@@ -30,7 +30,7 @@ async def run_hil(host: str, token: str, timeout: float) -> bool:  # noqa: C901
         return False
 
     ws_url = f"ws://{host}/api/v1/ws?access_token={token}"
-    print(f"Connecting to {ws_url[:60]}...")
+    print(f"Connecting to ws://{host}/api/v1/ws?access_token=<redacted>...")
 
     results: list[dict] = []
     type_counter: Counter = Counter()
@@ -105,8 +105,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Sinum WebSocket HIL test")
     parser.add_argument("--host", required=True, help="Hub IP or hostname")
     parser.add_argument("--token", required=True, help="API token (JWT)")
-    parser.add_argument("--timeout", type=float, default=15.0,
-                        help="Seconds to wait for events (default: 15)")
+    parser.add_argument(
+        "--timeout", type=float, default=15.0, help="Seconds to wait for events (default: 15)"
+    )
     args = parser.parse_args()
 
     ok = asyncio.run(run_hil(args.host, args.token, args.timeout))

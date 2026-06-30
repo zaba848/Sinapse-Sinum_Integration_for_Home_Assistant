@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Sample hub API payloads used across tests
   ├── test_code_quality.py     CC gate — all functions must have CC ≤ 4
   ├── hardware_in_loop/        HIL scripts for live hub smoke testing
-  └── test_*.py                1481 tests across all platforms and device types
+  └── test_*.py                1648 passing tests across all platforms and device types
 ```
 
 ---
@@ -102,10 +102,11 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Test statistics: **1481 tests, 44 test files**, ~8 s runtime. All must pass before merging.
+Test statistics: **1648 passing tests, 5 skipped live-write tests, 46 test files**, ~10 s runtime. All non-hardware tests must pass before merging.
 
 Skip markers:
-- `@pytest.mark.skipif` — HIL tests skipped without `SINUM_HOST` / `SINUM_PASSWORD` env vars
+- live-write tests in `tests/test_api_endpoint_write.py` are skipped unless `SINUM_WRITE_TESTS=1` and live credentials are provided
+- HIL scripts in `tests/hardware_in_loop/` are standalone Python scripts, not normal pytest test modules
 
 ---
 
@@ -119,7 +120,7 @@ All pull requests must pass:
 | Format | `ruff format` | No diffs |
 | Types | `mypy` | Zero errors |
 | Cyclomatic complexity | `radon` via `tests/test_code_quality.py` | All functions CC ≤ 4 |
-| Tests | `pytest` | All 1481 pass |
+| Tests | `pytest` | All 1648 non-hardware tests pass |
 | HACS | hacs-action | Valid `hacs.json` and manifest |
 
 ```bash
@@ -367,12 +368,20 @@ logger:
     custom_components.sinum: debug
 ```
 
-Then use the hardware-in-loop scripts in `tests/hardware_in_loop/` (requires `SINUM_HOST` and `SINUM_PASSWORD` env vars):
+Then use the read-only smoke runner (credentials via env, never committed):
 
 ```bash
-export SINUM_HOST=10.0.62.167
+export SINUM_SMOKE_HUBS="SBUS=http://10.0.62.167"
 export SINUM_PASSWORD=your_password
-pytest tests/hardware_in_loop/ -v
+python3 scripts/hardware_smoke_check.py
+```
+
+For deeper probes, run the standalone HIL scripts with a token:
+
+```bash
+python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_api_coverage.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
 ```
 
 Or use the diagnostic script to survey device fields on your hub:
@@ -392,7 +401,7 @@ Quick checklist before submitting a PR:
 - [ ] `ruff check custom_components/` passes
 - [ ] `ruff format custom_components/` produces no diffs
 - [ ] `mypy custom_components/sinum/` passes
-- [ ] `pytest tests/` — all 1481 tests pass
+- [ ] `pytest tests/` — all 1648 non-hardware tests pass
 - [ ] `pytest tests/test_code_quality.py` — CC gate clean (no `_LEGACY_ALLOWANCE` entries added)
 - [ ] New device types have constants in `const.py`
 - [ ] New functionality has at least 3 tests

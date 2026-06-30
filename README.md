@@ -6,20 +6,20 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1498%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1648%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/version-0.5.7-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.21-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
 
 ## What You Get
 
-- **2 581 HA entities** from 2 live production hubs (WTP + SBUS)
-- **11 entity platforms**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
-- **4 buses**: Virtual, WTP, SBUS, LoRa — polled in parallel every 30 s
+- **5 live production hubs** configured in Home Assistant; 4 123 Sinum registry entities before pending collision cleanup
+- **12 entity platforms**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
+- **7 local surfaces**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — polled in parallel every 30 s
 - **Real-time push** via WebSocket (\< 1 s latency), MQTT bridge as fallback
-- **1 481 tests** across 44 test files, CC ≤ 4 on every function, mypy clean
+- **1 648 passing tests** across 46 test files, CC ≤ 4 on every function, ruff and mypy clean
 
 ---
 
@@ -185,12 +185,15 @@ data:
 
 ## Tested Hubs
 
-| Hub | Model | API | Firmware | Virtual | WTP | SBUS | HA entities |
-|---|---|---|---|---|---|---|---|
-| tablica-wtp | sinum\_plus | 1.4 | 1.24.0-alpha.2 | 28 | 254 | 8 | 1 084 |
-| sinum-tablica-sbus-1 | sinum\_lite | 1.4 | 1.24.0-alpha.3 | 169 | 35 | 436 | 1 497 |
+| Hub | IP | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| tablica-wtp | 10.0.61.132 | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
+| sinum-tablica-sbus-1 | 10.0.62.167 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
+| tablica-video-nowa | 10.0.62.117 | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
+| tablicaKlimak | 10.0.61.114 | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
+| sinum-tablica-sbus2 | 10.0.62.209 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
 
-**Total: 2 581 entities** verified on live hardware (2026-06-24).
+Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live hardware (2026-06-30). HA currently has 5 Sinum config entries and 582 suffix-collision registry entries pending migration cleanup.
 
 `tablica-wtp` (WTP-heavy): 108 WTP relays, 18 blind controllers, 15 temperature regulators, 28 buttons, full sensor suite (temperature/humidity/CO₂/IAQ/pressure/light/motion/flood), 1 fan coil, 1 energy meter.
 
@@ -209,7 +212,7 @@ data:
 | **Virtual blind integrators** | Report `position = None` when no physical controllers are linked (hub configuration issue, not integration bug). |
 | **Energy Center** | Sensors appear only when hub firmware exposes `/api/v1/energy-center/*`. |
 | **Schedules** | Read-only sensors + `sinum.update_schedule` service. Full schedule editing UI is not implemented. |
-| **LoRa / SLINK / Video** | Require specific hardware modules. SLINK devices are not mapped to HA entities. Video streams require direct RTSP credentials — use HA Generic Camera. |
+| **LoRa / SLINK / Video** | Require specific hardware modules. SLINK relay and energy meter entities are mapped; video cameras use hub snapshot/WebRTC paths. LoRa write support is implemented but still needs relay hardware validation. |
 | **Alpha firmware 408s** | Intermittent on bus polling. Integration retries once then serves cached state. |
 
 ---

@@ -23,6 +23,18 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.21] — 2026-06-30
+
+### Security
+- Removed committed live-hub credentials from hardware test documentation and smoke runner defaults. Hardware validation now reads credentials from environment variables or CI secrets only.
+
+### Changed
+- `scripts/hardware_smoke_check.py` now supports arbitrary `LABEL=URL` hub lists via `SINUM_SMOKE_HUBS` or repeated `--hub` arguments, including per-hub token variables such as `SINUM_SBUS_TOKEN`.
+- `hardware-nightly.yml` now runs the real read-only smoke runner on a LAN self-hosted runner instead of mocked/unit-only checks.
+- HIL WebSocket script now redacts the access token in connection logs.
+- Live write validation now uses the current `SinumClient` API names and keeps alarm writes gated by `SINUM_ALARM_TEST_PIN`.
+- README, development docs and implementation plan refreshed for v0.5.21 / 1 648 passing tests.
+
 ## [0.5.20] — 2026-06-30
 
 ### Quality

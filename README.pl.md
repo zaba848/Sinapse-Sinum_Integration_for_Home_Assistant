@@ -6,20 +6,20 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/testy-1498%20OK-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/testy-1648%20OK-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-%E2%89%A44%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/wersja-0.5.7-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/wersja-0.5.21-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/licencja-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
 
 ## Co zyskujesz
 
-- **2 581 encji HA** z 2 produkcyjnych central (WTP + SBUS)
-- **11 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
-- **4 magistrale**: Virtual, WTP, SBUS, LoRa — odpytywane równolegle co 30 s
+- **5 produkcyjnych central** skonfigurowanych w Home Assistant; 4 123 encje Sinum w registry przed oczyszczeniem kolizji
+- **12 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
+- **7 lokalnych powierzchni API**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — odpytywane równolegle co 30 s
 - **Aktualizacje w czasie rzeczywistym** przez WebSocket (opóźnienie \< 1 s), most MQTT jako wariant awaryjny
-- **1 498 testów** w 44 plikach, CC ≤ 4 w każdej funkcji, czysty mypy
+- **1 648 przechodzących testów** w 46 plikach, CC ≤ 4 w każdej funkcji, czysty ruff i mypy
 
 ---
 
@@ -185,12 +185,15 @@ data:
 
 ## Testowane centrale
 
-| Centrala | Model | API | Firmware | Virtual | WTP | SBUS | Encje HA |
-|---|---|---|---|---|---|---|---|
-| tablica-wtp | sinum\_plus | 1.4 | 1.24.0-alpha.2 | 28 | 254 | 8 | 1 084 |
-| sinum-tablica-sbus-1 | sinum\_lite | 1.4 | 1.24.0-alpha.3 | 169 | 35 | 436 | 1 497 |
+| Centrala | IP | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| tablica-wtp | 10.0.61.132 | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
+| sinum-tablica-sbus-1 | 10.0.62.167 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
+| tablica-video-nowa | 10.0.62.117 | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
+| tablicaKlimak | 10.0.61.114 | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
+| sinum-tablica-sbus2 | 10.0.62.209 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
 
-**Łącznie: 2 581 encji** zweryfikowanych na żywym sprzęcie (2026-06-24).
+Read-only smoke, API coverage, HIL smoke i testy WebSocket przeszły na żywym sprzęcie (2026-06-30). HA ma obecnie 5 config entries Sinum oraz 582 encje registry z sufiksami kolizyjnymi oczekujące na migrację.
 
 `tablica-wtp` (instalacja WTP-heavy): 108 przekaźników WTP, 18 sterowników rolet, 15 regulatorów temperatury, 28 przycisków, pełny zestaw czujników (temperatura/wilgotność/CO₂/IAQ/ciśnienie/światło/ruch/zalanie), 1 fan coil, 1 licznik energii.
 
@@ -209,7 +212,7 @@ data:
 | **Integratory rolet wirtualnych** | Raportują `position = None` gdy brak podłączonych sterowników fizycznych (kwestia konfiguracji centrali). |
 | **Energy Center** | Sensory pojawiają się tylko gdy firmware eksponuje `/api/v1/energy-center/*`. |
 | **Harmonogramy** | Tylko odczyt + usługa `sinum.update_schedule`. Pełny edytor UI harmonogramów nie jest zaimplementowany. |
-| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Urządzenia SLINK nie są mapowane. Streamy wideo wymagają bezpośrednich danych RTSP — użyj Generic Camera HA. |
+| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Przekaźniki i liczniki energii SLINK są mapowane; kamery używają ścieżek snapshot/WebRTC przez hub. Zapis LoRa jest zaimplementowany, ale wymaga walidacji na przekaźniku LoRa. |
 | **Błędy 408 firmware alpha** | Sporadyczne przy odpytywaniu magistral. Integracja ponawia raz, potem serwuje stan z cache. |
 
 ---

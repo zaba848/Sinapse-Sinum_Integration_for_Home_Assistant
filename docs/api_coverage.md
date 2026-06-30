@@ -96,7 +96,7 @@ This matrix details the implementation status and live-write validation scope fo
 | `/api/v1/devices/lora/{id}` | GET | Fetch single LoRa device | ✅ Implemented | Used for polling |
 | `/api/v1/devices/lora/{id}` | PATCH | Update LoRa device state | ✅ Implemented | Relay on/off |
 
-**Live-Write Validation**: ⏭️ SKIP — 0 LoRa devices on both test hubs (2026-06-25). Endpoint implemented but untestable without hardware.
+**Live-Write Validation**: ⏭️ SKIP — 0 LoRa devices on the five live hubs checked on 2026-06-30. Endpoint implemented but untestable without LoRa relay hardware.
 
 ### Devices — Modbus
 
@@ -180,7 +180,7 @@ This matrix details the implementation status and live-write validation scope fo
 
 ## Live-Write Validation Roadmap
 
-The following write operations require hardware validation to ensure idempotency, state consistency, and correct HA entity updates. These tests run on both live hubs (WTP: 10.0.61.132, SBUS: 10.0.62.167).
+The following write operations require hardware validation to ensure idempotency, state consistency, and correct HA entity updates. Read-only smoke/API/HIL checks run on all five live hubs; live-write validation remains restricted to explicitly approved safe test windows.
 
 ### A. LoRa Relay PATCH Scope
 - **Objective**: Determine if LoRa relay supports PATCH (state update) or is read-only.
@@ -237,7 +237,8 @@ The following write operations require hardware validation to ensure idempotency
 
 ### CI Gate
 - **Gate Status**: Live-write validation run manually before each release.
-- **Last Run**: 2026-06-25 — 5/5 PASS on hub 10.0.62.167
+- **Last Read-Only Run**: 2026-06-30 — 5/5 hubs PASS for smoke/API/HIL checks; final smoke repeated after HA deploy/migration
+- **Last Live-Write Run**: 2026-06-25 — 5/5 PASS on hub 10.0.62.167
 - **Report**: `docs/live_write_validation_latest.md`
 
 ---
@@ -249,5 +250,6 @@ The following write operations require hardware validation to ensure idempotency
 | **GET Operations** | ✅ 100% — All read endpoints callable including new modbus |
 | **PATCH/POST Write Operations** | ✅ 98% — All documented writes implemented; LoRa PATCH untestable (no devices) |
 | **Entity Mapping** | ✅ 98% — All HA platforms covered; modbus energy meter added; custom Lua excluded |
-| **Live-Write Validation** | ✅ 5/5 PASS (2026-06-25) — B: dimmer idempotency, C: heat pump modes, D: schedules, A/E: skip |
+| **Read-Only Hardware Validation** | ✅ 5/5 hubs PASS (2026-06-30) — smoke, API coverage, HIL smoke, WebSocket event format where traffic was present; final smoke repeated after HA deploy/migration |
+| **Live-Write Validation** | ✅ 5/5 PASS (2026-06-25) — B: dimmer idempotency, C: heat pump modes, D: schedules, A/E: skip; requires explicit approval for rerun |
 | **CI/Release Gate** | ✅ Complete — Gate MET before each release |

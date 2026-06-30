@@ -8,7 +8,7 @@ Test E (alarm arm/disarm) is skipped when all zones are armed — unsafe to modi
 a live alarm installation without owner confirmation.
 
 Usage:
-    python3 scripts/validate_api_writes.py --host 10.0.62.167 --password admintablica
+    python3 scripts/validate_api_writes.py --host 10.0.62.167 --password <hub-password>
 
 Environment:
     SINUM_HOST: Hub IP address or hostname
@@ -94,7 +94,9 @@ class ApiWriteValidationRunner:
                     result["devices_tested"].append(
                         {"device_id": device_id, "name": relay.get("name"), "writable": is_writable}
                     )
-                    print(f"  {'✅' if is_writable else '⚠️'} {relay.get('name')} — writable: {is_writable}")
+                    print(
+                        f"  {'✅' if is_writable else '⚠️'} {relay.get('name')} — writable: {is_writable}"
+                    )
                 except SinumConnectionError as e:
                     result["devices_tested"].append(
                         {"device_id": device_id, "name": relay.get("name"), "error": str(e)}
@@ -141,22 +143,28 @@ class ApiWriteValidationRunner:
                     idempotent = actual == test_level
                     # Restore
                     await self.client.patch_sbus_device(device_id, {"target_level": original_level})
-                    result["devices_tested"].append({
-                        "device_id": device_id,
-                        "name": dev.get("name"),
-                        "type": "sbus_dimmer",
-                        "target_level": test_level,
-                        "actual_after": actual,
-                        "idempotent": idempotent,
-                    })
-                    print(f"  {'✅' if idempotent else '❌'} {dev.get('name')} — idempotent: {idempotent}")
+                    result["devices_tested"].append(
+                        {
+                            "device_id": device_id,
+                            "name": dev.get("name"),
+                            "type": "sbus_dimmer",
+                            "target_level": test_level,
+                            "actual_after": actual,
+                            "idempotent": idempotent,
+                        }
+                    )
+                    print(
+                        f"  {'✅' if idempotent else '❌'} {dev.get('name')} — idempotent: {idempotent}"
+                    )
                 except SinumConnectionError as e:
                     result["devices_tested"].append(
                         {"device_id": device_id, "name": dev.get("name"), "error": str(e)}
                     )
                     print(f"  ❌ {dev.get('name')} — error: {e}")
 
-            result["passed"] = all(d.get("idempotent", False) for d in result["devices_tested"] if "idempotent" in d)
+            result["passed"] = all(
+                d.get("idempotent", False) for d in result["devices_tested"] if "idempotent" in d
+            )
             result["summary"] = f"Tested {len(result['devices_tested'])} dimmer(s)"
         except Exception as e:
             result["summary"] = f"Error: {e}"
@@ -199,8 +207,12 @@ class ApiWriteValidationRunner:
                     if actual is None:
                         fetched = await self.client.get_virtual_device(device_id)
                         actual = fetched.get("work_mode")
-                    mode_results.append({"target": mode, "actual": actual, "success": actual == mode})
-                    print(f"  {'✅' if actual == mode else '❌'} work_mode={mode} → actual={actual}")
+                    mode_results.append(
+                        {"target": mode, "actual": actual, "success": actual == mode}
+                    )
+                    print(
+                        f"  {'✅' if actual == mode else '❌'} work_mode={mode} → actual={actual}"
+                    )
                 except SinumConnectionError as e:
                     mode_results.append({"target": mode, "error": str(e)})
                     print(f"  ❌ work_mode={mode} — error: {e}")
@@ -212,8 +224,16 @@ class ApiWriteValidationRunner:
                 if actual_enabled is None:
                     fetched = await self.client.get_virtual_device(device_id)
                     actual_enabled = fetched.get("enabled")
-                mode_results.append({"target": "OFF (enabled=False)", "actual_enabled": actual_enabled, "success": actual_enabled is False})
-                print(f"  {'✅' if actual_enabled is False else '❌'} OFF via enabled=False → {actual_enabled}")
+                mode_results.append(
+                    {
+                        "target": "OFF (enabled=False)",
+                        "actual_enabled": actual_enabled,
+                        "success": actual_enabled is False,
+                    }
+                )
+                print(
+                    f"  {'✅' if actual_enabled is False else '❌'} OFF via enabled=False → {actual_enabled}"
+                )
             except SinumConnectionError as e:
                 mode_results.append({"target": "OFF (enabled=False)", "error": str(e)})
 
@@ -222,11 +242,13 @@ class ApiWriteValidationRunner:
                 device_id, {"work_mode": original_mode, "enabled": original_enabled}
             )
 
-            result["devices_tested"].append({
-                "device_id": device_id,
-                "name": dev.get("name"),
-                "mode_transitions": mode_results,
-            })
+            result["devices_tested"].append(
+                {
+                    "device_id": device_id,
+                    "name": dev.get("name"),
+                    "mode_transitions": mode_results,
+                }
+            )
             result["passed"] = all(m.get("success") for m in mode_results)
             result["summary"] = f"Tested {len(mode_results)} mode transitions on {dev.get('name')}"
         except Exception as e:
@@ -256,10 +278,16 @@ class ApiWriteValidationRunner:
             sched_id = sched["id"]
             detail = await self.client.get_schedule(sched_id)
             original_fallback = detail.get("fallback")
-            original_temp = (original_fallback or {}).get("target_temperature") if isinstance(original_fallback, dict) else None
+            original_temp = (
+                (original_fallback or {}).get("target_temperature")
+                if isinstance(original_fallback, dict)
+                else None
+            )
 
             if original_temp is None:
-                result["summary"] = f"Schedule {sched.get('name')} has no fallback.target_temperature — skipping write"
+                result["summary"] = (
+                    f"Schedule {sched.get('name')} has no fallback.target_temperature — skipping write"
+                )
                 result["passed"] = True
                 self.results["tests"].append(result)
                 return
@@ -277,14 +305,18 @@ class ApiWriteValidationRunner:
                 await self.client.patch_schedule(
                     sched_id, {"fallback": {"target_temperature": original_temp}}
                 )
-                result["devices_tested"].append({
-                    "schedule_id": sched_id,
-                    "name": sched.get("name"),
-                    "target_temp": test_temp,
-                    "actual_temp": actual_temp,
-                    "success": success,
-                })
-                print(f"  {'✅' if success else '❌'} {sched.get('name')} — temp {original_temp} → {actual_temp}")
+                result["devices_tested"].append(
+                    {
+                        "schedule_id": sched_id,
+                        "name": sched.get("name"),
+                        "target_temp": test_temp,
+                        "actual_temp": actual_temp,
+                        "success": success,
+                    }
+                )
+                print(
+                    f"  {'✅' if success else '❌'} {sched.get('name')} — temp {original_temp} → {actual_temp}"
+                )
                 result["passed"] = success
             except SinumConnectionError as e:
                 result["devices_tested"].append({"schedule_id": sched_id, "error": str(e)})
@@ -325,24 +357,36 @@ class ApiWriteValidationRunner:
                 self.results["tests"].append(result)
                 return
 
+            pin = os.getenv("SINUM_ALARM_TEST_PIN")
+            if not pin:
+                result["summary"] = "SKIP — alarm write validation requires SINUM_ALARM_TEST_PIN"
+                result["passed"] = True
+                print(f"  ⏭️  {result['summary']}")
+                self.results["tests"].append(result)
+                return
+
             # Find a zone that is disarmed — safe to arm then disarm
             for zone in zones:
                 zone_id = zone["id"]
                 if zone.get("armed"):
                     continue
                 try:
-                    await self.client.command_alarm_device(zone_id, "arm", pin="")
+                    await self.client.command_alarm_device(zone_id, "arm", {"arm": pin})
                     await asyncio.sleep(0.5)
-                    await self.client.command_alarm_device(zone_id, "arm", pin="")
+                    await self.client.command_alarm_device(zone_id, "arm", {"arm": pin})
                     updated = await self.client.get_alarm_device(zone_id)
                     armed = updated.get("armed")
-                    await self.client.command_alarm_device(zone_id, "disarm", pin="")
-                    result["devices_tested"].append({
-                        "zone_id": zone_id,
-                        "name": zone.get("name"),
-                        "double_arm_consistent": armed is True,
-                    })
-                    print(f"  {'✅' if armed else '⚠️'} {zone.get('name')} — double-arm consistent: {armed}")
+                    await self.client.command_alarm_device(zone_id, "disarm", {"disarm": pin})
+                    result["devices_tested"].append(
+                        {
+                            "zone_id": zone_id,
+                            "name": zone.get("name"),
+                            "double_arm_consistent": armed is True,
+                        }
+                    )
+                    print(
+                        f"  {'✅' if armed else '⚠️'} {zone.get('name')} — double-arm consistent: {armed}"
+                    )
                     break
                 except SinumConnectionError as e:
                     result["devices_tested"].append({"zone_id": zone_id, "error": str(e)})
@@ -360,7 +404,9 @@ class ApiWriteValidationRunner:
     def generate_report(self, output_path: str) -> None:
         passed_count = sum(1 for t in self.results["tests"] if t.get("passed"))
         total_count = len(self.results["tests"])
-        status = "✅ PASS" if passed_count == total_count else f"⚠️ {passed_count}/{total_count} passed"
+        status = (
+            "✅ PASS" if passed_count == total_count else f"⚠️ {passed_count}/{total_count} passed"
+        )
 
         lines = [
             "# API Endpoint Write Validation Report",

@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Przykładowe odpowiedzi API centrali używane w testach
   ├── test_code_quality.py     Bramka CC — wszystkie funkcje muszą mieć CC ≤ 4
   ├── hardware_in_loop/        Skrypty HIL do smoke testów na żywej centrali
-  └── test_*.py                1498 testów dla wszystkich platform i typów urządzeń
+  └── test_*.py                1648 przechodzących testów dla wszystkich platform i typów urządzeń
 ```
 
 ---
@@ -102,10 +102,11 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Statystyki testów: **1498 testów, 44 pliki testów**, czas wykonania ~9 s. Wszystkie muszą przejść przed mergem.
+Statystyki testów: **1648 przechodzących testów, 5 pominiętych testów live-write, 46 plików testów**, czas wykonania ~10 s. Wszystkie testy niesprzętowe muszą przejść przed mergem.
 
 Markery pomijania:
-- `@pytest.mark.skipif` — testy HIL pomijane bez zmiennych środowiskowych `SINUM_HOST` / `SINUM_PASSWORD`
+- testy live-write w `tests/test_api_endpoint_write.py` są pomijane bez `SINUM_WRITE_TESTS=1` i danych dostępowych do live huba
+- skrypty HIL w `tests/hardware_in_loop/` są samodzielnymi skryptami Pythona, nie zwykłymi modułami pytest
 
 ---
 
@@ -119,7 +120,7 @@ Wszystkie pull requesty muszą przejść:
 | Format | `ruff format` | Brak różnic |
 | Typy | `mypy` | Zero błędów |
 | Złożoność cyklomatyczna | `radon` przez `tests/test_code_quality.py` | Wszystkie funkcje CC ≤ 4 |
-| Testy | `pytest` | Wszystkie 1498 przechodzą |
+| Testy | `pytest` | Wszystkie 1648 testów niesprzętowych przechodzą |
 | HACS | hacs-action | Poprawne `hacs.json` i manifest |
 
 ```bash
@@ -367,12 +368,20 @@ logger:
     custom_components.sinum: debug
 ```
 
-Następnie użyj skryptów hardware-in-loop z `tests/hardware_in_loop/` (wymagają zmiennych środowiskowych `SINUM_HOST` i `SINUM_PASSWORD`):
+Następnie użyj read-only smoke runnera (sekrety przez env, nigdy w repo):
 
 ```bash
-export SINUM_HOST=10.0.62.167
+export SINUM_SMOKE_HUBS="SBUS=http://10.0.62.167"
 export SINUM_PASSWORD=twoje_haslo
-pytest tests/hardware_in_loop/ -v
+python3 scripts/hardware_smoke_check.py
+```
+
+Do głębszych probe uruchom samodzielne skrypty HIL z tokenem:
+
+```bash
+python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_api_coverage.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
 ```
 
 ---
@@ -386,7 +395,7 @@ Szybka lista kontrolna przed zgłoszeniem PR:
 - [ ] `ruff check custom_components/` przechodzi
 - [ ] `ruff format custom_components/` nie daje różnic
 - [ ] `mypy custom_components/sinum/` przechodzi
-- [ ] `pytest tests/` — wszystkie 1498 testów przechodzą
+- [ ] `pytest tests/` — wszystkie 1648 testów niesprzętowych przechodzą
 - [ ] `pytest tests/test_code_quality.py` — bramka CC czysta (bez nowych wpisów `_LEGACY_ALLOWANCE`)
 - [ ] Nowe typy urządzeń mają stałe w `const.py`
 - [ ] Nowa funkcjonalność ma co najmniej 3 testy

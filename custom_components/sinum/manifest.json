@@ -1,7 +1,7 @@
 {
   "domain": "sinum",
   "name": "Sinum (Sinapse)",
-  "version": "0.5.20",
+  "version": "0.5.21",
   "documentation": "https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant",
   "issue_tracker": "https://github.com/zaba848/sinapse-sinum-integration-for-home-assistant/issues",
   "homeassistant": "2024.1.0",
