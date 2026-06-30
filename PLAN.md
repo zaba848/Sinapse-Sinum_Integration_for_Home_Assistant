@@ -1,177 +1,188 @@
-# Sinapse — Implementation Plan & Critical Review
+# Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-06-29 (v0.5.9 — camera platform, RTSP streaming)
-> Verified against two live hubs (firmware `1.24.0-alpha.2`/`alpha.3`, API `1.4`).
+> Last updated: 2026-06-30 (v0.5.20)
+> Verified against 5 live hubs (firmware `1.24.0-alpha.2/alpha.4`, API `1.4`).
 > Credentials and API tokens must never be committed to this repository.
 
 ---
 
-## Project Status (2026-06-29)
+## Project Status (2026-06-30)
 
 ```text
-Tests:  1 516 passing, 5 skipped (~8.2 s)
-Ruff:   0 errors (28 files, pinned 0.4.8)
-mypy:   0 errors (28 files)
+Tests:  1 648 passing, 5 skipped (~9 s)
+Ruff:   0 errors
+mypy:   0 errors
 CC:     ≤ 4, _LEGACY_ALLOWANCE = {}
-Live:   2 581 entities on 2 hubs (both HA entries, 0 errors)
-Tags:   v0.5.7, v0.5.8, v0.5.9 released (v0.5.8/5.9 GitHub Releases TBD)
-HACS:   submission ready pending hassfest validation
+Coverage: api.py 100%, coordinator.py 100%, websocket.py 100%
+Live:   5 hubs connected (3846 HA entities total), 0 errors in error_log
+Tags:   v0.5.15–v0.5.20 released on GitHub
+Deploy: v0.5.17–v0.5.20 awaiting deploy to RPi (v0.5.16 last deployed)
 ```
 
 ---
 
-## Live Hub Inventory
+## Live Hub Inventory (5 hubs)
 
-Two hubs verified continuously. Hub 2 is the active HA instance.
-
-### Hub 1 — tablica-wtp (sinum_plus, 10.0.61.132)
-
-Heavy WTP installation: 28 virtual, 254 WTP, 8 SBUS, 34 rooms.
-
-| Bus | Type | Count | HA entity |
-|---|---|---:|---|
-| WTP | `relay` | 108 | switch |
-| WTP | `temperature_sensor` | 26 | sensor |
-| WTP | `humidity_sensor` | 21 | sensor |
-| WTP | `blind_controller` | 18 | cover |
-| WTP | `temperature_regulator` | 15 | climate |
-| WTP | `button` | 28 | event + sensor |
-| WTP | `two_state_input_sensor` | 8 | binary_sensor |
-| WTP | `light_sensor` | 6 | sensor |
-| WTP | `iaq_sensor` | 5 | sensor |
-| WTP | `pressure_sensor` | 5 | sensor |
-| WTP | `co2_sensor` | 3 | sensor |
-| WTP | `flood_sensor` | 2 | binary_sensor |
-| WTP | `motion_sensor` | 2 | binary_sensor |
-| WTP | `aq_sensor` | 2 | sensor |
-| WTP | `energy_meter` | 1 | sensor (power/voltage/current/energy) |
-| WTP | `fan_coil` / `fan_coil_v2` | 2 | climate |
-| WTP | `dimmer` | 1 | light |
-| WTP | `rgb_controller` | 1 | light (ONOFF only) |
-
-### Hub 2 — sinum-tablica-sbus-1 (sinum_lite, 10.0.62.167) — **active in HA**
-
-Heavy SBUS installation: 169 virtual, 35 WTP, 436 SBUS, 60 rooms.
-
-| Bus | Type | Count | HA entity |
-|---|---|---:|---|
-| SBUS | `temperature_sensor` | 134 | sensor |
-| SBUS | `relay` | 69 | switch |
-| SBUS | `temperature_regulator` | 51 | climate + sensor |
-| SBUS | `humidity_sensor` | 46 | sensor |
-| SBUS | `dimmer` | 38 | light |
-| SBUS | `two_state_input_sensor` | 35 | binary_sensor |
-| SBUS | `button` | 30 | event + sensor |
-| SBUS | `analog_input` | 10 | sensor |
-| SBUS | `rgb_controller` | 6 | light (ONOFF only) |
-| SBUS | `impulse_meter` | 4 | sensor |
-| SBUS | `analog_output` | 3 | number |
-| SBUS | `motion_sensor` | 2 | binary_sensor |
-| SBUS | `light_sensor` | 2 | sensor |
-| SBUS | `pulse_width_modulation` | 2 | sensor |
-| SBUS | `common_valve` / `valve_pump` | 4 | switch |
-| Virtual | `thermostat` | 83 | climate |
-| Virtual | `heat_pump_manager` | 1 | climate + switch (DHW) |
-| Virtual | `dimmer_rgb_integrator` | 1 | light |
-| Virtual | `custom_device` | 65 | — (intentionally skipped) |
-| Virtual | `thermostat_output_group` | 9 | — (group metadata) |
-
----
-
-## Critical Review
-
-### Confirmed API Limitations (live-tested on both hubs)
-
-| Device class | Bus | Accepted PATCH fields | Rejected fields |
+| Hub | IP | Type | Key devices |
 |---|---|---|---|
-| `rgb_controller` | WTP (label `rgbw`) | `state: bool` | brightness, led_color, white_temperature → 422 |
-| `rgb_controller` | SBUS (label `rgbww`) | `state: bool` | same → 422 |
-| `dimmer_rgb_integrator` | Virtual | `state: bool`, `brightness: int` | `led_color` → 422 |
-| `dimmer` | WTP / SBUS | `state: bool`, `target_level: int` | — |
-| `temperature_regulator` | WTP / SBUS | `target_temperature: int×10` | — |
-| `fan_coil` | SBUS | `work_mode: str`, `target_temperature: int×10`, `fan_speed: str` | — |
+| sinum-tablica-sbus-1 | 10.0.62.167 | sinum_lite | 436 SBUS, 35 WTP, 169 virtual |
+| tablica-wtp | 10.0.61.132 | sinum_plus | 254 WTP, 8 SBUS, 28 virtual |
+| tablica-video-nowa | 10.0.62.117 | sinum_short | IP/ONVIF cameras |
+| ehome-wojtek | (unknown) | — | newly added, full device list TBD |
+| sinum-tablica-sbus2 | (unknown) | — | newly added, 433 entities in HA |
 
-### Known Hardware Limitations
+### Device types → HA platforms
 
-| Issue | Status |
-|---|---|
-| Virtual cover integrators (roletki): state=unknown, no position feedback | Accepted — hardware limitation; state restores from HA after first command |
-| WTP rgb_controller: Lua not supported — REST only, limited control in temperature mode | Accepted — firmware limitation |
-| LoRa relay PATCH endpoint | Untested — no LoRa hardware available on either hub |
+| Type | Bus | HA platform | Notes |
+|---|---|---|---|
+| `relay` | WTP/SBUS/SLINK | switch | |
+| `temperature_sensor` / `humidity_sensor` | all | sensor | |
+| `temperature_regulator` | WTP/SBUS | climate + sensor | |
+| `fan_coil` / `fan_coil_v2` | WTP/SBUS | climate | |
+| `blind_controller` | WTP/SBUS | cover | |
+| `dimmer` | WTP/SBUS/virtual | light | brightness |
+| `rgb_controller` | WTP/SBUS | light | on/off only (API limitation) |
+| `button` | WTP/SBUS | event + sensor | |
+| `two_state_input_sensor` | all | binary_sensor | |
+| `flood_sensor` / `motion_sensor` / `smoke_sensor` / `opening_sensor` | all | binary_sensor | |
+| `energy_meter` | WTP/SBUS/SLINK | sensor | power/voltage/current/energy |
+| `analog_input` | SBUS | sensor | dynamic unit |
+| `impulse_meter` | SBUS | sensor | total/window count + value |
+| `analog_output` / `pulse_width_modulation` | SBUS | number | |
+| `common_valve` / `valve_pump` | SBUS | switch | |
+| `heat_pump` / `inverter` / `battery` / `car_charger` / `common_dhw_main` | Modbus | sensor | disabled by default |
+| `ip_camera` / `onvif_camera` | Video | camera | snapshot + WebRTC |
+| `thermostat` / `heat_pump_manager` / `dimmer_rgb_integrator` | Virtual | climate/light | |
+| Alarm zones | — | alarm_control_panel | |
+| Schedules | — | sensor (3/schedule) | target temp, fallback, active period |
+| Parent devices | — | binary_sensor + update | online/problem/firmware |
 
 ---
 
 ## Completed Phases
 
-| Phase | Summary | Status |
+| Version | Summary | Tests |
 |---|---|---|
-| 1–6 | Core REST client, coordinator, config_flow, virtual devices | ✅ |
-| 7A | WTP fan_coil + fan_coil_v2 climate entities | ✅ |
-| 7B | Temperature regulator sensors + climate (WTP + SBUS) | ✅ |
-| 7C | Thermal schedule sensors | ✅ |
-| 7D | MQTT bridge hardening (lua v0.7+, heartbeat) | ✅ |
-| 7E | Quality gate: translations, alarm panel, parent connectivity | ✅ |
-| 8 | WTP/SBUS physical relay → switch; WTP blind_controller → cover | ✅ |
-| 9 | SBUS/WTP dimmer → light; RGB controller → light; virtual dimmer | ✅ |
-| 10 | SBUS motion sensor; illuminance/analog_input/impulse_meter sensors | ✅ |
-| 11 | Sensor bug fixes: flood, aq PM, iaq, energy_meter fields | ✅ |
-| 12 | valve_pump/common_valve switch; analog_output number; heat_pump_manager | ✅ |
-| 13 | HA event entity; DHW switch; target_reached binary_sensor; 552 tests | ✅ |
-| 14 | Boolean state fix, RGB ONOFF-only, via_device hierarchy, critical review | ✅ |
-| 15A | HA compliance: state_class, homeassistant min version, hacs.json | ✅ |
-| 15B | Code quality: sensor.py split, climate mixin, SinumVariableNumber | ✅ |
-| 15C | Test coverage: MQTT routing, multi-hub, event types | ✅ |
-| 15D | New features: api_coverage, energy center, schedules, modbus | ✅ |
-| 15E | HACS prep: brands/, translation keys, CONTRIBUTING.md | ✅ (except hassfest) |
-| v0.3.x | Failsafe add/reauth flow, retry, host normalization, anti-bruteforce | ✅ |
-| v0.4.x | WS transport, CC gate, modbus energy meter, quality sprint | ✅ |
-| v0.5.x | WS 100%, ConfigEntryAuthFailed, stale cleanup, PL docs, ruff clean | ✅ |
-| v0.5.8 | mypy fix (light.py), temperature-zero → unavailable (WTP regulators) | ✅ |
-| v0.5.9 | Camera platform: snapshot proxy + RTSP streaming for ip_camera/onvif_camera | ✅ |
+| v0.1–v0.4 | Core: REST, coordinator, config_flow, virtual, WTP/SBUS sensors, climate, light, cover, switch, number | — |
+| v0.5.0 | WS transport, CC gate | — |
+| v0.5.3 | WS 100%, ConfigEntryAuthFailed | — |
+| v0.5.4 | Sensor 404 crash fix, WS background task | — |
+| v0.5.5 | CC zero-legacy, stale device cleanup | — |
+| v0.5.6 | ConfigEntryAuthFailed, device registry cleanup | — |
+| v0.5.7 | Full PL docs, ruff clean, MQTT bridge translation | 1 498 |
+| v0.5.8 | mypy fix (light.py), temperature-zero → unavailable | 1 499 |
+| v0.5.9 | Camera: snapshot proxy + WebRTC (ip_camera/onvif) | 1 516 |
+| v0.5.10 | `run_scene` service, diagnostics video, notify tests | 1 546 |
+| v0.5.13 | WebRTC trickle ICE, HA 2026.6 native API | — |
+| v0.5.15 | SLINK bus (relay + energy_meter), WebRTC coordinator tests | 1 605 |
+| v0.5.16 | Modbus: heat_pump, inverter, battery, car_charger, DHW sensors | 1 616 |
+| v0.5.17 | Multi-hub device name prefix (hub_name: Device) | 1 616 |
+| v0.5.18 | Per-phase unique translation keys, entity registry migration script | 1 616 |
+| v0.5.19 | hub_prefixed_name extended to camera, sensor_virtual, event, binary_sensor, update, sensor_schedule | 1 616 |
+| v0.5.20 | 100% coverage: api.py, coordinator.py, websocket.py (+32 tests) | 1 648 |
+
+---
+
+## Immediate Actions Required (user)
+
+### 1. Deploy v0.5.17–v0.5.20 to RPi
+
+```bash
+# Lokalnie:
+tar czf /tmp/sinum_v0520.tar.gz custom_components/sinum/
+
+# SSH na RPi:
+scp /tmp/sinum_v0520.tar.gz tomasz@homeassistant.local:/tmp/
+ssh tomasz@homeassistant.local \
+  "cd /config && tar xzf /tmp/sinum_v0520.tar.gz"
+```
+
+Następnie restart HA:
+```bash
+curl -X POST http://homeassistant.local:8123/api/services/homeassistant/restart \
+  -H "Authorization: Bearer <HA_TOKEN>"
+```
+
+### 2. Wyczyść stare entity_ids (migration script)
+
+Po restarcie HA zatrzymaj go i uruchom skrypt:
+```bash
+ssh tomasz@homeassistant.local
+ha core stop
+python3 /config/scripts/migrate_entity_registry.py
+ha core start
+```
+
+Skrypt usuwa ~85 collision entity_ids z sufiksem `_2`/`_3` które powstały zanim dodano prefiks hubów.
 
 ---
 
 ## Remaining Work
 
-### Next: HACS Submission
+### Priorytet 1 — Jakość kodu (możliwe natychmiast)
 
-- [ ] **hassfest validation** — run via Docker or CI (blocked locally: requires Python 3.12+
-  environment with `homeassistant` package). See [hassfest Docker](#hassfest-docker) below.
-- [ ] Submit PR to [hacs/default](https://github.com/hacs/default) once hassfest is clean.
+| Plik | Coverage | Brakujące linie | Szacunek |
+|---|---|---|---|
+| `__init__.py` | 91% | 237, 275-276, 297-325, 367, 479-480 | setup/teardown paths, WS bridge start/stop |
+| `config_flow.py` | 96% | 99, 108, 115, 117, 119, 277, 317-318, 491, 493 | edge cases w config flow |
+| `binary_sensor.py` | 99% | 182, 312 | fan_coil gear logic, `_source_from_label` |
+| `camera.py` | 98% | 117-118, 224 | `async_is_supported` URL parse error, `stream_source` non-streamable |
+| `sensor_modbus.py` | 99% | 624 | jedna gałąź |
 
-#### hassfest Docker
+### Priorytet 2 — Nowe typy urządzeń
 
-```bash
-docker run \
-  --rm \
-  -v $(pwd)/custom_components/sinum:/github/workspace/custom_components/sinum \
-  ghcr.io/home-assistant/hassfest \
-  --integration-path /github/workspace/custom_components/sinum
-```
+| Typ | Bus | Urządzenia live | Status |
+|---|---|---|---|
+| `iaq_sensor` / `air_quality_sensor` | WTP | 5+2 na tablica-wtp | **NIE zaimplementowane** w sensor_bus_descriptions.py (tylko const.py) |
+| `aq_sensor` | WTP | 2 na tablica-wtp | Nie podłączone do sensora WTP |
 
-Or via the GitHub Actions workflow `.github/workflows/validate.yml` if configured.
+> **Uwaga**: `analog_input`, `impulse_meter` już działają przez `SBUS_SENSORS`.
 
-### Backlog
+### Priorytet 3 — Multi-hub polish
 
-| Item | Priority | Notes |
+| Item | Status |
+|---|---|
+| Uruchomić `migrate_entity_registry.py` → czyści 85 collision `_2/_3` entity_ids | Czeka na deploy + user |
+| Zweryfikować live entity names po deployu v0.5.17–v0.5.19 | Po deployu |
+| Sprawdzić nowe huby `ehome-wojtek` i `sinum-tablica-sbus2` — inventory urządzeń | TBD |
+
+### Priorytet 4 — HACS / dokumentacja
+
+| Item | Notes |
+|---|---|
+| hassfest validation | `docker run ghcr.io/home-assistant/hassfest` |
+| HACS submission (`hacs/default` PR) | Po hassfest |
+| Docs: SLINK, WebRTC, multi-hub, Energy Dashboard | README + docs/ |
+| GitHub Releases dla v0.5.15–v0.5.20 | `gh release create` |
+
+### Priorytet 5 — Funkcjonalne rozszerzenia (backlog)
+
+| Feature | Priorytet | Uwagi |
 |---|---|---|
-| Smoke test v0.5.8/v0.5.9 on live hub | **High** | Camera entity verification, temperature-zero fix |
-| GitHub Releases v0.5.8 + v0.5.9 | **High** | Manual — `gh` not authenticated |
-| Camera: PTZ control (pan/tilt/zoom) | Medium | API endpoint unknown — needs hub investigation |
-| Camera: motion events from hub WebSocket | Medium | Hub may push `motion` events for video devices |
-| LoRa relay live test | Low | No hardware — skip until available |
-| Nightly regression summary in docs | Low | CI artefact, defer until HACS submission |
-| Endpoint matrix in `docs/api_coverage.md` | Low | Dev docs completeness |
-| Anti-bruteforce backoff — verify UI message | Low | Already implemented, needs UX test |
+| Camera: PTZ control | Low | Nieznany endpoint w API |
+| Camera: motion events z WS | Medium | Hub może pushować `motion` dla video devices |
+| LoRa relay live test | Low | Brak hardware |
+| Alarm panel: arming modes, bypass | Low | Obecna implementacja podstawowa |
+| Scene triggers w automatyzacjach | Low | device_trigger już jest, sceny przez `run_scene` |
+| SBUS `blind_controller` position feedback | Medium | API endpoint TBD |
+
+---
+
+## Known API Limitations
+
+| Device | Bus | Problem |
+|---|---|---|
+| `rgb_controller` | WTP/SBUS | `brightness`, `led_color` → 422; tylko `state: bool` |
+| Virtual cover integrators | Virtual | Brak position feedback; state = unknown po restarcie |
+| LoRa relay PATCH | LoRa | Nieprzetestowane — brak hardware |
 
 ---
 
 ## Working Rules
 
-- Never commit secrets, tokens, hub credentials, or raw diagnostic payloads.
-- Treat writes to fan coils, scenes, alarms, gates, and doors as potentially destructive.
-- Prefer read-only discovery first, then test write payloads on non-critical devices.
-- Keep REST polling as the baseline; MQTT is an optimization, not a dependency.
-- All new device types require a fixture + ≥1 unit test before merging.
-- `ruff check`, `ruff format --check`, and `mypy` must pass on every commit.
-- CC ≤ 4, `_LEGACY_ALLOWANCE = {}` — no exemptions.
+- Nigdy nie commitować sekretów, tokenów, credentials.
+- Zapis do fan coils, scen, alarmów, bram — traktować jako destrukcyjne.
+- Nowe typy urządzeń: fixture + ≥1 test przed mergiem.
+- `ruff check`, `ruff format --check`, `mypy` muszą przejść na każdym commicie.
+- CC ≤ 4, `_LEGACY_ALLOWANCE = {}` — brak wyjątków.
+- Testy: każda nowa gałąź kodu musi być pokryta.

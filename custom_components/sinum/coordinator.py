@@ -709,6 +709,12 @@ class SinumDeviceAvailableMixin:
         return DeviceInfo(**{**info, "name": f"{hub_name}: {raw_name}"})
 
 
+def hub_prefixed_name(coordinator: SinumCoordinator, name: str) -> str:
+    """Prefix a device name with the hub name for multi-hub entity_id uniqueness."""
+    hub = coordinator.hub_name
+    return f"{hub}: {name}" if hub else name
+
+
 def via_device_for(device: dict[str, Any], entry_id: str) -> tuple[str, str] | None:
     """Return (DOMAIN, unique_key) for the parent hardware device, or None."""
     cls = device.get("_parent_class")
