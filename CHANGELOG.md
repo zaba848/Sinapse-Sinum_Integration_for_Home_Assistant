@@ -23,6 +23,14 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.20] — 2026-06-30
+
+### Quality
+- **100% test coverage** on `api.py`, `coordinator.py`, `websocket.py` — added 32 tests covering: `session` property, `ensure_push_auth` login paths, 404/500 status errors, SLINK get/patch, video snapshot edge cases, `hub_name` property, `_device_class` empty branch, `SinumDeviceAvailableMixin.device_info` hub-prefix paths, WebRTC video stream message handlers (answer, candidate, bye/error).
+
+### Changed
+- Test count: 1636 → 1648
+
 ## [0.5.19] — 2026-06-30
 
 ### Fixed
