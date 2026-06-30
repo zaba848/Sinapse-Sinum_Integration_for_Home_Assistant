@@ -224,7 +224,7 @@ async def _start_ws_bridge(
     coordinator: SinumCoordinator,
     opts: dict[str, Any],
 ) -> bool:
-    if not opts.get(CONF_WS_ENABLED, False):
+    if not opts.get(CONF_WS_ENABLED, True):
         return False
 
     bridge = SinumWebSocketBridge(

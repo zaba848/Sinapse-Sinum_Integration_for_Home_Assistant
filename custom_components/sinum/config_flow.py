@@ -463,7 +463,7 @@ class SinumOptionsFlow(OptionsFlow):
                 ): vol.All(int, vol.Range(min=1)),
                 vol.Optional(
                     CONF_WS_ENABLED,
-                    default=self._opt(CONF_WS_ENABLED, False),
+                    default=self._opt(CONF_WS_ENABLED, True),
                 ): bool,
                 vol.Optional(
                     CONF_WS_PATH,

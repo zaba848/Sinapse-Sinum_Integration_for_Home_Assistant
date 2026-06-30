@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-_RECONNECT_DELAY = 5
+_RECONNECT_DELAY_MIN = 5
+_RECONNECT_DELAY_MAX = 60
 
 
 class SinumWebSocketBridge:
@@ -45,6 +46,7 @@ class SinumWebSocketBridge:
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
         self._auth_failed = False
+        self._reconnect_attempt = 0
 
     async def async_start(self) -> bool:
         """Start websocket consumer task."""
@@ -52,6 +54,7 @@ class SinumWebSocketBridge:
             return True
         self._stop_event.clear()
         self._auth_failed = False
+        self._reconnect_attempt = 0
         self._task = self._hass.async_create_background_task(self._run(), name="sinum_ws_bridge")
         _LOGGER.info("Sinapse WebSocket bridge starting (%s)", self._ws_path)
         return True
@@ -75,16 +78,19 @@ class SinumWebSocketBridge:
     async def _run_one_cycle(self) -> None:
         try:
             await self._consume_loop()
+            self._reconnect_attempt = 0  # Reset on success
         except asyncio.CancelledError:
             raise
         except Exception as err:
             _LOGGER.warning("WebSocket bridge error: %s", err)
+            self._reconnect_attempt += 1
         if not self._stop_event.is_set():
             await self._wait_reconnect()
 
     async def _wait_reconnect(self) -> None:
+        delay = min(_RECONNECT_DELAY_MIN * (2 ** self._reconnect_attempt), _RECONNECT_DELAY_MAX)
         with contextlib.suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(self._stop_event.wait(), timeout=_RECONNECT_DELAY)
+            await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
 
     async def _consume_loop(self) -> None:
         await self._client.ensure_push_auth()
@@ -138,6 +144,7 @@ class SinumWebSocketBridge:
             self._handle_video_stream_message(data)
             return False
         if evt_type != "device_state_changed":
+            _LOGGER.debug("Unhandled Sinum WS event type: %s", evt_type)
             return False
         return self._apply_device_state(data)
 

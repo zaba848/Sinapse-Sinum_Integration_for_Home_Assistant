@@ -8,14 +8,14 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/tests-1648%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/version-0.5.21-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
 
 ## What You Get
 
-- **5 live production hubs** configured in Home Assistant; 4 123 Sinum registry entities before pending collision cleanup
+- **5 live production hubs** configured in Home Assistant; over 3 800 Sinum registry entities
 - **12 entity platforms**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
 - **7 local surfaces**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — polled in parallel every 30 s
 - **Real-time push** via WebSocket (\< 1 s latency), MQTT bridge as fallback
@@ -35,7 +35,7 @@
 3. Settings → Devices & Services → Add Integration → search "Sinum"
    Enter hub IP and API token
 
-4. Settings → … → Sinum → Configure → Enable WebSocket real-time transport
+4. WebSocket real-time transport is enabled by default.
 ```
 
 → **[Full Installation Guide with screenshots](docs/installation.md)**
@@ -185,15 +185,15 @@ data:
 
 ## Tested Hubs
 
-| Hub | IP | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|
-| tablica-wtp | 10.0.61.132 | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
-| sinum-tablica-sbus-1 | 10.0.62.167 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
-| tablica-video-nowa | 10.0.62.117 | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
-| tablicaKlimak | 10.0.61.114 | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
-| sinum-tablica-sbus2 | 10.0.62.209 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
+| Hub | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| tablica-wtp | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
+| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
+| tablica-video-nowa | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
+| tablicaKlimak | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
+| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
 
-Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live hardware (2026-06-30). HA currently has 5 Sinum config entries and 582 suffix-collision registry entries pending migration cleanup.
+Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live hardware (2026-06-30).
 
 `tablica-wtp` (WTP-heavy): 108 WTP relays, 18 blind controllers, 15 temperature regulators, 28 buttons, full sensor suite (temperature/humidity/CO₂/IAQ/pressure/light/motion/flood), 1 fan coil, 1 energy meter.
 
