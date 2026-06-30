@@ -13,6 +13,7 @@ from custom_components.sinum.api import (
     SinumAuthError,
     SinumClient,
     SinumConnectionError,
+    SinumNotSupportedError,
     _list_result,
 )
 
@@ -1059,3 +1060,133 @@ class TestHelperFunctions:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client.patch_schedule(5, {"active": True})
         assert result == {}
+
+
+class TestSessionProperty:
+    def test_session_property_returns_underlying_session(self):
+        """Line 227: session property exposes the aiohttp session."""
+        sess = MagicMock(spec=aiohttp.ClientSession)
+        client = SinumClient("192.168.1.1", sess, api_token="tok")
+        assert client.session is sess
+
+
+class TestEnsurePushAuth:
+    @pytest.mark.asyncio
+    async def test_ensure_push_auth_skips_login_when_api_token_set(self, session):
+        """Line 252: early-return branch when api_token already present."""
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch.object(client, "login", new_callable=AsyncMock) as mock_login:
+            await client.ensure_push_auth()
+        mock_login.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ensure_push_auth_skips_login_when_jwt_set(self, session):
+        """Line 252: early-return branch when jwt already present."""
+        client = SinumClient("192.168.1.1", session)
+        client._jwt = "some-jwt"
+        with patch.object(client, "login", new_callable=AsyncMock) as mock_login:
+            await client.ensure_push_auth()
+        mock_login.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ensure_push_auth_calls_login_when_no_token(self, session):
+        """Line 254: login() called when neither api_token nor jwt is set."""
+        client = SinumClient("192.168.1.1", session, username="u", password="p")
+        with patch.object(client, "login", new_callable=AsyncMock) as mock_login:
+            await client.ensure_push_auth()
+        mock_login.assert_called_once()
+
+
+class TestRaiseIfUnexpectedStatus:
+    def test_404_raises_not_supported(self):
+        """Line 466: 404 status raises SinumNotSupportedError."""
+        from custom_components.sinum.api import SinumClient
+
+        resp = MagicMock()
+        resp.status = 404
+        with pytest.raises(SinumNotSupportedError, match="Endpoint not found"):
+            SinumClient._raise_if_unexpected_status(resp, "/api/v1/missing")
+
+    def test_500_raises_connection_error(self):
+        """Line 467: non-200/404 status raises SinumConnectionError."""
+        resp = MagicMock()
+        resp.status = 500
+        with pytest.raises(SinumConnectionError, match="API error 500"):
+            SinumClient._raise_if_unexpected_status(resp, "/api/v1/something")
+
+    def test_200_does_not_raise(self):
+        """Line 463-464: happy path returns without exception."""
+        for status in (200, 201, 204):
+            resp = MagicMock()
+            resp.status = status
+            SinumClient._raise_if_unexpected_status(resp, "/api/v1/ok")
+
+
+class TestSlinkApi:
+    @pytest.mark.asyncio
+    async def test_get_slink_devices_returns_list(self, session):
+        """Lines 553-554: get_slink_devices unwraps list result."""
+        resp = make_response(200, {"data": [{"id": 1, "type": "relay"}]})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_slink_devices()
+        assert result == [{"id": 1, "type": "relay"}]
+
+    @pytest.mark.asyncio
+    async def test_get_slink_device_returns_dict(self, session):
+        """Line 557: get_slink_device passes through result."""
+        resp = make_response(200, {"data": {"id": 3, "state": "on"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_slink_device(3)
+        assert result == {"id": 3, "state": "on"}
+
+    @pytest.mark.asyncio
+    async def test_patch_slink_device_sends_payload(self, session):
+        """Line 560: patch_slink_device sends PATCH and returns result."""
+        resp = make_response(200, {"data": {"id": 3, "state": "off"}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.patch_slink_device(3, {"state": "off"})
+        assert result == {"id": 3, "state": "off"}
+        call_kwargs = session.request.call_args
+        assert call_kwargs.kwargs.get("json") == {"state": "off"}
+
+
+class TestVideoSnapshot:
+    @pytest.mark.asyncio
+    async def test_get_video_snapshot_returns_none_when_no_payload(self, session):
+        """Line 769: None returned when payload key missing."""
+        resp = make_response(200, {"data": {}})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_snapshot(1)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_video_snapshot_returns_bytes_for_valid_base64(self, session):
+        """Lines 771: valid base64 decoded to bytes."""
+        import base64
+
+        jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+        b64 = base64.b64encode(jpeg_bytes).decode()
+        resp = make_response(200, {"payload": b64})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_snapshot(1)
+        assert result == jpeg_bytes
+
+    @pytest.mark.asyncio
+    async def test_get_video_snapshot_returns_none_on_bad_base64(self, session):
+        """Lines 772-773: invalid base64 swallowed, returns None."""
+        resp = make_response(200, {"payload": "!!!not-valid-base64!!!"})
+        session.request = AsyncMock(return_value=resp)
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            result = await client.get_video_snapshot(1)
+        assert result is None
