@@ -23,6 +23,21 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-06-30
+
+### Added
+- **Camera RTSP for stills** — `SinumCamera` now sets `use_stream_for_stills = True`. When RTSP credentials are available (hub returns unmasked password), HA uses the RTSP stream to generate thumbnail images instead of polling the hub's HTTP snapshot endpoint. Falls back to hub snapshot when RTSP is unavailable.
+- **RTSP URL caching** — `stream_source()` caches the result of the hub credential fetch so the individual device endpoint is called at most once per camera lifetime. Failed API calls are retried on next invocation; masked passwords are cached as `None` (no pointless retries).
+
+### Fixed
+- Removed unused `_VIDEO_STATUS_OFFLINE` constant from `camera.py` (IDE hint).
+- Production hub IP addresses replaced with generic placeholders (`<WTP_HUB_IP>` etc.) in `PLAN.md`, `HARDWARE_TEST_PLAN.md`, and HIL script docstrings.
+- Real hub IPs replaced with `10.0.0.x` placeholders in unit tests (`test_init_setup.py`, `test_config_flow.py`, `test_retry_integration.py`).
+
+### Quality
+- 1675 tests passing (↑ 4 new camera caching tests over v0.7.0).
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.7.0] — 2026-06-30
 
 ### Added

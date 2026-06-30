@@ -57,7 +57,7 @@ def _patches():
 def _make_client(responses: list) -> tuple[SinumClient, MagicMock]:
     session = MagicMock(spec=aiohttp.ClientSession)
     session.request = AsyncMock(side_effect=responses)
-    client = SinumClient("10.0.62.167", session, api_token="test-token")
+    client = SinumClient("10.0.0.2", session, api_token="test-token")
     return client, session
 
 

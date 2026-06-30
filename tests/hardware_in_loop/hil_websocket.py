@@ -5,8 +5,8 @@ Connects to a live Sinum hub, validates the WebSocket endpoint,
 and verifies that device_state_changed events arrive in the expected format.
 
 Usage:
-    python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.167 --token <JWT>
-    python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.117 --token <JWT>
+    python3 tests/hardware_in_loop/hil_websocket.py --host <HUB_IP> --token <JWT>
+    python3 tests/hardware_in_loop/hil_websocket.py --host <VIDEO_HUB_IP> --token <JWT>
 
 Exit codes:
     0 — all checks passed

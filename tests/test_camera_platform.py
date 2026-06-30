@@ -9,9 +9,11 @@ Covers:
 - PARALLEL_UPDATES = 0
 - async_setup_entry creates entities from coordinator.video_devices
 - supported_features: STREAM for ip_camera/onvif_camera, 0 for others
-- stream_source: builds rtsp:// URL from individual device endpoint
+- use_stream_for_stills: True (RTSP preferred for thumbnails when available)
+- stream_source: builds rtsp:// URL from individual device endpoint (cached)
 - stream_source: returns None when password is masked
-- stream_source: returns None on API error
+- stream_source: returns None on API error (retries next call)
+- stream_source: caches result — hub API called only once per successful fetch
 - CoordinatorEntity: available reflects coordinator last_update_success
 """
 
@@ -399,6 +401,41 @@ class TestCameraStreamSource:
         cam.coordinator.client.get_video_device = AsyncMock(return_value=dev)
         url = await cam.stream_source()
         assert url == "rtsp://192.168.1.131:554/ch01"
+
+    @pytest.mark.asyncio
+    async def test_caches_rtsp_url_after_success(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=_CAMERA_RTSP_FULL_CREDS)
+        url1 = await cam.stream_source()
+        url2 = await cam.stream_source()
+        assert url1 == url2 == "rtsp://admin:secret123@192.168.1.131:554/ch01"
+        cam.coordinator.client.get_video_device.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_caches_none_when_password_masked(self):
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(return_value=_CAMERA_RTSP)
+        await cam.stream_source()
+        await cam.stream_source()
+        cam.coordinator.client.get_video_device.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_retries_after_api_error(self):
+        """API failures do not set _rtsp_fetched — next call retries hub."""
+        cam = _make_camera(_CAMERA_RTSP)
+        cam.coordinator.client.get_video_device = AsyncMock(
+            side_effect=[Exception("timeout"), _CAMERA_RTSP_FULL_CREDS]
+        )
+        url1 = await cam.stream_source()
+        url2 = await cam.stream_source()
+        assert url1 is None
+        assert url2 == "rtsp://admin:secret123@192.168.1.131:554/ch01"
+        assert cam.coordinator.client.get_video_device.call_count == 2
+
+    def test_use_stream_for_stills_is_true(self):
+        from custom_components.sinum.camera import SinumCamera
+
+        assert SinumCamera._attr_use_stream_for_stills is True
 
 
 # ──────────────────────────────────────────────────────────────────────────────

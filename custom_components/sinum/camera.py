@@ -39,7 +39,6 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 _VIDEO_STATUS_ONLINE = "online"
-_VIDEO_STATUS_OFFLINE = "offline"
 _MASKED_PASSWORD = "*******"
 
 _CAMERA_BASE_KEYS = (
@@ -170,6 +169,7 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
 
     _attr_has_entity_name = True
     _attr_frontend_stream_type = StreamType.WEB_RTC
+    _attr_use_stream_for_stills = True
 
     def __init__(
         self,
@@ -182,6 +182,8 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
         self._device_id = device_id
         self._entry_id = entry_id
         self._attr_unique_id = f"{entry_id}_video_{device_id}"
+        self._rtsp_url: str | None = None
+        self._rtsp_fetched: bool = False
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -224,27 +226,34 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
             attrs["url3_path"] = dev["url3"]
         return attrs
 
-    async def stream_source(self) -> str | None:
-        """Return RTSP URL for live streaming, fetching full credentials from hub.
+    async def _fetch_rtsp_url(self) -> None:
+        """Fetch and cache RTSP URL from hub. No-op on API error (retry next call)."""
+        try:
+            dev = await self.coordinator.client.get_video_device(self._device_id)
+            self._rtsp_url = _build_rtsp_url(dev)
+            self._rtsp_fetched = True
+        except Exception as exc:
+            _LOGGER.debug("Cannot fetch camera %d credentials: %s", self._device_id, exc)
 
-        The individual /devices/video/{id} endpoint returns an unmasked password
-        unlike the list endpoint. Returns None if credentials are still masked
-        (hub firmware limitation) — HA falls back to snapshot mode.
+    async def stream_source(self) -> str | None:
+        """Return RTSP URL for live streaming and still image generation.
+
+        Result is cached after the first successful hub response. The cache is
+        intentionally not reset on coordinator updates — RTSP credentials don't
+        change at run time. Returns None on masked password or API failure.
         """
         if self._device.get("type") not in _STREAMABLE_TYPES:
             return None
-        try:
-            dev = await self.coordinator.client.get_video_device(self._device_id)
-        except Exception as exc:
-            _LOGGER.debug("Cannot fetch camera %d credentials for stream: %s", self._device_id, exc)
-            return None
-        url = _build_rtsp_url(dev)
-        if url is None:
-            _LOGGER.debug("Camera %d: password masked by hub, stream unavailable", self._device_id)
-        return url
+        if not self._rtsp_fetched:
+            await self._fetch_rtsp_url()
+        if self._rtsp_url is None:
+            _LOGGER.debug("Camera %d: RTSP unavailable (masked or fetch failed)", self._device_id)
+        return self._rtsp_url
 
     async def async_camera_image(
-        self, width: int | None = None, height: int | None = None
+        self,
+        width: int | None = None,
+        height: int | None = None,  # noqa: ARG002
     ) -> bytes | None:
         """Return JPEG snapshot from hub proxy endpoint."""
         try:

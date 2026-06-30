@@ -5,7 +5,7 @@ Probes all known Sinum REST API endpoints and reports which are available.
 Run against a live hub to ensure API client coverage is complete.
 
 Usage:
-    python3 tests/hardware_in_loop/hil_api_coverage.py --host 10.0.62.167 --token <JWT>
+    python3 tests/hardware_in_loop/hil_api_coverage.py --host <HUB_IP> --token <JWT>
 
 Exit codes:
     0 — all critical endpoints responded (non-500)

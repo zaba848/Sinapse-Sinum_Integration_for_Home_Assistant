@@ -305,7 +305,7 @@ class TestReconfigureFlow:
 
         mock_entry = MagicMock()
         mock_entry.data = {
-            "host": "10.0.61.132",
+            "host": "10.0.0.1",
             CONF_AUTH_MODE: AUTH_MODE_TOKEN,
             CONF_API_TOKEN: "old_token",
         }
@@ -332,7 +332,7 @@ class TestReconfigureFlow:
 
             mock_entry = MagicMock()
             mock_entry.data = {
-                "host": "10.0.61.132",
+                "host": "10.0.0.1",
                 CONF_AUTH_MODE: AUTH_MODE_TOKEN,
                 CONF_API_TOKEN: "old_token",
             }
@@ -345,7 +345,7 @@ class TestReconfigureFlow:
             await flow.async_step_reconfigure(None)
             # Step 2: submit new host + auth_mode
             await flow.async_step_reconfigure(
-                {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+                {"host": "10.0.0.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
             )
             # Step 3: submit token credentials
             result = await flow.async_step_token({CONF_API_TOKEN: "new_token", "scan_interval": 30})
@@ -370,7 +370,7 @@ class TestReconfigureFlow:
 
             mock_entry = MagicMock()
             mock_entry.data = {
-                "host": "10.0.61.132",
+                "host": "10.0.0.1",
                 CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
                 "username": "admin",
                 "password": "old",
@@ -382,7 +382,7 @@ class TestReconfigureFlow:
 
             await flow.async_step_reconfigure(None)
             await flow.async_step_reconfigure(
-                {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_PASSWORD}
+                {"host": "10.0.0.1", CONF_AUTH_MODE: AUTH_MODE_PASSWORD}
             )
             result = await flow.async_step_password(
                 {"username": "admin", "password": "new_pass", "scan_interval": 30}
@@ -406,12 +406,12 @@ class TestReconfigureFlow:
             flow.context = {}
 
             mock_entry = MagicMock()
-            mock_entry.data = {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+            mock_entry.data = {"host": "10.0.0.1", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
             flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
 
             await flow.async_step_reconfigure(None)
             await flow.async_step_reconfigure(
-                {"host": "10.0.61.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+                {"host": "10.0.0.200", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
             )
             result = await flow.async_step_token({CONF_API_TOKEN: "tok", "scan_interval": 30})
 
@@ -429,7 +429,7 @@ class TestMigrateEntry:
 
         mock_entry = MagicMock()
         mock_entry.version = 1
-        mock_entry.data = {"host": "10.0.61.132", "api_token": "tok"}
+        mock_entry.data = {"host": "10.0.0.1", "api_token": "tok"}
 
         hass.config_entries = MagicMock()
         hass.config_entries.async_update_entry = MagicMock()
@@ -449,7 +449,7 @@ class TestMigrateEntry:
         mock_entry = MagicMock()
         mock_entry.version = 1
         mock_entry.data = {
-            "host": "10.0.61.132",
+            "host": "10.0.0.1",
             CONF_AUTH_MODE: AUTH_MODE_PASSWORD,
             "username": "admin",
             "password": "pass",
@@ -697,11 +697,11 @@ class TestConfigFlowFailsafeAndFallback:
         flow.context = {}
 
         mock_entry = MagicMock()
-        mock_entry.data = {"host": "10.0.61.132", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+        mock_entry.data = {"host": "10.0.0.1", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
         flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
 
         result = await flow.async_step_reconfigure(
-            {"host": "10.0.61.132/path", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
+            {"host": "10.0.0.1/path", CONF_AUTH_MODE: AUTH_MODE_TOKEN}
         )
 
         assert result["type"] == "form"
@@ -744,11 +744,11 @@ class TestConfigFlowFailsafeAndFallback:
             flow = SinumConfigFlow()
             flow.hass = hass
             flow.context = {}
-            flow._host = "10.0.61.132"
+            flow._host = "10.0.0.1"
 
             result = await flow.async_step_password(
                 {"username": "admin", "password": "secret", "scan_interval": 30}
             )
 
         assert result["type"] == "create_entry"
-        assert result["title"] == "Sinum (10.0.61.132)"
+        assert result["title"] == "Sinum (10.0.0.1)"

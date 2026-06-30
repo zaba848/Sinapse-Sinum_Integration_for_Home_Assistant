@@ -407,7 +407,7 @@ class TestSendNotificationService:
         entry_a.title = "Sinum (Hub A)"
         entry_a.options = {}
         entry_a.data = {
-            "host": "10.0.61.132",
+            "host": "10.0.0.1",
             "auth_mode": "token",
             "api_token": "tok-a",
             "scan_interval": 30,
@@ -417,7 +417,7 @@ class TestSendNotificationService:
         entry_b.title = "Sinum (Hub B)"
         entry_b.options = {}
         entry_b.data = {
-            "host": "10.0.62.167",
+            "host": "10.0.0.2",
             "auth_mode": "token",
             "api_token": "tok-b",
             "scan_interval": 30,
@@ -478,7 +478,7 @@ class TestUpdateScheduleService:
         entry.title = "Sinum (Hub A)"
         entry.options = {}
         entry.data = {
-            "host": "10.0.61.132",
+            "host": "10.0.0.1",
             "auth_mode": "token",
             "api_token": "tok-a",
             "scan_interval": 30,
@@ -538,7 +538,7 @@ class TestUpdateScheduleService:
         entry_a.title = "Sinum (Hub A)"
         entry_a.options = {}
         entry_a.data = {
-            "host": "10.0.61.132",
+            "host": "10.0.0.1",
             "auth_mode": "token",
             "api_token": "tok-a",
             "scan_interval": 30,
@@ -548,7 +548,7 @@ class TestUpdateScheduleService:
         entry_b.title = "Sinum (Hub B)"
         entry_b.options = {}
         entry_b.data = {
-            "host": "10.0.62.167",
+            "host": "10.0.0.2",
             "auth_mode": "token",
             "api_token": "tok-b",
             "scan_interval": 30,
@@ -820,7 +820,7 @@ class TestRunSceneService:
         entry.entry_id = "hub_a"
         entry.title = "Sinum (Hub A)"
         entry.options = {}
-        entry.data = {"host": "10.0.61.132", "auth_mode": "token", "api_token": "tok"}
+        entry.data = {"host": "10.0.0.1", "auth_mode": "token", "api_token": "tok"}
 
         with (
             patch("custom_components.sinum.SinumCoordinator", return_value=coordinator),
@@ -858,7 +858,7 @@ class TestRunSceneService:
         entry.entry_id = "hub_b"
         entry.title = "Sinum (Hub B)"
         entry.options = {}
-        entry.data = {"host": "10.0.62.1", "auth_mode": "token", "api_token": "tok2"}
+        entry.data = {"host": "10.0.0.3", "auth_mode": "token", "api_token": "tok2"}
 
         with (
             patch("custom_components.sinum.SinumCoordinator", return_value=coordinator),

@@ -4,8 +4,8 @@
 Validates: login, device fetch, WS connection, snapshot proxy, state update flow.
 
 Usage:
-    python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.167 --token <JWT>
-    python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.117 --token <JWT> --video
+    python3 tests/hardware_in_loop/hil_smoke.py --host <HUB_IP> --token <JWT>
+    python3 tests/hardware_in_loop/hil_smoke.py --host <VIDEO_HUB_IP> --token <JWT> --video
 
 Exit codes:
     0 — smoke passed

@@ -4,14 +4,14 @@ Znane huby testowe:
 
 | Hub | Domyślny adres | Uwagi |
 |---|---|---|
-| SBUS | `http://10.0.62.167` | może używać statycznego tokenu API |
-| WTP | `http://10.0.61.132` | login hasłem przez `/api/v1/login` |
-| Video | `http://10.0.62.117` | kamery IP/ONVIF, wymaga osobnej walidacji |
+| SBUS | `http://<SBUS_HUB_IP>` | może używać statycznego tokenu API |
+| WTP | `http://<WTP_HUB_IP>` | login hasłem przez `/api/v1/login` |
+| Video | `http://<VIDEO_HUB_IP>` | kamery IP/ONVIF, wymaga osobnej walidacji |
 
 Sekrety nie mogą być zapisane w repozytorium. Testy live uruchamiaj przez env:
 
 ```bash
-export SINUM_SMOKE_HUBS="WTP=http://10.0.61.132,SBUS=http://10.0.62.167,VIDEO=http://10.0.62.117"
+export SINUM_SMOKE_HUBS="WTP=http://<WTP_HUB_IP>,SBUS=http://<SBUS_HUB_IP>,VIDEO=http://<VIDEO_HUB_IP>"
 export SINUM_USERNAME="admin"
 export SINUM_PASSWORD="<hub-password>"
 python3 scripts/hardware_smoke_check.py
@@ -28,8 +28,8 @@ Read-only test API wykonany na obu hubach (logowanie + odczyt endpointów krytyc
 
 | Hub | Login | `/api/v1/info` | `/api/v1/devices/wtp` | `/api/v1/devices/sbus` | `/api/v1/devices/virtual` |
 |---|---|---|---|---|---|
-| `10.0.61.132` (WTP) | 200 | 200 | 200 | 200 | 200 |
-| `10.0.62.167` (SBUS) | 200 | 200 | 200 | 200 | 200 |
+| `<WTP_HUB_IP>` (WTP) | 200 | 200 | 200 | 200 | 200 |
+| `<SBUS_HUB_IP>` (SBUS) | 200 | 200 | 200 | 200 | 200 |
 
 Wniosek: łączność i autoryzacja działają, kluczowe endpointy zwracają poprawne odpowiedzi.
 
@@ -40,11 +40,11 @@ Read-only smoke wykonany na pięciu aktywnych hubach przez `scripts/hardware_smo
 
 | Hub | `/api/v1/info` | `/api/v1/devices/wtp` | `/api/v1/devices/sbus` | `/api/v1/devices/virtual` |
 |---|---:|---:|---:|---:|
-| tablica-wtp (`10.0.61.132`) | 200 | 200 | 200 | 200 |
-| sinum-tablica-sbus-1 (`10.0.62.167`) | 200 | 200 | 200 | 200 |
-| tablica-video-nowa (`10.0.62.117`) | 200 | 200 | 200 | 200 |
-| tablicaKlimak (`10.0.61.114`) | 200 | 200 | 200 | 200 |
-| sinum-tablica-sbus2 (`10.0.62.209`) | 200 | 200 | 200 | 200 |
+| tablica-wtp (`<WTP_HUB_IP>`) | 200 | 200 | 200 | 200 |
+| sinum-tablica-sbus-1 (`<SBUS_HUB_IP>`) | 200 | 200 | 200 | 200 |
+| tablica-video-nowa (`<VIDEO_HUB_IP>`) | 200 | 200 | 200 | 200 |
+| tablicaKlimak (`<KLIMAK_HUB_IP>`) | 200 | 200 | 200 | 200 |
+| sinum-tablica-sbus2 (`<SBUS2_HUB_IP>`) | 200 | 200 | 200 | 200 |
 
 Dodatkowo:
 - HIL API coverage: 5/5 PASS, 0 critical failures.

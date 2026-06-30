@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 671 passing, 5 skipped (~10 s)
+Tests:  1 675 passing, 5 skipped (~10 s)
 Ruff:   0 errors
 mypy:   0 errors
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
@@ -43,7 +43,7 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 Recommended local smoke configuration:
 
 ```bash
-export SINUM_SMOKE_HUBS="WTP=http://10.0.61.132,SBUS=http://10.0.62.167,VIDEO=http://10.0.62.117"
+export SINUM_SMOKE_HUBS="WTP=http://<WTP_HUB_IP>,SBUS=http://<SBUS_HUB_IP>,VIDEO=http://<VIDEO_HUB_IP>"
 export SINUM_USERNAME="admin"
 export SINUM_PASSWORD="<hub-password>"
 python3 scripts/hardware_smoke_check.py
@@ -99,6 +99,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.5.20 | api.py/coordinator.py/websocket.py coverage sweep | 1 648 |
 | v0.6.0 | WS hardening (exponential backoff), WS default enabled, README IP removal | 1 648 |
 | v0.7.0 | Camera motion events, SBUS blind position WS, alarm ARM_HOME/NIGHT, zone bypass, scene triggers | 1 671 |
+| v0.7.1 | Camera RTSP polling (use_stream_for_stills), RTSP URL cache, IP sanitisation in tests/docs | 1 675 |
 
 ---
 
@@ -133,7 +134,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | Deploy latest integration to RPi | Done | v0.5.21 installed to `/config/custom_components/sinum`; previous directory and registry backed up under `/config/backups/sinum` |
 | Run entity registry migration | Done | HA WebSocket registry migration removed 322 stale collision entries; remaining migration candidates: 0 |
 | Verify live entity names after restart | Done | HA API up on 2026.6.4; 5 Sinum config entries; live/file registry: 3 801 Sinum entries, 260 suffix entries, 0 removable collisions |
-| Inventory `ehome-wojtek` and `sinum-tablica-sbus2` | Done | credentials label `ehome-wojtek` resolves via API as `tablicaKlimak` at 10.0.61.114 |
+| Inventory `ehome-wojtek` and `sinum-tablica-sbus2` | Done | credentials label `ehome-wojtek` resolves via API as `tablicaKlimak` |
 
 ### P3 - Documentation and metadata
 
@@ -223,13 +224,13 @@ curl -s http://homeassistant.local:8123/api/states \
 
 ### Krok 2 — HIL smoke na nowych hubach
 
-Nowe huby tablicaKlimak (10.0.61.114) i sinum-tablica-sbus2 (10.0.62.209) nie były jeszcze weryfikowane po v0.7.0.
+Nowe huby tablicaKlimak i sinum-tablica-sbus2 nie były jeszcze weryfikowane po v0.7.0.
 
 ```bash
-export SINUM_SMOKE_HUBS="KLIMAK=http://10.0.61.114,SBUS2=http://10.0.62.209"
+export SINUM_SMOKE_HUBS="KLIMAK=http://<KLIMAK_HUB_IP>,SBUS2=http://<SBUS2_HUB_IP>"
 export SINUM_USERNAME="admin"
-export SINUM_KLIMAK_TOKEN="<token-z-memory>"
-export SINUM_SBUS2_TOKEN="<token-z-memory>"
+export SINUM_KLIMAK_TOKEN="<api-token>"
+export SINUM_SBUS2_TOKEN="<api-token>"
 python3 scripts/hardware_smoke_check.py
 ```
 
