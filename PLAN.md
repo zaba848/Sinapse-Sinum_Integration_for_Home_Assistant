@@ -195,8 +195,8 @@ export SINUM_SBUS_TOKEN="<api-token>"
 
 | Feature | Priority | Effort | Status | Notes |
 |---|---|---|---|---|
-| **P4 — IAQ/AQ Live Probe** | Medium | 15 min | Pending | Confirm live WTP payload format for `iaq_sensor`, `aq_sensor`, `air_quality_sensor` |
-| **P5 — Scene device_trigger** | Medium | 1-2 h | Pending | Enable scenes to trigger automations via device_trigger (UI integration) |
+| **P4 — IAQ/AQ Live Probe** | Medium | 15 min | ✅ Complete | All 3 WTP iaq_sensor devices validated; descriptors match live payloads |
+| **P5.1 — Scene device_trigger** | Medium | 1-2 h | ✅ Complete | Scene platform + device_trigger automation support implemented and tested |
 | **Camera motion events** | Medium | 2-3 h | Pending | Parse motion event payloads from WS; requires live video WS traffic |
 | **SBUS blind position feedback** | Medium | 2-3 h | Pending | Implement blind position state updates (API endpoint TBD) |
 | **Alarm modes & bypass** | Low | 2-3 h | Pending | Add arm/disarm modes, zone bypass (requires destructive write testing) |
