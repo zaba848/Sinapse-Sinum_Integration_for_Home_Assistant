@@ -157,6 +157,7 @@ class TestAsyncSetupEntry:
             CONF_API_TOKEN: "tok",
             CONF_MQTT_ENABLED: True,
             "scan_interval": DEFAULT_SCAN_INTERVAL,
+            CONF_WS_ENABLED: False,
         }
         entry.options = {CONF_MQTT_TOPIC_PREFIX: "sinum/hub-a"}
 
@@ -199,6 +200,7 @@ class TestAsyncSetupEntry:
             CONF_API_TOKEN: "tok",
             CONF_MQTT_ENABLED: False,
             "scan_interval": DEFAULT_SCAN_INTERVAL,
+            CONF_WS_ENABLED: False,
         }
         entry.options = {}
 

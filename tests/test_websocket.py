@@ -528,7 +528,7 @@ async def test_wait_reconnect_returns_immediately_when_stop_set():
 async def test_wait_reconnect_times_out_when_not_stopped():
     bridge, _hass, _coordinator = _bridge()
     bridge._stop_event.clear()
-    with patch("custom_components.sinum.websocket._RECONNECT_DELAY", 0.01):
+    with patch("custom_components.sinum.websocket._RECONNECT_DELAY_MIN", 0.01):
         await bridge._wait_reconnect()  # timeout fires after 10 ms, suppressed
 
 
