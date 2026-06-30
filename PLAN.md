@@ -156,11 +156,11 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | Feature | Priority | Notes |
 |---|---|---|
 | Camera PTZ control | Low | endpoint unknown |
-| Camera motion events from WS | Medium | depends on live video WS payloads |
+| Camera motion events from WS | Done | ✅ v0.7.0 |
 | LoRa relay live test | Low | no LoRa hardware on known hubs |
-| Alarm modes and bypass | Low | current implementation basic |
-| Scene triggers in automations | Low | `device_trigger` exists; scenes via `run_scene` |
-| SBUS `blind_controller` position feedback | Medium | API endpoint TBD |
+| Alarm modes and bypass | Done | ✅ v0.7.0 |
+| Scene triggers in automations | Done | ✅ v0.7.0 |
+| SBUS `blind_controller` position feedback | Done | ✅ v0.7.0 |
 
 ---
 
@@ -198,11 +198,65 @@ export SINUM_SBUS_TOKEN="<api-token>"
 |---|---|---|---|---|
 | **P4 — IAQ/AQ Live Probe** | Medium | 15 min | ✅ Complete | All 3 WTP iaq_sensor devices validated; descriptors match live payloads |
 | **P5.1 — Scene device_trigger** | Medium | 1-2 h | ✅ Complete | Scene platform + device_trigger automation support implemented and tested |
-| **P5.2 — Camera motion events** | Medium | 2-3 h | ✅ Complete | Motion_detected WS event type, coordinator dispatch, event entity; all tests passing (1653) |
-| **P5.3 — SBUS blind position feedback** | Medium | 2-3 h | ✅ Complete | Position fields (`current_opening`, `current_tilt`) via WebSocket dispatcher; 5 tests; 1658 total |
-| **P5.4 — Alarm modes & bypass** | Low | 2-3 h | ✅ Complete | ARM_HOME, ARM_NIGHT modes + zone bypass; 14 new alarm tests; 1667 total tests ✅ |
+| **P5.2 — Camera motion events** | Medium | 2-3 h | ✅ Complete | Motion_detected WS event type, coordinator dispatch, event entity; all tests passing (1671) |
+| **P5.3 — SBUS blind position feedback** | Medium | 2-3 h | ✅ Complete | Position fields (`current_opening`, `current_tilt`) via WebSocket dispatcher; 5 tests; 1671 total |
+| **P5.4 — Alarm modes & bypass** | Low | 2-3 h | ✅ Complete | ARM_HOME, ARM_NIGHT modes + zone bypass; 14 new alarm tests; 1671 total tests ✅ |
 | **LoRa relay live test** | Low | 1 h | Blocked | No LoRa hardware on known hubs; waiting for LoRa-equipped hub |
 | **Performance metrics** | Low | 3-4 h | Future | Add WS uptime/reconnect rate dashboard; integration health metrics |
+
+---
+
+## v0.8.0 Plan — kolejne kroki
+
+### Krok 1 — Deploy v0.7.0 na RPi (priorytet)
+
+```bash
+# Skopiuj integrację na RPi
+rsync -av --delete custom_components/sinum/ tomasz@homeassistant.local:/config/custom_components/sinum/
+# Restart HA
+curl -X POST http://homeassistant.local:8123/api/services/homeassistant/restart \
+  -H "Authorization: Bearer <HA_TOKEN>"
+# Sprawdź encje po restarcie
+curl -s http://homeassistant.local:8123/api/states \
+  -H "Authorization: Bearer <HA_TOKEN>" | python3 -c "import sys,json; s=json.load(sys.stdin); print(len([x for x in s if x['entity_id'].startswith('sinum') or 'sinum' in x.get('attributes',{}).get('integration','').lower()]))"
+```
+
+### Krok 2 — HIL smoke na nowych hubach
+
+Nowe huby tablicaKlimak (10.0.61.114) i sinum-tablica-sbus2 (10.0.62.209) nie były jeszcze weryfikowane po v0.7.0.
+
+```bash
+export SINUM_SMOKE_HUBS="KLIMAK=http://10.0.61.114,SBUS2=http://10.0.62.209"
+export SINUM_USERNAME="admin"
+export SINUM_KLIMAK_TOKEN="<token-z-memory>"
+export SINUM_SBUS2_TOKEN="<token-z-memory>"
+python3 scripts/hardware_smoke_check.py
+```
+
+Oczekiwane: read-only smoke PASS na obu hubach.
+
+### Krok 3 — HIL alarm ARM_HOME/ARM_NIGHT
+
+**Ryzyko**: ARM_HOME/ARM_NIGHT wysyłają komendę do żywego alarmu. Wymagają:
+- Znajomości PIN-u (`SINUM_ALARM_TEST_PIN`)
+- Że alarm jest w stanie `disarmed`
+- Wykonania na hubie testowym, nie produkcyjnym
+
+Dodać do `validate_api_writes.py` test ARM_HOME + natychmiastowe rozbrojenie.
+
+### Krok 4 — HIL camera motion events
+
+Kamera motion WS event (`type: "motion_detected"`) nie ma HIL testu bo wymagałby fizycznego ruchu przed kamerą. Opcje:
+1. Pasywny: nasłuchiwać WS przez 30s i logować jeśli przyjdzie event — nie wymaga ruchu
+2. Aktywny: nie robić — nie warto symulować ruchu automatycznie
+
+### Krok 5 — Nowe funkcje (po potwierdzeniu v0.7.0 na RPi)
+
+| Feature | Priorytet | Uwagi |
+|---------|-----------|-------|
+| Camera PTZ control | Low | Endpoint nieznany — najpierw zbadać API |
+| WS uptime/health metrics | Low | Przydatne dopiero gdy WS jest stabilne przez 7+ dni |
+| LoRa relay | Blocked | Czekamy na sprzęt |
 
 ---
 
