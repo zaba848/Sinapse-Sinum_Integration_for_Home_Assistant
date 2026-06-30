@@ -753,3 +753,97 @@ def test_full_video_stream_message_via_handle_payload():
     bridge._handle_payload(payload)
     coordinator.dispatch_webrtc_answer.assert_called_once_with("s42", "v=0\r\n")
     coordinator.async_set_updated_data.assert_not_called()
+
+
+# ─── Blind Position Feedback via WebSocket (P5.3) ───────────────────────────────
+
+
+def test_apply_device_state_updates_sbus_blind_position():
+    """P5.3: device_state_changed updates SBUS blind current_opening."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
+    
+    payload = [{"data": {"type": "device_state_changed", "details": None,
+                          "payload": {"class": "sbus", "id": 15, "current_opening": 75}}}]
+    bridge._handle_payload(json.dumps(payload))
+    
+    assert coordinator.sbus_devices[15]["current_opening"] == 75
+    coordinator.async_set_updated_data.assert_called_once()
+
+
+def test_apply_device_state_updates_sbus_blind_position_and_tilt():
+    """P5.3: device_state_changed updates SBUS blind position and tilt."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.sbus_devices[15] = {
+        "id": 15,
+        "type": "blind_controller",
+        "current_opening": 50,
+        "current_tilt": 20,
+    }
+    
+    payload = [{"data": {"type": "device_state_changed", "details": None,
+                          "payload": {"class": "sbus", "id": 15,
+                                      "current_opening": 80, "current_tilt": 45,
+                                      "target_opening": 80}}}]
+    bridge._handle_payload(json.dumps(payload))
+    
+    assert coordinator.sbus_devices[15]["current_opening"] == 80
+    assert coordinator.sbus_devices[15]["current_tilt"] == 45
+    coordinator.async_set_updated_data.assert_called_once()
+
+
+def test_apply_device_state_updates_wtp_blind_position():
+    """P5.3: device_state_changed updates WTP blind current_opening."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.wtp_devices[25] = {"id": 25, "type": "blind_controller", "current_opening": 30}
+    
+    payload = [{"data": {"type": "device_state_changed", "details": None,
+                          "payload": {"class": "wtp", "id": 25,
+                                      "current_opening": 60, "target_opening": 60,
+                                      "action_in_progress": False}}}]
+    bridge._handle_payload(json.dumps(payload))
+    
+    assert coordinator.wtp_devices[25]["current_opening"] == 60
+    coordinator.async_set_updated_data.assert_called_once()
+
+
+def test_blind_position_updates_fire_state_event():
+    """P5.3: Blind position updates fire sinum_device_state_changed event."""
+    bridge, hass, coordinator = _bridge()
+    coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
+    
+    payload = [{"data": {"type": "device_state_changed", "details": None,
+                          "payload": {"class": "sbus", "id": 15, "current_opening": 75}}}]
+    bridge._handle_payload(json.dumps(payload))
+    
+    hass.bus.async_fire.assert_called_once()
+    call_args = hass.bus.async_fire.call_args
+    assert call_args[0][0] == "sinum_device_state_changed"
+    event_data = call_args[0][1]
+    assert event_data["id"] == 15
+    assert event_data["class"] == "sbus"
+
+
+def test_blind_position_updates_via_full_ws_payload():
+    """P5.3 Integration: full WS payload with blind position update."""
+    bridge, _hass, coordinator = _bridge()
+    coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
+    
+    payload = json.dumps([{
+        "data": {
+            "type": "device_state_changed",
+            "details": None,
+            "payload": {
+                "class": "sbus",
+                "id": 15,
+                "current_opening": 85,
+                "current_tilt": 30,
+            }
+        }
+    }])
+    
+    bridge._handle_payload(payload)
+    
+    assert coordinator.sbus_devices[15]["current_opening"] == 85
+    assert coordinator.sbus_devices[15]["current_tilt"] == 30
+    coordinator.async_set_updated_data.assert_called()

@@ -197,8 +197,8 @@ export SINUM_SBUS_TOKEN="<api-token>"
 |---|---|---|---|---|
 | **P4 — IAQ/AQ Live Probe** | Medium | 15 min | ✅ Complete | All 3 WTP iaq_sensor devices validated; descriptors match live payloads |
 | **P5.1 — Scene device_trigger** | Medium | 1-2 h | ✅ Complete | Scene platform + device_trigger automation support implemented and tested |
-| **Camera motion events** | Medium | 2-3 h | Pending | Parse motion event payloads from WS; requires live video WS traffic |
-| **SBUS blind position feedback** | Medium | 2-3 h | Pending | Implement blind position state updates (API endpoint TBD) |
+| **P5.2 — Camera motion events** | Medium | 2-3 h | ✅ Complete | Motion_detected WS event type, coordinator dispatch, event entity; all tests passing (1648 ✅) |
+| **P5.3 — SBUS blind position feedback** | Medium | 2-3 h | In Progress | Position fields (`current_opening`, `current_tilt`) already in API; verify live feedback and add comprehensive tests |
 | **Alarm modes & bypass** | Low | 2-3 h | Pending | Add arm/disarm modes, zone bypass (requires destructive write testing) |
 | **LoRa relay live test** | Low | 1 h | Blocked | No LoRa hardware on known hubs; waiting for LoRa-equipped hub |
 | **Performance metrics** | Low | 3-4 h | Future | Add WS uptime/reconnect rate dashboard; integration health metrics |
