@@ -532,3 +532,31 @@ class SinumHubWifiSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         if ip := wifi.get("ip"):
             attrs["ip"] = ip
         return attrs
+
+
+class SinumHubFirmwareSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
+    """Hub firmware version sensor."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "hub_firmware"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:chip"
+
+    def __init__(self, coordinator: SinumCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_hub_firmware"
+        self._attr_device_info = _hub_device_info(entry_id, coordinator.hub_info)
+
+    @property
+    def native_value(self) -> str | None:
+        return self.coordinator.hub_info.get("version")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        info = self.coordinator.hub_info
+        attrs: dict[str, Any] = {}
+        if dev_type := info.get("device_type"):
+            attrs["device_type"] = dev_type
+        if api_ver := info.get("api"):
+            attrs["api_version"] = api_ver
+        return attrs

@@ -253,7 +253,7 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
     async def async_camera_image(
         self,
         width: int | None = None,
-        height: int | None = None,  # noqa: ARG002
+        height: int | None = None,
     ) -> bytes | None:
         """Return JPEG snapshot from hub proxy endpoint."""
         try:

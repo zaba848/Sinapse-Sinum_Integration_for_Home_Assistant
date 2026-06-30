@@ -8,7 +8,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
 [![Tests](https://img.shields.io/badge/tests-1675%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.7.2-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---

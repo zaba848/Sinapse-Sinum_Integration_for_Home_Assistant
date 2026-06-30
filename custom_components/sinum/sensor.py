@@ -36,6 +36,7 @@ from .sensor_virtual import (
     SinumAutomationStatusSensor,
     SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
+    SinumHubFirmwareSensor,
     SinumHubUptimeSensor,
     SinumHubWifiSensor,
     SinumThermostatOutputGroupSensor,
@@ -189,6 +190,7 @@ def _add_hub_sensors(
     if not coordinator.hub_info:
         return
     entities.append(SinumHubUptimeSensor(coordinator, entry_id))
+    entities.append(SinumHubFirmwareSensor(coordinator, entry_id))
     wifi = coordinator.hub_info.get("wifi", {})
     if isinstance(wifi, dict) and wifi.get("signal") is not None:
         entities.append(SinumHubWifiSensor(coordinator, entry_id))
@@ -263,6 +265,7 @@ __all__ = [
     "SinumButtonSensor",
     "SinumEnergyCenterStatusSensor",
     "SinumEnergySensor",
+    "SinumHubFirmwareSensor",
     "SinumHubUptimeSensor",
     "SinumHubWifiSensor",
     "SinumScheduleActivePeriodSensor",

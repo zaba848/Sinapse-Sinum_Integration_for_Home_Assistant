@@ -1,4 +1,5 @@
 {
+  "title": "Sinapse",
   "config": {
     "step": {
       "user": {
@@ -121,6 +122,9 @@
     "sensor": {
       "hub_uptime": {
         "name": "Uptime"
+      },
+      "hub_firmware": {
+        "name": "Firmware version"
       },
       "hub_wifi_signal": {
         "name": "Wi-Fi signal"
