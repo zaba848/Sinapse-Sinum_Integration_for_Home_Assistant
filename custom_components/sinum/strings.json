@@ -235,6 +235,60 @@
       },
       "tariff_indicator": {
         "name": "Tariff indicator"
+      },
+      "temperature_outdoor": {
+        "name": "Outdoor Temperature"
+      },
+      "heating_supply": {
+        "name": "Heating Supply Temperature"
+      },
+      "heating_return": {
+        "name": "Heating Return Temperature"
+      },
+      "buffer_temperature": {
+        "name": "Buffer Temperature"
+      },
+      "hot_gas_temperature": {
+        "name": "Hot Gas Temperature"
+      },
+      "compressor_percentage": {
+        "name": "Compressor Frequency"
+      },
+      "running_hours": {
+        "name": "Running Hours"
+      },
+      "pv_total_active_power": {
+        "name": "PV Active Power"
+      },
+      "grid_total_active_power": {
+        "name": "Grid Active Power"
+      },
+      "energy_produced_total": {
+        "name": "Energy Produced"
+      },
+      "energy_produced_today": {
+        "name": "Energy Produced Today"
+      },
+      "energy_fed_today": {
+        "name": "Energy Fed to Grid Today"
+      },
+      "charge_power": {
+        "name": "Charge Power"
+      },
+      "energy_charged_total": {
+        "name": "Energy Charged"
+      },
+      "energy_discharged_total": {
+        "name": "Energy Discharged"
+      },
+      "energy_charged_today": {
+        "name": "Energy Charged Today"
+      },
+      "temperature_domestic_hot_water": {
+        "name": "DHW Temperature"
+      },
+      "target_temperature_dhw": {
+        "name": "DHW Target Temperature"
       }
     },
     "binary_sensor": {

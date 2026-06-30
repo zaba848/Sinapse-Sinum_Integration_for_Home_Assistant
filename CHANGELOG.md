@@ -23,6 +23,20 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.5.16] — 2026-06-30
+
+### Added
+- **Modbus: heat_pump sensors** — 7 sensors: outdoor temp, heating supply/return, buffer temp, hot gas temp, compressor frequency, running hours (all disabled by default; temperatures use 0.1°C scale)
+- **Modbus: inverter sensors** — 5 sensors: PV active power, grid active power, energy produced/fed today and total
+- **Modbus: battery sensors** — 4 sensors: SoC (%), charge power, energy charged/discharged total
+- **Modbus: car_charger sensors** — 5 sensors: charge power, current, voltage, energy charged total/today
+- **Modbus: common_dhw_main sensors** — 2 sensors: DHW temperature, DHW target temperature
+- **17 new translation keys** (PL + EN + strings.json) for all new sensor names
+- **17 new tests** for all new modbus device types in `test_modbus_sensor.py`
+
+### Changed
+- Test count: 1605 → 1616
+
 ## [0.5.15] — 2026-06-30
 
 ### Added

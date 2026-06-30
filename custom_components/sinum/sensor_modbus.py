@@ -16,6 +16,8 @@ from homeassistant.const import (
     UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -191,9 +193,275 @@ _MODBUS_ENERGY_METER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
     ),
 )
 
+# ── Heat pump sensor descriptions ─────────────────────────────────────────────
+# Temperatures from TECH modbus are in 0.1 °C (scale=0.1). Frequencies in Hz.
+
+_MODBUS_HEAT_PUMP_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="temperature_outdoor",
+        field_path="temperature_outdoor",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="temperature_outdoor",
+    ),
+    SinumModbusSensorDescription(
+        key="heating_supply",
+        field_path="heating_supply",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="heating_supply",
+    ),
+    SinumModbusSensorDescription(
+        key="heating_return",
+        field_path="heating_return",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="heating_return",
+    ),
+    SinumModbusSensorDescription(
+        key="buffer_temperature",
+        field_path="buffer_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="buffer_temperature",
+    ),
+    SinumModbusSensorDescription(
+        key="hot_gas_temperature",
+        field_path="hot_gas_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="hot_gas_temperature",
+    ),
+    SinumModbusSensorDescription(
+        key="compressor_percentage",
+        field_path="compressor_percentage",
+        device_class=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        icon="mdi:heat-pump",
+        translation_key="compressor_percentage",
+    ),
+    SinumModbusSensorDescription(
+        key="running_hours",
+        field_path="running_hours",
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="running_hours",
+    ),
+)
+
+# ── Inverter sensor descriptions ───────────────────────────────────────────────
+
+_MODBUS_INVERTER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="pv_total_active_power",
+        field_path="pv_total_active_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="pv_total_active_power",
+    ),
+    SinumModbusSensorDescription(
+        key="grid_total_active_power",
+        field_path="grid_total_active_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="grid_total_active_power",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_produced_total",
+        field_path="energy_produced_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_produced_total",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_produced_today",
+        field_path="energy_produced_today",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_produced_today",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_fed_today",
+        field_path="energy_fed_today",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_fed_today",
+    ),
+)
+
+# ── Battery sensor descriptions ────────────────────────────────────────────────
+
+_MODBUS_BATTERY_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="soc",
+        field_path="soc",
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+    ),
+    SinumModbusSensorDescription(
+        key="charge_power",
+        field_path="charge_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="charge_power",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_charged_total",
+        field_path="energy_charged_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_charged_total",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_discharged_total",
+        field_path="energy_discharged_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_discharged_total",
+    ),
+)
+
+# ── Car charger sensor descriptions ───────────────────────────────────────────
+
+_MODBUS_CAR_CHARGER_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="charge_power",
+        field_path="charge_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="charge_power",
+    ),
+    SinumModbusSensorDescription(
+        key="current",
+        field_path="current",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+    ),
+    SinumModbusSensorDescription(
+        key="voltage",
+        field_path="voltage",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+    ),
+    SinumModbusSensorDescription(
+        key="energy_charged_total",
+        field_path="energy_charged_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_charged_total",
+    ),
+    SinumModbusSensorDescription(
+        key="energy_charged_today",
+        field_path="energy_charged_today",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+        translation_key="energy_charged_today",
+    ),
+)
+
+# ── DHW (domestic hot water) sensor descriptions ───────────────────────────────
+
+_MODBUS_DHW_SENSORS: tuple[SinumModbusSensorDescription, ...] = (
+    SinumModbusSensorDescription(
+        key="temperature_domestic_hot_water",
+        field_path="temperature_domestic_hot_water",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="temperature_domestic_hot_water",
+    ),
+    SinumModbusSensorDescription(
+        key="target_temperature",
+        field_path="target_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        scale=0.1,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+        translation_key="target_temperature_dhw",
+    ),
+)
+
 # Map device type → applicable sensor descriptions
 _SENSOR_MAP: dict[str, tuple[SinumModbusSensorDescription, ...]] = {
     "energy_meter": _MODBUS_ENERGY_METER_SENSORS,
+    "heat_pump": _MODBUS_HEAT_PUMP_SENSORS,
+    "inverter": _MODBUS_INVERTER_SENSORS,
+    "battery": _MODBUS_BATTERY_SENSORS,
+    "car_charger": _MODBUS_CAR_CHARGER_SENSORS,
+    "common_dhw_main": _MODBUS_DHW_SENSORS,
 }
 
 

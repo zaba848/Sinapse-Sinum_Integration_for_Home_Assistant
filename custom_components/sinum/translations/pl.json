@@ -235,6 +235,60 @@
       },
       "tariff_indicator": {
         "name": "Wskaźnik taryfy"
+      },
+      "temperature_outdoor": {
+        "name": "Temperatura zewnętrzna"
+      },
+      "heating_supply": {
+        "name": "Temperatura zasilania"
+      },
+      "heating_return": {
+        "name": "Temperatura powrotu"
+      },
+      "buffer_temperature": {
+        "name": "Temperatura bufora"
+      },
+      "hot_gas_temperature": {
+        "name": "Temperatura gorącego gazu"
+      },
+      "compressor_percentage": {
+        "name": "Częstotliwość sprężarki"
+      },
+      "running_hours": {
+        "name": "Czas pracy"
+      },
+      "pv_total_active_power": {
+        "name": "Moc fotowoltaiczna"
+      },
+      "grid_total_active_power": {
+        "name": "Moc sieciowa"
+      },
+      "energy_produced_total": {
+        "name": "Energia wyprodukowana"
+      },
+      "energy_produced_today": {
+        "name": "Energia wyprodukowana dziś"
+      },
+      "energy_fed_today": {
+        "name": "Energia oddana dziś"
+      },
+      "charge_power": {
+        "name": "Moc ładowania"
+      },
+      "energy_charged_total": {
+        "name": "Energia naładowana"
+      },
+      "energy_discharged_total": {
+        "name": "Energia rozładowana"
+      },
+      "energy_charged_today": {
+        "name": "Energia naładowana dziś"
+      },
+      "temperature_domestic_hot_water": {
+        "name": "Temperatura CWU"
+      },
+      "target_temperature_dhw": {
+        "name": "Zadana temperatura CWU"
       }
     },
     "binary_sensor": {
