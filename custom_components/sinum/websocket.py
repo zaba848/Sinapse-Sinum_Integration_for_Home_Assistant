@@ -88,7 +88,7 @@ class SinumWebSocketBridge:
             await self._wait_reconnect()
 
     async def _wait_reconnect(self) -> None:
-        delay = min(_RECONNECT_DELAY_MIN * (2 ** self._reconnect_attempt), _RECONNECT_DELAY_MAX)
+        delay = min(_RECONNECT_DELAY_MIN * (2**self._reconnect_attempt), _RECONNECT_DELAY_MAX)
         with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
 
@@ -135,14 +135,24 @@ class SinumWebSocketBridge:
             return False
         return self._dispatch_event_type(data)
 
-    def _dispatch_event_type(self, data: dict[str, Any]) -> bool:
-        evt_type = data.get("type")
+    def _handle_special_event(self, evt_type: str, data: dict[str, Any]) -> bool | None:
+        """Handle special (non-state) event types. Returns bool or None if unhandled."""
         if evt_type == "unauthorized":
             self._mark_auth_failed()
             return False
         if evt_type == "video_stream_message":
             self._handle_video_stream_message(data)
             return False
+        if evt_type == "motion_detected":
+            self._handle_motion_detected(data)
+            return False
+        return None
+
+    def _dispatch_event_type(self, data: dict[str, Any]) -> bool:
+        evt_type = data.get("type")
+        special = self._handle_special_event(evt_type, data)
+        if special is not None:
+            return special
         if evt_type != "device_state_changed":
             _LOGGER.debug("Unhandled Sinum WS event type: %s", evt_type)
             return False
@@ -180,6 +190,25 @@ class SinumWebSocketBridge:
         reason = inner.get("reason", msg_type)
         _LOGGER.debug("WebRTC %s session %s: %s", msg_type, session_id, reason)
         self._coordinator.dispatch_webrtc_error(session_id, msg_type, reason)
+
+    def _handle_motion_detected(self, data: dict[str, Any]) -> None:
+        """Handle motion detection event from camera WebSocket."""
+        payload = data.get("payload", {})
+        device_id = payload.get("device_id")
+        timestamp = payload.get("timestamp")
+
+        if not device_id:
+            _LOGGER.debug("Motion event missing device_id: %s", payload)
+            return
+
+        _LOGGER.debug(
+            "Motion detected on device %s at %s",
+            device_id,
+            timestamp,
+        )
+
+        # Publish motion event to coordinator for event entities to trigger
+        self._coordinator.dispatch_motion_detected(device_id, payload)
 
     def _mark_auth_failed(self) -> None:
         self._auth_failed = True

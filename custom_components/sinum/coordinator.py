@@ -88,6 +88,23 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def close_webrtc_session(self, session_id: str) -> None:
         self._webrtc_sessions.pop(session_id, None)
 
+    def dispatch_motion_detected(self, device_id: int, payload: dict[str, Any]) -> None:
+        """Store motion detection event from WebSocket for event entities."""
+        if not hasattr(self, "_motion_events"):
+            self._motion_events = {}
+        self._motion_events[device_id] = {
+            "timestamp": payload.get("timestamp"),
+            "device_id": device_id,
+        }
+        # Trigger a coordinator update so event entities can check for motion
+        self.async_set_updated_data(self.data)
+
+    def get_motion_event(self, device_id: int) -> dict[str, Any] | None:
+        """Get and clear motion event for device."""
+        if not hasattr(self, "_motion_events"):
+            return None
+        return self._motion_events.pop(device_id, None)
+
     async def forward_webrtc_candidate(self, session_id: str, candidate: Any) -> None:
         session = self._webrtc_sessions.get(session_id)
         if session is None:

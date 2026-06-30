@@ -1,6 +1,6 @@
 # Sinapse — Sinum Integration for Home Assistant
 
-**Sinapse** connects a [TECH Sterowniki](https://www.techsterowniki.pl) **Sinum EH-01** building automation hub to Home Assistant over the local network. All physical and virtual devices are exposed as native HA entities with full read/write control and real-time state updates.
+**Sinapse** connects a [TECH Sterowniki](https://www.techsterowniki.pl) **Sinum** building automation hub to Home Assistant over the local network. All physical and virtual devices are exposed as native HA entities with full read/write control and real-time state updates.
 
 **Language:** English | [Polski](README.pl.md)
 
@@ -126,7 +126,7 @@ SinumCoordinator (coordinator.py)
 | Option | Default | Description |
 |---|---|---|
 | Scan interval | 30 s | REST poll interval (10–300 s). Always active as safety reconciliation path. |
-| Enable WebSocket real-time transport | off | Persistent WS to hub for instant state push. Recommended. |
+| Enable WebSocket real-time transport | **on** | Persistent WS to hub for instant state push (<1s latency). Enabled by default in v0.6.0+. |
 | WebSocket endpoint path | `/api/v1/ws` | Change only if your hub firmware uses a non-standard path. |
 | Enable MQTT real-time transport | off | Legacy MQTT push via Lua bridge. Use only if WS is not supported. |
 | MQTT topic prefix | `sinum` | Must match `TOPIC_PREFIX` in `mqtt_bridge.lua`. |

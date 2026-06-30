@@ -84,6 +84,9 @@ async def async_setup_entry(
         "sbus",
     )
 
+    # Add motion event entities for video cameras
+    _add_motion_events(coordinator, entry.entry_id, entities)
+
     async_add_entities(entities)
 
 
@@ -149,3 +152,54 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
             self._prev_count = count
             self._trigger_event("pressed", {"action": None, "buttons_count": count})
         self.async_write_ha_state()
+
+
+def _add_motion_events(
+    coordinator: SinumCoordinator,
+    entry_id: str,
+    entities: list[EventEntity],
+) -> None:
+    """Add motion event entities for video camera devices."""
+    # Check if coordinator has video devices (from virtual device family)
+    if hasattr(coordinator, "virtual_devices"):
+        for device_id, device in coordinator.virtual_devices.items():
+            if device.get("type") in ("ip_camera", "onvif_camera"):
+                entities.append(SinumMotionEvent(coordinator, device_id, entry_id))
+
+
+class SinumMotionEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
+    """Motion detection event entity — fires 'motion_detected' on motion events."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "motion_detected"
+    _attr_icon = "mdi:motion-sensor"
+    _attr_event_types = ["motion_detected"]
+
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_motion_{device_id}"
+        device = coordinator.virtual_devices.get(device_id, {})
+        label = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_video_{device_id}")},
+            name=hub_prefixed_name(coordinator, label),
+            manufacturer="TECH Sterowniki",
+            model=device.get("_parent_model") or "Sinum Video Camera",
+            suggested_area=device.get("_area") or None,
+        )
+        self._last_motion_time: float | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Check for motion events from WebSocket."""
+        motion_event = self.coordinator.get_motion_event(self._device_id)
+        if motion_event:
+            timestamp = motion_event.get("timestamp")
+            self._trigger_event("motion_detected", {"timestamp": timestamp})
+            self.async_write_ha_state()

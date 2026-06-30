@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.sinum.const import DOMAIN, CONF_API_TOKEN
+
 # turbojpeg is an optional C extension used by the HA camera platform for JPEG
 # re-encoding. It is not available in the CI/test environment; provide a stub so
 # camera-related tests can import homeassistant.components.camera without error.
@@ -101,3 +103,44 @@ def _wtp_device_side_effect(fixtures: dict[str, Any]):
         return dict(mapping[device_id])
 
     return _side_effect
+
+
+@pytest.fixture(name="mock_config_entry")
+def fixture_mock_config_entry(hass: Any) -> Any:
+    """Return a mock config entry."""
+
+    def add_to_hass_impl(hass_instance: Any) -> None:
+        """Add entry to hass config_entries."""
+        hass_instance.config_entries._entries[entry.entry_id] = entry
+
+    entry = MagicMock()
+    entry.entry_id = "test_entry_id"
+    entry.domain = DOMAIN
+    entry.data = {"host": "192.168.1.100", "api_token": "test_token"}
+    entry.options = {}
+    entry.add_to_hass = lambda h: add_to_hass_impl(h)
+    entry.async_on_unload = MagicMock(return_value=lambda: None)
+    return entry
+
+
+@pytest.fixture(name="mock_coordinator")
+def fixture_mock_coordinator(mock_client: MagicMock) -> MagicMock:
+    """Return a mock coordinator."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "devices": [],
+        "rooms": [],
+        "floors": [],
+        "scenes": [],
+        "variables": [],
+        "weather": {},
+        "energy": {},
+        "schedules": [],
+        "alarm_devices": [],
+    }
+    coordinator.client = mock_client
+    coordinator.hass = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.get_motion_event = MagicMock(return_value=None)
+    coordinator.dispatch_motion_detected = MagicMock()
+    return coordinator

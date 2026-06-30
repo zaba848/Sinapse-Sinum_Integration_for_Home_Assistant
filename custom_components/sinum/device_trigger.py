@@ -34,39 +34,52 @@ async def async_validate_trigger_config(
     return TRIGGER_SCHEMA(config)
 
 
+def _build_trigger(device_id: str, trigger_type: str) -> dict[str, Any]:
+    """Build a device trigger configuration."""
+    return {
+        CONF_PLATFORM: "device",
+        CONF_DOMAIN: DOMAIN,
+        CONF_DEVICE_ID: device_id,
+        CONF_TYPE: trigger_type,
+    }
+
+
+def _is_button_entity(entry: Any) -> bool:
+    """Check if entity is a button event entity."""
+    return entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
+
+
+def _is_scene_entity(entry: Any) -> bool:
+    """Check if entity is a scene entity."""
+    return entry.domain == SCENE_DOMAIN and entry.platform == DOMAIN
+
+
+def _count_entities(entries: list[Any], predicate: Any) -> int:
+    """Count entries matching predicate."""
+    return sum(1 for e in entries if predicate(e))
+
+
+def _get_button_triggers(hass: HomeAssistant, device_id: str) -> list[dict[str, Any]]:
+    """Get button press triggers for device."""
+    ent_reg = er.async_get(hass)
+    entries = er.async_entries_for_device(ent_reg, device_id)
+    count = _count_entities(entries, _is_button_entity)
+    return [_build_trigger(device_id, TRIGGER_TYPE_PRESSED) for _ in range(count)]
+
+
+def _get_scene_triggers(hass: HomeAssistant, device_id: str) -> list[dict[str, Any]]:
+    """Get scene activation triggers for device."""
+    ent_reg = er.async_get(hass)
+    entries = er.async_entries_for_device(ent_reg, device_id)
+    count = _count_entities(entries, _is_scene_entity)
+    return [_build_trigger(device_id, TRIGGER_TYPE_SCENE_ACTIVATED) for _ in range(count)]
+
+
 async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict[str, Any]]:
     """Return triggers for each Sinum button and scene entity on this device."""
-    ent_reg = er.async_get(hass)
     triggers = []
-
-    # Button triggers
-    triggers.extend(
-        [
-            {
-                CONF_PLATFORM: "device",
-                CONF_DOMAIN: DOMAIN,
-                CONF_DEVICE_ID: device_id,
-                CONF_TYPE: TRIGGER_TYPE_PRESSED,
-            }
-            for entry in er.async_entries_for_device(ent_reg, device_id)
-            if entry.domain == EVENT_DOMAIN and entry.platform == DOMAIN
-        ]
-    )
-
-    # Scene triggers
-    triggers.extend(
-        [
-            {
-                CONF_PLATFORM: "device",
-                CONF_DOMAIN: DOMAIN,
-                CONF_DEVICE_ID: device_id,
-                CONF_TYPE: TRIGGER_TYPE_SCENE_ACTIVATED,
-            }
-            for entry in er.async_entries_for_device(ent_reg, device_id)
-            if entry.domain == SCENE_DOMAIN and entry.platform == DOMAIN
-        ]
-    )
-
+    triggers.extend(_get_button_triggers(hass, device_id))
+    triggers.extend(_get_scene_triggers(hass, device_id))
     return triggers
 
 
