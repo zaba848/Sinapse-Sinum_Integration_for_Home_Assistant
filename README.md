@@ -105,7 +105,7 @@ SinumCoordinator (coordinator.py)
 | `number` | Numeric Lua environment variables · SBUS analog output (0–10 V) |
 | `update` | Parent device firmware tracker |
 | `alarm_control_panel` | Alarm system (when present on hub) |
-| `camera` | IP/ONVIF cameras via hub snapshot proxy |
+| `camera` | IP/ONVIF cameras — RTSP stills (when credentials available) + hub snapshot fallback + WebRTC live view |
 
 ### Device Types per Bus
 
@@ -212,7 +212,7 @@ Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live har
 | **Virtual blind integrators** | Report `position = None` when no physical controllers are linked (hub configuration issue, not integration bug). |
 | **Energy Center** | Sensors appear only when hub firmware exposes `/api/v1/energy-center/*`. |
 | **Schedules** | Read-only sensors + `sinum.update_schedule` service. Full schedule editing UI is not implemented. |
-| **LoRa / SLINK / Video** | Require specific hardware modules. SLINK relay and energy meter entities are mapped; video cameras use hub snapshot/WebRTC paths. LoRa write support is implemented but still needs relay hardware validation. |
+| **LoRa / SLINK / Video** | Require specific hardware modules. SLINK relay and energy meter entities are mapped; video cameras use RTSP (when credentials are available) for thumbnail stills and WebRTC for live view, with hub snapshot as fallback. LoRa write support is implemented but still needs relay hardware validation. |
 | **Alpha firmware 408s** | Intermittent on bus polling. Integration retries once then serves cached state. |
 
 ---

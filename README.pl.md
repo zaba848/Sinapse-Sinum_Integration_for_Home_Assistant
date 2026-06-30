@@ -105,7 +105,7 @@ SinumCoordinator (coordinator.py)
 | `number` | Numeryczne zmienne środowiskowe Lua · wyjście analogowe SBUS (0–10 V) |
 | `update` | Śledzenie firmware urządzeń nadrzędnych |
 | `alarm_control_panel` | System alarmowy (jeśli dostępny w centrali) |
-| `camera` | Kamery IP/ONVIF przez proxy snapshotów centrali |
+| `camera` | Kamery IP/ONVIF — klatki RTSP (gdy dostępne dane logowania) + snapshot przez centralę (fallback) + widok na żywo WebRTC |
 
 ### Typy urządzeń na magistralach
 
@@ -212,7 +212,7 @@ Read-only smoke, API coverage, HIL smoke i testy WebSocket przeszły na żywym s
 | **Integratory rolet wirtualnych** | Raportują `position = None` gdy brak podłączonych sterowników fizycznych (kwestia konfiguracji centrali). |
 | **Energy Center** | Sensory pojawiają się tylko gdy firmware eksponuje `/api/v1/energy-center/*`. |
 | **Harmonogramy** | Tylko odczyt + usługa `sinum.update_schedule`. Pełny edytor UI harmonogramów nie jest zaimplementowany. |
-| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Przekaźniki i liczniki energii SLINK są mapowane; kamery używają ścieżek snapshot/WebRTC przez hub. Zapis LoRa jest zaimplementowany, ale wymaga walidacji na przekaźniku LoRa. |
+| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Przekaźniki i liczniki energii SLINK są mapowane; kamery używają RTSP dla miniatur (gdy dane logowania są dostępne) i WebRTC dla widoku na żywo, ze snapshotem przez hub jako fallback. Zapis LoRa jest zaimplementowany, ale wymaga walidacji na przekaźniku LoRa. |
 | **Błędy 408 firmware alpha** | Sporadyczne przy odpytywaniu magistral. Integracja ponawia raz, potem serwuje stan z cache. |
 
 ---

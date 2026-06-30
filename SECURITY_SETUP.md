@@ -111,7 +111,7 @@ This document provides step-by-step instructions for configuring GitHub security
 
 3. **Optional repository variable**:
    - Name: `SINUM_SMOKE_HUBS`
-   - Value example: `WTP=http://10.0.61.132,SBUS=http://10.0.62.167,VIDEO=http://10.0.62.117`
+   - Value example: `WTP=http://<WTP_HUB_IP>,SBUS=http://<SBUS_HUB_IP>,VIDEO=http://<VIDEO_HUB_IP>`
 
 4. **Verify workflow** is active:
    - Go to **.github/workflows/hardware-nightly.yml** (already committed)

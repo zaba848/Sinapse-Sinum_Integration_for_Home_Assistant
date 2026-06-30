@@ -251,7 +251,17 @@ Kamera motion WS event (`type: "motion_detected"`) nie ma HIL testu bo wymagałb
 1. Pasywny: nasłuchiwać WS przez 30s i logować jeśli przyjdzie event — nie wymaga ruchu
 2. Aktywny: nie robić — nie warto symulować ruchu automatycznie
 
-### Krok 5 — Nowe funkcje (po potwierdzeniu v0.7.0 na RPi)
+### Krok 4b — HIL RTSP stills (v0.7.1)
+
+`use_stream_for_stills = True` wymaga weryfikacji na żywej kamerze. Obserwacja:
+1. Zrestartować HA po deploy v0.7.1
+2. Otworzyć kartę kamery w HA — zdjęcie miniatury powinno pobrać się przez RTSP, a nie przez `/snapshot`
+3. Sprawdzić logi HA (`homeassistant.log`) pod kątem błędów `camera.py` i `stream.py`
+4. Jeśli hub maskuje hasło: HA musi wrócić do snapshot — to też jest poprawne zachowanie
+
+**Realny problem do sprawdzenia**: `_rtsp_fetched` jest cache per-restart HA. Jeśli hub zmieni hasło, cache będzie nieaktualne. W praktyce to nie problem (hasła RTSP nie zmieniają się), ale warto odnotować.
+
+### Krok 5 — Nowe funkcje (po potwierdzeniu v0.7.1 na RPi)
 
 | Feature | Priorytet | Uwagi |
 |---------|-----------|-------|
