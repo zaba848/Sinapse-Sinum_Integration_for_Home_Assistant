@@ -1,7 +1,7 @@
 # Sinapse - Implementation Plan & Status
 
-> Last updated: 2026-06-30 (released: v0.7.0 ✅)
-> Current manifest version: v0.7.0 (production)
+> Last updated: 2026-07-01 (released: v0.7.2 ✅)
+> Current manifest version: v0.7.2 (production)
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 675 passing, 5 skipped (~10 s)
+Tests:  1 678 passing, 5 skipped (~10 s)
 Ruff:   0 errors
 mypy:   0 errors
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
@@ -100,6 +100,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.6.0 | WS hardening (exponential backoff), WS default enabled, README IP removal | 1 648 |
 | v0.7.0 | Camera motion events, SBUS blind position WS, alarm ARM_HOME/NIGHT, zone bypass, scene triggers | 1 671 |
 | v0.7.1 | Camera RTSP polling (use_stream_for_stills), RTSP URL cache, IP sanitisation in tests/docs | 1 675 |
+| v0.7.2 | Hub firmware version sensor, Sinapse title in UI, ruff CI pin, camera.py cleanup | 1 678 |
 
 ---
 

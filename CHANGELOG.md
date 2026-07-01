@@ -23,6 +23,20 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-07-01
+
+### Added
+- **Hub firmware version sensor** — each configured hub now exposes a diagnostic `Firmware version` sensor (translation key `hub_firmware`) showing the hub firmware string (e.g. `1.24.0-alpha.4`). Extra attributes include `device_type` and `api_version` when available. The sensor is always created; `native_value` returns `None` when the hub info endpoint does not include a `version` field.
+- **Integration title "Sinapse"** — added `"title": "Sinapse"` to `strings.json` and `pl.json` so the integration appears as "Sinapse" in the HA integrations UI (Settings → Devices & Services).
+
+### Fixed
+- **Ruff CI pin** — `.github/workflows/lint.yml` now installs `ruff==0.15.17` explicitly, preventing silent CI failures caused by upstream ruff breaking changes.
+- **`camera.py` noqa cleanup** — removed spurious `# noqa: ARG002` comment from `async_camera_image` parameters; `ARG002` is not in the project's ruff select set, so the hint was misleading.
+
+### Quality
+- 1678 tests passing (↑ 3 new hub firmware sensor tests over v0.7.1).
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.7.1] — 2026-06-30
 
 ### Added
