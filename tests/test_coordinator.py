@@ -475,14 +475,20 @@ class TestFirstDeviceClassField:
 
 
 class TestDeviceInfoMixinWithHubPrefix:
-    def _make_mixin_entity(self, hub_name: str, device_info):
-        """Helper: returns a minimal SinumDeviceAvailableMixin instance."""
+    def _make_mixin_entity(self, hub_name: str, device_info, *, num_entries: int = 1):
+        """Helper: returns a minimal SinumDeviceAvailableMixin instance.
+
+        num_entries controls how many active config entries the mock hass reports.
+        Use 2+ to simulate a multi-hub setup (prefix is added only then).
+        """
         from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
         from custom_components.sinum.coordinator import SinumDeviceAvailableMixin
 
         coordinator = MagicMock()
         coordinator.hub_name = hub_name
+        entries = [MagicMock(disabled_by=None) for _ in range(num_entries)]
+        coordinator.hass.config_entries.async_entries.return_value = entries
 
         class _Entity(SinumDeviceAvailableMixin, CoordinatorEntity):
             def __init__(self):
@@ -496,19 +502,33 @@ class TestDeviceInfoMixinWithHubPrefix:
         return _Entity()
 
     def test_device_info_prefixes_name_with_hub(self):
-        """Lines 706-709: device_info adds hub prefix to device name."""
+        """device_info adds hub prefix when multiple hubs are active."""
         from homeassistant.helpers.device_registry import DeviceInfo
 
         entity = self._make_mixin_entity(
             "tablica-wtp",
             DeviceInfo(identifiers={("sinum", "e1_wtp_1")}, name="Energy Meter 1"),
+            num_entries=2,
         )
         info = entity.device_info
         assert info is not None
         assert info.get("name") == "tablica-wtp: Energy Meter 1"
 
+    def test_device_info_no_prefix_when_single_hub(self):
+        """device_info does NOT prefix when only one hub is active."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        entity = self._make_mixin_entity(
+            "tablica-wtp",
+            DeviceInfo(identifiers={("sinum", "e1_wtp_1")}, name="Energy Meter 1"),
+            num_entries=1,
+        )
+        info = entity.device_info
+        assert info is not None
+        assert info.get("name") == "Energy Meter 1"
+
     def test_device_info_unchanged_when_hub_name_empty(self):
-        """Lines 704: early return when hub_name is empty."""
+        """Early return when hub_name is empty (no hub configured)."""
         from homeassistant.helpers.device_registry import DeviceInfo
 
         entity = self._make_mixin_entity(
@@ -520,7 +540,7 @@ class TestDeviceInfoMixinWithHubPrefix:
         assert info.get("name") == "Energy Meter 1"
 
     def test_device_info_unchanged_when_device_name_missing(self):
-        """Lines 706-708: skip prefix when device_info has no name field."""
+        """Skip prefix when device_info has no name field."""
         from homeassistant.helpers.device_registry import DeviceInfo
 
         entity = self._make_mixin_entity(
@@ -530,3 +550,52 @@ class TestDeviceInfoMixinWithHubPrefix:
         info = entity.device_info
         assert info is not None
         assert info.get("name") is None
+
+
+class TestEffectiveHubName:
+    def _make_coordinator(self, hub_name: str, num_entries: int):
+        coord = MagicMock()
+        coord.hub_name = hub_name
+        entries = [MagicMock(disabled_by=None) for _ in range(num_entries)]
+        coord.hass.config_entries.async_entries.return_value = entries
+        return coord
+
+    def test_returns_none_when_hub_name_empty(self):
+        from custom_components.sinum.coordinator import _effective_hub_name
+
+        coord = self._make_coordinator("", 2)
+        assert _effective_hub_name(coord) is None
+
+    def test_returns_none_when_single_hub(self):
+        from custom_components.sinum.coordinator import _effective_hub_name
+
+        coord = self._make_coordinator("tablica-wtp", 1)
+        assert _effective_hub_name(coord) is None
+
+    def test_returns_hub_name_when_multi_hub(self):
+        from custom_components.sinum.coordinator import _effective_hub_name
+
+        coord = self._make_coordinator("tablica-wtp", 2)
+        assert _effective_hub_name(coord) == "tablica-wtp"
+
+    def test_disabled_entries_not_counted(self):
+        from custom_components.sinum.coordinator import _effective_hub_name
+
+        coord = MagicMock()
+        coord.hub_name = "tablica-wtp"
+        active = MagicMock(disabled_by=None)
+        disabled = MagicMock(disabled_by="user")
+        coord.hass.config_entries.async_entries.return_value = [active, disabled]
+        assert _effective_hub_name(coord) is None
+
+    def test_hub_prefixed_name_multi_hub(self):
+        from custom_components.sinum.coordinator import hub_prefixed_name
+
+        coord = self._make_coordinator("tablica-wtp", 2)
+        assert hub_prefixed_name(coord, "Energy Meter 1") == "tablica-wtp: Energy Meter 1"
+
+    def test_hub_prefixed_name_single_hub(self):
+        from custom_components.sinum.coordinator import hub_prefixed_name
+
+        coord = self._make_coordinator("tablica-wtp", 1)
+        assert hub_prefixed_name(coord, "Energy Meter 1") == "Energy Meter 1"

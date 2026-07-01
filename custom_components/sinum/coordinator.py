@@ -713,7 +713,7 @@ class SinumDeviceAvailableMixin:
     @property
     def device_info(self) -> DeviceInfo | None:
         info = self._attr_device_info
-        hub_name = self.coordinator.hub_name
+        hub_name = _effective_hub_name(self.coordinator)
         if not info or not hub_name:
             return info
         raw_name = info.get("name")
@@ -722,9 +722,18 @@ class SinumDeviceAvailableMixin:
         return DeviceInfo(**{**info, "name": f"{hub_name}: {raw_name}"})
 
 
+def _effective_hub_name(coordinator: SinumCoordinator) -> str | None:
+    if not coordinator.hub_name:
+        return None
+    entries = coordinator.hass.config_entries.async_entries(DOMAIN)
+    active = sum(not e.disabled_by for e in entries)
+    if active <= 1:
+        return None
+    return coordinator.hub_name
+
+
 def hub_prefixed_name(coordinator: SinumCoordinator, name: str) -> str:
-    """Prefix a device name with the hub name for multi-hub entity_id uniqueness."""
-    hub = coordinator.hub_name
+    hub = _effective_hub_name(coordinator)
     return f"{hub}: {name}" if hub else name
 
 

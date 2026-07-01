@@ -23,6 +23,11 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-07-01
+
+### Changed
+- **Hub name prefix only in multi-hub setups** — device names no longer carry the hub name prefix (e.g. `tablica-wtp: Energy Meter 1`) when only one Sinum hub is configured. The prefix is added automatically when two or more hubs are active so device names stay unique across HA. Applies to all entity types using `SinumDeviceAvailableMixin.device_info` and `hub_prefixed_name` (parent, camera, event, schedule, update, sensor_virtual entities).
+
 ## [0.7.3] — 2026-07-01
 
 ### Added
