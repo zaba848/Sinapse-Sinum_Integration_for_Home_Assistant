@@ -289,6 +289,8 @@ class SinumBinarySensor(
             manufacturer="TECH Sterowniki",
             model=device.get("_parent_model")
             or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
+            sw_version=device.get("software_version"),
+            serial_number=device.get("eui"),
             suggested_area=device.get("_area") or None,
             via_device=via,
         )

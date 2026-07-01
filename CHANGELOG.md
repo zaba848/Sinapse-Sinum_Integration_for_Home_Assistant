@@ -23,6 +23,15 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-07-01
+
+### Added
+- **LoRa device EUI and firmware in device registry** — `sensor_bus.py` and `binary_sensor.py` now populate `serial_number` (from the LoRa EUI field) and `sw_version` (from `software_version`, e.g. `ACW THO v4.x/v5.x`) in the HA device registry for all LoRa-bus entities. Verified on live ACW THO temperature + humidity sensor on `sinum-lora` hub.
+
+### Quality
+- 1682 tests passing (↑ 4 new LoRa device-info tests over v0.7.2).
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.7.2] — 2026-07-01
 
 ### Added

@@ -101,6 +101,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.7.0 | Camera motion events, SBUS blind position WS, alarm ARM_HOME/NIGHT, zone bypass, scene triggers | 1 671 |
 | v0.7.1 | Camera RTSP polling (use_stream_for_stills), RTSP URL cache, IP sanitisation in tests/docs | 1 675 |
 | v0.7.2 | Hub firmware version sensor, Sinapse title in UI, ruff CI pin, camera.py cleanup | 1 678 |
+| v0.7.3 | LoRa EUI as serial_number + software_version as sw_version in device registry | 1 682 |
 
 ---
 

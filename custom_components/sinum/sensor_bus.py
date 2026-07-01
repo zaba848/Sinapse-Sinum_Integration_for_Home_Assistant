@@ -119,6 +119,8 @@ def _sensor_device_info(
         name=label,
         manufacturer="TECH Sterowniki",
         model=device.get("_parent_model") or _model_for_source(source),
+        sw_version=device.get("software_version"),
+        serial_number=device.get("eui"),
         suggested_area=device.get("_area") or None,
         via_device=via_device_for(device, entry_id),
     )

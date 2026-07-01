@@ -575,3 +575,59 @@ class TestSinumButtonSensor:
         entity = SinumButtonSensor(coordinator, 1, "entry", "wtp")
         attrs = entity.extra_state_attributes
         assert "buzzer" not in attrs
+
+
+class TestLoRaSensorDeviceInfo:
+    """Device-info enrichment for LoRa sensors (EUI + software_version)."""
+
+    def _make_lora_sensor(self, device: dict) -> SinumSensor:
+        from custom_components.sinum.sensor_bus_descriptions import LORA_SENSORS
+
+        desc = next(d for d in LORA_SENSORS if d.api_key == "temperature")
+        coordinator = MagicMock()
+        coordinator.lora_devices = {2: device}
+        return SinumSensor(coordinator, 2, desc, "entry")
+
+    def test_eui_appears_as_serial_number(self):
+        device = {
+            "id": 2,
+            "type": "temperature_sensor",
+            "name": "Temperature sensor 1",
+            "temperature": 231,
+            "eui": "70B3D59BA000A200",
+            "software_version": "ACW THO v4.x/v5.x",
+        }
+        entity = self._make_lora_sensor(device)
+        assert entity._attr_device_info["serial_number"] == "70B3D59BA000A200"
+
+    def test_software_version_appears_as_sw_version(self):
+        device = {
+            "id": 2,
+            "type": "temperature_sensor",
+            "name": "Temperature sensor 1",
+            "temperature": 231,
+            "eui": "70B3D59BA000A200",
+            "software_version": "ACW THO v4.x/v5.x",
+        }
+        entity = self._make_lora_sensor(device)
+        assert entity._attr_device_info["sw_version"] == "ACW THO v4.x/v5.x"
+
+    def test_no_eui_serial_number_is_none(self):
+        device = {
+            "id": 2,
+            "type": "temperature_sensor",
+            "name": "Temperature sensor 1",
+            "temperature": 231,
+        }
+        entity = self._make_lora_sensor(device)
+        assert entity._attr_device_info.get("serial_number") is None
+
+    def test_lora_values_scale_correctly(self):
+        from custom_components.sinum.sensor_bus_descriptions import LORA_SENSORS
+
+        temp_desc = next(d for d in LORA_SENSORS if d.api_key == "temperature")
+        hum_desc = next(d for d in LORA_SENSORS if d.api_key == "humidity")
+        bat_desc = next(d for d in LORA_SENSORS if d.api_key == "battery")
+        assert temp_desc.scale == 0.1
+        assert hum_desc.scale == 0.1
+        assert bat_desc.scale == 1.0
