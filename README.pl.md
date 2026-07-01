@@ -187,19 +187,22 @@ data:
 
 ## Testowane centrale
 
-| Centrala | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| tablica-wtp | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
-| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
-| tablica-video-nowa | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
-| tablicaKlimak | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
-| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
+| Centrala | Firmware | Virtual | WTP | SBUS | LoRa | SLINK | Modbus | Video | Alarm |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| tablica-wtp | 1.24.0-alpha.2 | 30 | 254 | 8 | 0 | 2 | 0 | 0 | 1 |
+| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 0 | 1 | 0 | 3 |
+| tablica-video-nowa | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 0 | 1 | 6 | 0 |
+| tablicaKlimak | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 0 | 5 | 0 | 0 |
+| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 29 | 50 | 191 | 0 | 2 | 3 | 0 | 16 |
+| sinum-lora | 1.24.0-alpha.4 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 
-Read-only smoke, API coverage, HIL smoke i testy WebSocket przeszły na żywym sprzęcie (2026-06-30).
+Read-only smoke, API coverage, HIL smoke i testy WebSocket przeszły na żywym sprzęcie (2026-07-01).
 
 `tablica-wtp` (instalacja WTP-heavy): 108 przekaźników WTP, 18 sterowników rolet, 15 regulatorów temperatury, 28 przycisków, pełny zestaw czujników (temperatura/wilgotność/CO₂/IAQ/ciśnienie/światło/ruch/zalanie), 1 fan coil, 1 licznik energii.
 
 `sinum-tablica-sbus-1` (instalacja SBUS-heavy): 83 termostaty wirtualne, 51 regulatorów SBUS, 69 przekaźników SBUS, 38 ściemniaczy SBUS, 6 sterowników RGB SBUS, 30 przycisków SBUS, 134 czujniki temperatury SBUS, 46 czujników wilgotności SBUS, 1 manager pompy ciepła.
+
+`sinum-lora` (brama LoRa): 2 urządzenia LoRa z czujnika Atim ACW THO (EUI 70B3D59BA000A200) — temperatura i wilgotność, poziom baterii, siła sygnału. EUI widoczny jako numer seryjny w rejestrze urządzeń HA.
 
 ---
 

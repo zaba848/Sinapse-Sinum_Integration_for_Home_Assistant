@@ -187,19 +187,22 @@ data:
 
 ## Tested Hubs
 
-| Hub | Firmware | Virtual | WTP | SBUS | SLINK | Modbus | Video | Alarm |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| tablica-wtp | 1.24.0-alpha.2 | 30 | 254 | 8 | 2 | 0 | 0 | 1 |
-| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 1 | 0 | 3 |
-| tablica-video-nowa | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 1 | 6 | 0 |
-| tablicaKlimak | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 5 | 0 | 0 |
-| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 29 | 50 | 191 | 2 | 3 | 0 | 16 |
+| Hub | Firmware | Virtual | WTP | SBUS | LoRa | SLINK | Modbus | Video | Alarm |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| tablica-wtp | 1.24.0-alpha.2 | 30 | 254 | 8 | 0 | 2 | 0 | 0 | 1 |
+| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 171 | 35 | 436 | 0 | 0 | 1 | 0 | 3 |
+| tablica-video-nowa | 1.24.0-alpha.4 | 6 | 21 | 77 | 0 | 0 | 1 | 6 | 0 |
+| tablicaKlimak | 1.24.0-alpha.4 | 13 | 41 | 25 | 0 | 0 | 5 | 0 | 0 |
+| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 29 | 50 | 191 | 0 | 2 | 3 | 0 | 16 |
+| sinum-lora | 1.24.0-alpha.4 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 
-Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live hardware (2026-06-30).
+Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live hardware (2026-07-01).
 
 `tablica-wtp` (WTP-heavy): 108 WTP relays, 18 blind controllers, 15 temperature regulators, 28 buttons, full sensor suite (temperature/humidity/CO₂/IAQ/pressure/light/motion/flood), 1 fan coil, 1 energy meter.
 
 `sinum-tablica-sbus-1` (SBUS-heavy): 83 virtual thermostats, 51 SBUS temperature regulators, 69 SBUS relays, 38 SBUS dimmers, 6 SBUS RGB controllers, 30 SBUS buttons, 134 SBUS temperature sensors, 46 SBUS humidity sensors, 1 heat pump manager.
+
+`sinum-lora` (LoRa gateway): 2 LoRa devices from Atim ACW THO sensor (EUI 70B3D59BA000A200) — temperature and humidity, battery level, signal strength. EUI shown as serial number in HA device registry.
 
 ---
 
