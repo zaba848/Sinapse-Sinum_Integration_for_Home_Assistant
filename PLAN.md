@@ -272,6 +272,168 @@ Kamera motion WS event (`type: "motion_detected"`) nie ma HIL testu bo wymagałb
 
 ---
 
+## Release & Documentation Workflow (v0.7.2 → v0.8.0)
+
+### Phase 1: GitHub Release Publication (5 min, DONE for v0.6.0)
+
+**File**: `.github_release_v0.6.0.md` (template ready)
+
+Steps:
+1. Log in GitHub → https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/releases/new
+2. Tag: `v0.6.0` (or next version)
+3. Title: `v0.6.0 — WebSocket Hardening & Security`
+4. Description: Copy from `.github_release_v0.6.0.md`
+5. Publish
+
+**Impact**: HACS user discovery, release notes visible to all users
+
+---
+
+### Phase 2: README & Derived Documentation Update (30 min after each release)
+
+**Files affected** (keep in sync):
+- `custom_components/sinum/README.md` — Primary entity reference
+- `README.md` — Project overview, setup links
+- `README.pl.md` — Polish localization (mirror)
+- `docs/installation.md` — Setup workflow (EN)
+- `docs/installation.pl.md` — Setup workflow (PL)
+- `docs/real-time.md` — WebSocket/latency explanation (EN)
+- `docs/real-time.pl.md` — WebSocket/latency explanation (PL)
+- `docs/development.md` — Dev guide, test counts (EN)
+- `docs/development.pl.md` — Dev guide, test counts (PL)
+
+**Update triggers**:
+- New platforms added (reflect in entity count)
+- Version bump (update all version badges)
+- Test count changes (update pytest count in all docs)
+- Quality gate changes (update ruff/mypy/CC status)
+- Feature deprecation (update known limitations)
+
+**Quality checks**:
+```bash
+# Find all hardcoded test counts:
+grep -r "1 678\|1678\|1 667\|1667" docs/ README.md README.pl.md custom_components/
+
+# Find all hardcoded version strings:
+grep -r "0\.7\.[0-9]\|v0\.7\.[0-9]" docs/ README.md README.pl.md custom_components/
+
+# Verify no production IP addresses:
+grep -rE "192\.|10\." docs/ README.md README.pl.md custom_components/ || echo "✓ No IPs found"
+```
+
+---
+
+### Phase 3: Hardware Testing Workflow (Post-Deploy Validation)
+
+**Pre-release (local PC)**:
+```bash
+# All quality gates must pass before commit
+python3 -m pytest -q                                    # All tests
+python3 -m pytest -q tests/test_code_quality.py        # CC <= 4 check
+/opt/homebrew/bin/ruff check custom_components/        # Style
+/opt/homebrew/bin/ruff format --check custom_components/
+/opt/homebrew/bin/mypy custom_components/sinum/ \
+  --ignore-missing-imports --no-site-packages          # Types
+```
+
+**Post-release (on 5 hub inventory)**:
+```bash
+# Read-only smoke (no changes, no credentials)
+export SINUM_SMOKE_HUBS="WTP=http://<IP1>,SBUS=http://<IP2>,VIDEO=http://<IP3>,KLIMAK=http://<IP4>,SBUS2=http://<IP5>"
+export SINUM_USERNAME="admin"
+python3 scripts/hardware_smoke_check.py                # 5/5 hubs PASS expected
+
+# Live write validation (only on test hub)
+export SINUM_SBUS_TOKEN="<api-token>"                  # Explicit token for dimmer/schedule writes
+python3 scripts/validate_api_writes.py                 # Dimmer/schedule writes only (no alarm)
+
+# Alarm-specific testing (requires explicit approval)
+export SINUM_ALARM_TEST_PIN="1234"                     # Only set when alarm testing approved
+python3 scripts/validate_api_writes.py --alarm-only    # ARM_HOME + immediate disarm
+
+# Live WS event validation (30s passive listen)
+python3 scripts/hardware_in_loop/websocket_listener.py \
+  --hub=http://<SBUS_HUB> --token=<api-token> --duration=30  # Capture any WS events
+```
+
+**Output files** (generated post-test):
+- `docs/hardware_smoke_latest.md` — Latest smoke results (dates, hub versions, endpoint counts)
+- `docs/hardware_in_loop/live_write_validation_latest.md` — Write test results (dimmer/schedule/alarm safe writes)
+- `docs/ci_quality_dashboard.md` — Test count, CC violations, ruff errors, mypy errors (trend chart)
+
+---
+
+### Phase 4: Quality Gate Enforcement Checklist
+
+**Before every merge to `main`**:
+
+- [ ] **CC <= 4**: `python3 -m pytest -q tests/test_code_quality.py` passes
+  - If violation found (e.g., function CC=5): extract helper methods until CC <= 4
+  - No exceptions in `_LEGACY_ALLOWANCE = {}`
+  
+- [ ] **Ruff clean**: `ruff check custom_components/` returns 0 violations
+  - If violation: run `ruff format --fix` or manual edit
+  
+- [ ] **MyPy clean**: `mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages` returns 0 errors
+  - If error: add type hints to affected code or `# type: ignore` comment (with justification)
+  
+- [ ] **All tests pass**: `pytest -q` returns "N passed, M skipped, 0 failed"
+  - If new feature: must have ≥1 test (mocked or fixture-based)
+  - If modification: run affected test module to confirm regression-free
+
+- [ ] **No credentials in commits**: 
+  ```bash
+  git diff --cached | grep -iE "password|token|api.?key|secret" && echo "❌ Credentials found" || echo "✓ Safe"
+  ```
+
+- [ ] **README/docs in sync**: Any version bump or test count change propagated to all `.md` files
+  ```bash
+  # Check consistency
+  export TEST_COUNT=$(python3 -c "import re; print(re.search(r'(\d+)\s+passed', open('pytest.ini').read() or '1678').group(1) or '1678')")
+  grep -l "$TEST_COUNT" README.md README.pl.md docs/*.md || echo "⚠️  Test count mismatch"
+  ```
+
+---
+
+## v0.8.0 Feature Roadmap
+
+### Tier 1 (High priority, 2-4 weeks)
+
+| Feature | Effort | Status | Notes |
+|---------|--------|--------|-------|
+| **P6.1 — LoRa relay endpoint discovery** | 1h | Pending | Map LoRa devices to `/api/v1/devices/lora` payload structure; add fixtures |
+| **P6.2 — Camera PTZ (pan/tilt/zoom)** | 3h | Pending | Reverse-engineer PTZ endpoint; add number entity for preset selection |
+| **P6.3 — Energy dashboard template** | 2h | Pending | Provide HA energy dashboard config for impulse_meter entities |
+
+### Tier 2 (Medium priority, 4-8 weeks)
+
+| Feature | Effort | Status | Notes |
+|---------|--------|--------|-------|
+| **Performance metrics (WS uptime/latency dashboard)** | 3-4h | Future | Track WS reconnects, downtime, avg latency; expose as sensor |
+| **Multi-scene orchestration (sequential scenes)** | 2h | Future | Add scene dependency graph + execution order validation |
+| **Blind position presets (home/away/night)** | 1.5h | Future | Add preset service for blind positions per armed mode |
+
+### Tier 3 (Low priority, backlog)
+
+| Feature | Effort | Status | Notes |
+|---------|--------|--------|-------|
+| **LoRa relay live testing** | 2h | Blocked | Requires LoRa-equipped hub (currently none in inventory) |
+| **Lua script IDE integration** | 4h | Blocked | Requires hub firmware exposing Lua compilation endpoint |
+| **Custom device type registration** | 3h | Future | Let users add new device types via YAML config |
+
+---
+
+## Release Calendar (Projected)
+
+| Version | Release Date | Features | Test Count | Notes |
+|---------|--------------|----------|------------|-------|
+| v0.7.2 | 2026-07-01 ✅ | Hub firmware sensor, UI cleanup | 1678 | Production-ready |
+| v0.8.0 | ~2026-08-15 | LoRa discovery, PTZ, energy dashboard | 1750+ | Tier 1 features |
+| v0.8.1 | ~2026-09-01 | Performance metrics, blind presets | 1800+ | Tier 2 features |
+| v0.9.0 | ~2026-10-15 | Multi-scene orchestration, cleanup | 1850+ | Tier 2 completion |
+
+---
+
 ## Working Rules
 
 - Never commit credentials, tokens or HA access tokens.

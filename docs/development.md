@@ -358,6 +358,128 @@ Add fixture data to `tests/fixtures/sinum_devices.json` for complex device paylo
 
 ---
 
+## Hardware Testing Workflow
+
+All releases must be validated on real hubs before deployment to production. The workflow uses 5 known production hubs with known inventory.
+
+### Pre-Release (Local PC)
+
+All local quality gates must pass before pushing to GitHub:
+
+```bash
+# Unit tests (no hardware needed)
+python3 -m pytest -q
+
+# Code quality (CC <= 4, ruff, mypy)
+python3 -m pytest -q tests/test_code_quality.py
+/opt/homebrew/bin/ruff check custom_components/
+/opt/homebrew/bin/mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages
+
+# No credentials in commits
+git diff --cached | grep -iE "password|token|secret" && echo "❌ FAIL" || echo "✓ PASS"
+```
+
+### Post-Release (5 Live Hubs)
+
+#### Phase 1: Read-Only Smoke Test
+
+No writes, no credentials needed. Tests that endpoints are reachable and payloads are parseable.
+
+```bash
+export SINUM_SMOKE_HUBS="WTP=http://<IP1>,SBUS=http://<IP2>,VIDEO=http://<IP3>,KLIMAK=http://<IP4>,SBUS2=http://<IP5>"
+python3 scripts/hardware_smoke_check.py
+```
+
+**Expected output**:
+```
+[2026-07-01T12:00:00] WTP: 30 virtual, 254 WTP, 8 SBUS, 2 SLINK, 1 alarm ✓
+[2026-07-01T12:00:05] SBUS: 171 virtual, 35 WTP, 436 SBUS, 1 Modbus, 3 alarms ✓
+[2026-07-01T12:00:10] VIDEO: 6 virtual, 21 WTP, 77 SBUS, 1 Modbus, 6 video ✓
+[2026-07-01T12:00:15] KLIMAK: 13 virtual, 41 WTP, 25 SBUS, 5 Modbus ✓
+[2026-07-01T12:00:20] SBUS2: 29 virtual, 50 WTP, 191 SBUS, 2 SLINK, 3 Modbus, 16 alarms ✓
+
+Smoke results: 5/5 hubs PASS
+```
+
+#### Phase 2: API Coverage & Device-Level Validation
+
+Tests all endpoints for proper response codes, field presence, and type correctness. No writes.
+
+```bash
+export SINUM_SMOKE_HUBS="SBUS=http://<SBUS_IP>"
+python3 tests/hardware_in_loop/hil_api_coverage.py --host <SBUS_IP> --token "$SINUM_API_TOKEN"
+```
+
+#### Phase 3: Safe Write Validation (Dimmers + Schedules)
+
+Tests PATCH operations on non-destructive devices (dimmers, schedules, RTSP URLs). Writes are immediately rolled back.
+
+```bash
+export SINUM_SBUS_TOKEN="<api-token>"
+python3 scripts/validate_api_writes.py
+```
+
+**Writes tested**:
+- Dimmer brightness (set to 50%, verify, restore to 100%)
+- Schedule active status (toggle, verify, restore)
+- RTSP URL (if applicable)
+
+#### Phase 4: Alarm-Specific Testing (Requires Explicit Approval)
+
+**DESTRUCTIVE** — Do not run without explicit user approval and backups. Tests ARM_HOME, ARM_NIGHT, and zone bypass.
+
+```bash
+export SINUM_ALARM_TEST_PIN="<PIN>"    # Only set if alarm testing approved
+python3 scripts/validate_api_writes.py --alarm-only
+```
+
+**Sequence**:
+1. Disarm alarm (baseline)
+2. Arm in HOME mode (verify zone_status)
+3. Disarm (immediate cleanup)
+4. Arm in NIGHT mode
+5. Disarm
+6. Verify alarm is in original state
+
+#### Phase 5: WebSocket Event Validation (30s Passive Listen)
+
+Captures any WS events flowing through the bridge. Does not require motion or button presses.
+
+```bash
+python3 tests/hardware_in_loop/hil_websocket.py --host <SBUS_IP> --token "$SINUM_API_TOKEN" --duration=30
+```
+
+**Expected capture** (if motion/events occur):
+- `device_state_changed` events for updated devices
+- `motion_detected` events if cameras see motion
+- `button_pressed` events if buttons are pressed
+
+### Post-Test Documentation
+
+After all phases complete, update:
+
+- `docs/hardware_smoke_latest.md` — Test dates, hub firmware versions, endpoint counts, PASS/FAIL status
+- `docs/hardware_in_loop/live_write_validation_latest.md` — Write test results, safe devices, excluded operations
+- `docs/ci_quality_dashboard.md` — Test count trend, CC violations (if any), ruff/mypy status
+
+Example entry for `hardware_smoke_latest.md`:
+
+```markdown
+## 2026-07-01 (v0.7.2 Release Validation)
+
+| Hub | Firmware | Entities | Status |
+|---|---|---|---|
+| tablica-wtp | 1.24.0-alpha.2 | 295 | ✅ PASS |
+| sinum-tablica-sbus-1 | 1.24.0-alpha.4 | 646 | ✅ PASS |
+| tablica-video-nowa | 1.24.0-alpha.4 | 105 | ✅ PASS |
+| tablicaKlimak | 1.24.0-alpha.4 | 84 | ✅ PASS |
+| sinum-tablica-sbus2 | 1.24.0-alpha.3 | 273 | ✅ PASS |
+
+**Result**: 5/5 hubs PASS · No regressions
+```
+
+---
+
 ## Debugging on a Live Hub
 
 Enable debug logging in HA `configuration.yaml`:

@@ -201,6 +201,61 @@ Read-only smoke, API coverage, HIL smoke and WebSocket checks passed on live har
 
 ---
 
+## Quality Assurance & Testing
+
+### Local Quality Gates (Required before every merge)
+
+```bash
+# All tests pass (no regressions)
+python3 -m pytest -q
+
+# Cyclomatic Complexity ≤ 4 everywhere
+python3 -m pytest -q tests/test_code_quality.py
+
+# Ruff style checks
+/opt/homebrew/bin/ruff check custom_components/
+
+# No uncommitted formatting issues
+/opt/homebrew/bin/ruff format --check custom_components/
+
+# Type safety (Python 3.9+ compatible)
+/opt/homebrew/bin/mypy custom_components/sinum/ \
+  --ignore-missing-imports --no-site-packages
+
+# No credentials in staged commits
+git diff --cached | grep -iE "password|token|api.?key|secret" || echo "✓ Safe to commit"
+```
+
+### Post-Release Hardware Testing (5 live hubs)
+
+```bash
+# Read-only smoke (no writes, no credentials needed)
+export SINUM_SMOKE_HUBS="HUB1=http://<IP1>,HUB2=http://<IP2>,..."
+python3 scripts/hardware_smoke_check.py
+
+# Safe write validation (dimmer + schedule only)
+export SINUM_SBUS_TOKEN="<api-token>"
+python3 scripts/validate_api_writes.py
+
+# WebSocket event capture (30s passive listen)
+python3 scripts/hardware_in_loop/websocket_listener.py \
+  --hub=http://<SBUS_HUB> --token=<api-token> --duration=30
+```
+
+### Test Coverage
+
+| Metric | Value | Target |
+|---|---|---|
+| Test files | 46 | ≥40 |
+| Test cases | 1678 | ≥1600 |
+| Ruff violations | 0 | 0 |
+| MyPy errors | 0 | 0 |
+| CC > 4 functions | 0 | 0 |
+| Fixture data coverage | All 7 buses | All 7 buses |
+| Hardware inventory | 5/5 hubs tested | 5/5 hubs PASS |
+
+---
+
 ## Known Limitations
 
 | Limitation | Details |
