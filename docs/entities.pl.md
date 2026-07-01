@@ -28,17 +28,17 @@
 | Platforma | Opis | Magistrale |
 |---|---|---|
 | `climate` | Termostaty, fan coile, regulatory, manager pompy ciepła | Virtual, WTP, SBUS |
-| `sensor` | Temperatura, wilgotność, CO₂, energia, diagnostyka i inne | Wszystkie |
+| `sensor` | Temperatura, wilgotność, CO₂, energia, diagnostyka i inne | Virtual, WTP, SBUS, LoRa, SLINK, Modbus |
 | `binary_sensor` | Zalanie, ruch, otwarcie, dym, stan zaworu, łączność | WTP, SBUS, LoRa |
-| `switch` | Przekaźniki, elektrozaczep, pompa zaworu, zawór wspólny | Virtual, WTP, SBUS |
-| `cover` | Sterowniki rolet, bramy | Virtual, WTP |
+| `switch` | Przekaźniki, elektrozaczep, pompa zaworu, zawór wspólny | Virtual, WTP, SBUS, LoRa |
+| `cover` | Sterowniki rolet, bramy | Virtual, WTP, SBUS |
 | `light` | Ściemniacze, sterowniki RGB | Virtual, WTP, SBUS |
 | `event` | Zdarzenia naciśnięcia fizycznych przycisków | WTP, SBUS |
 | `button` | Sceny Lua Sinum | Poziom centrali |
 | `number` | Zmienne środowiskowe Lua, wyjście analogowe SBUS | Virtual, SBUS |
 | `update` | Śledzenie firmware urządzeń nadrzędnych | Poziom centrali |
 | `alarm_control_panel` | System alarmowy | Poziom centrali |
-| `camera` | Kamery IP/ONVIF przez proxy snapshotów centrali | Poziom centrali |
+| `camera` | Kamery IP/ONVIF — zdjęcia RTSP + obraz na żywo WebRTC | Poziom centrali |
 
 ---
 
@@ -126,6 +126,33 @@ Zapobiega to pojawianiu się fałszywych odczytów 0,0 °C na wirtualnych termos
 **Podsumowania harmonogramów**: nazwa aktywnego okresu i temperatura zadana dla harmonogramów termicznych.
 
 **Temperatura zadana regulatora SBUS**: temperatura zadana jako dedykowany czujnik (uzupełnienie encji climate).
+
+### Czujniki LoRa
+
+Urządzenia LoRa komunikują się przez sieć bezprzewodową małej mocy. Każde urządzenie fizyczne jest pogrupowane pod **urządzeniem nadrzędnym** (brama Lora device) za pomocą mechanizmu `via_device` HA — w HA widoczna jest jedna karta urządzenia na fizyczny czujnik z wszystkimi jego encjami.
+
+**Obsługiwane typy urządzeń LoRa** (sensor + binary_sensor):
+
+| Typ urządzenia centrali | Czujniki | Binary sensory |
+|---|---|---|
+| `temperature_sensor` | temperatura, poziom baterii %, sygnał % | — |
+| `humidity_sensor` | wilgotność, poziom baterii %, sygnał % | — |
+| `opening_sensor` | poziom baterii %, sygnał % | otwarcie/kontakt |
+| `flood_sensor` | poziom baterii %, sygnał % | zalanie |
+| `smoke_sensor` | poziom baterii %, sygnał % | dym |
+| `relay` | — | — (encja switch) |
+| `two_state_input_sensor` | poziom baterii %, sygnał % | wejście dwustanowe |
+
+**Pola rejestru urządzeń HA** (Ustawienia → Urządzenia):
+
+| Pole | Źródło | Przykład |
+|---|---|---|
+| Numer seryjny | EUI LoRa (pole `eui`) | `70B3D59BA000A200` |
+| Firmware | Pole `software_version` | `ACW THO v4.x/v5.x` |
+| Producent | Stałe | `TECH Sterowniki` |
+| Model | Klasa urządzenia centrali | `Sinum LoRa Temperature Sensor` |
+
+EUI jednoznacznie identyfikuje fizyczny moduł radiowy i pojawia się w rejestrze urządzeń HA pod **Numer seryjny**. Przydatne do identyfikacji krzyżowej z interfejsem webowym Sinum lub serwerem sieci LoRa.
 
 ---
 
@@ -396,3 +423,9 @@ Kamery IP i ONVIF (`ip_camera`, `onvif_camera`) skonfigurowane w Sinum są ekspo
 Wszystkie encje Sinum używają `available = bool(self._device)`. Gdy centrala jest niedostępna i koordynator wraca do cache, wszystkie encje pozostają dostępne ze stanem z cache. Jeśli cache jest pusty (świeży restart HA z niedostępną centralą), encje pokazują `unavailable`.
 
 Gdy urządzenie zostanie trwale usunięte z centrali, encje HA dla tego urządzenia są automatycznie usuwane z rejestru encji i rejestru urządzeń przy kolejnym udanym odświeżeniu koordynatora.
+
+## Nazwy urządzeń w konfiguracji z wieloma centralami
+
+Gdy skonfigurowana jest tylko jedna centrala Sinum, nazwy urządzeń wyświetlane są bez prefiksu (np. `Energy Meter 1`). Gdy aktywne są dwie lub więcej central, nazwa centrali jest automatycznie dodawana jako prefiks do każdej nazwy urządzenia (np. `tablica-wtp: Energy Meter 1`), aby zapobiec kolizjom między identycznie nazwanymi urządzeniami na różnych centralach.
+
+Prefiks jest dodawany dynamicznie — pojawia się gdy tylko załadowany zostanie drugi wpis konfiguracji centrali i znika, gdy liczba powróci do jednej (po restarcie HA).

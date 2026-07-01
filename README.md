@@ -139,6 +139,8 @@ If the hub token or password changes, HA shows a persistent notification. Click 
 
 Multiple Sinum hubs can be added as separate config entries. Services (`sinum.send_notification`, `sinum.update_schedule`, `sinum.upload_mqtt_bridge`) accept an optional `entry_id` field to target a specific hub.
 
+When two or more hubs are active, device names automatically gain a hub-name prefix (e.g. `tablica-wtp: Energy Meter 1`) to prevent collisions. Single-hub installations show clean names without a prefix.
+
 ---
 
 ## HA Services
@@ -267,7 +269,8 @@ python3 scripts/hardware_in_loop/websocket_listener.py \
 | **Virtual blind integrators** | Report `position = None` when no physical controllers are linked (hub configuration issue, not integration bug). |
 | **Energy Center** | Sensors appear only when hub firmware exposes `/api/v1/energy-center/*`. |
 | **Schedules** | Read-only sensors + `sinum.update_schedule` service. Full schedule editing UI is not implemented. |
-| **LoRa / SLINK / Video** | Require specific hardware modules. SLINK relay and energy meter entities are mapped; video cameras use RTSP (when credentials are available) for thumbnail stills and WebRTC for live view, with hub snapshot as fallback. LoRa write support is implemented but still needs relay hardware validation. |
+| **LoRa sensors** | Temperature, humidity, opening, flood, smoke and two-state-input entities are verified on hardware (ACW THO sensor). EUI is exposed as the device serial number and `software_version` as firmware in the HA device registry. LoRa relay write support is implemented but not yet validated on hardware. |
+| **SLINK / Video** | Require specific hardware modules. SLINK relay and energy meter entities are mapped; video cameras use RTSP (when credentials are available) for thumbnail stills and WebRTC for live view, with hub snapshot as fallback. |
 | **Alpha firmware 408s** | Intermittent on bus polling. Integration retries once then serves cached state. |
 
 ---

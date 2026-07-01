@@ -28,17 +28,17 @@
 | Platform | Description | Buses |
 |---|---|---|
 | `climate` | Thermostats, fan coils, regulators, heat pump manager | Virtual, WTP, SBUS |
-| `sensor` | Temperature, humidity, CO₂, energy, diagnostics, and more | All |
+| `sensor` | Temperature, humidity, CO₂, energy, diagnostics, and more | Virtual, WTP, SBUS, LoRa, SLINK, Modbus |
 | `binary_sensor` | Flood, motion, opening, smoke, valve state, connectivity | WTP, SBUS, LoRa |
-| `switch` | Relays, electric strike, valve pump, common valve | Virtual, WTP, SBUS |
-| `cover` | Blind controllers, gates | Virtual, WTP |
+| `switch` | Relays, electric strike, valve pump, common valve | Virtual, WTP, SBUS, LoRa |
+| `cover` | Blind controllers, gates | Virtual, WTP, SBUS |
 | `light` | Dimmers, RGB controllers | Virtual, WTP, SBUS |
 | `event` | Physical button press events | WTP, SBUS |
 | `button` | Sinum Lua scenes | Hub-level |
 | `number` | Lua environment variables, SBUS analog output | Virtual, SBUS |
 | `update` | Parent device firmware tracker | Hub-level |
 | `alarm_control_panel` | Alarm system | Hub-level |
-| `camera` | IP/ONVIF cameras via hub snapshot proxy | Hub-level |
+| `camera` | IP/ONVIF cameras — RTSP stills + WebRTC live view | Hub-level |
 
 ---
 
@@ -126,6 +126,33 @@ This prevents phantom 0.0 °C readings on virtual thermostats without associated
 **Schedule summaries**: active period name and target temperature for thermal schedules.
 
 **SBUS regulator target temp**: target temperature as a dedicated sensor (in addition to the climate entity).
+
+### LoRa sensors
+
+LoRa devices communicate over a low-power wireless network. Each physical device is grouped under a **parent device** (Lora device gateway) using HA's `via_device` mechanism — you see one device card per physical sensor, with all its entities listed together.
+
+**Supported LoRa device types** (sensor + binary_sensor):
+
+| Hub device type | Sensors | Binary sensors |
+|---|---|---|
+| `temperature_sensor` | temperature, battery %, signal % | — |
+| `humidity_sensor` | humidity, battery %, signal % | — |
+| `opening_sensor` | battery %, signal % | opening/contact |
+| `flood_sensor` | battery %, signal % | flood |
+| `smoke_sensor` | battery %, signal % | smoke |
+| `relay` | — | — (switch entity) |
+| `two_state_input_sensor` | battery %, signal % | two-state input |
+
+**Device registry fields** (HA Settings → Devices):
+
+| Field | Source | Example |
+|---|---|---|
+| Serial number | LoRa EUI (`eui` field) | `70B3D59BA000A200` |
+| Firmware | `software_version` field | `ACW THO v4.x/v5.x` |
+| Manufacturer | Fixed | `TECH Sterowniki` |
+| Model | Hub device class | `Sinum LoRa Temperature Sensor` |
+
+The EUI uniquely identifies the physical radio module and appears in HA's device registry under **Serial number**. This is useful for cross-referencing with the Sinum web UI or LoRa network server.
 
 ---
 
@@ -396,3 +423,9 @@ IP and ONVIF cameras (`ip_camera`, `onvif_camera`) configured in Sinum are expos
 All Sinum entities use `available = bool(self._device)`. When the hub is unreachable and the coordinator falls back to cache, all entities remain available with stale state. If the cache is empty (fresh HA restart with hub down), entities show `unavailable`.
 
 When a device is permanently removed from the hub, HA entities for that device are automatically removed from the entity registry on the next successful coordinator refresh. This prevents stale entries from accumulating.
+
+## Multi-Hub Device Names
+
+When only one Sinum hub is configured, device names are shown as-is (e.g. `Energy Meter 1`). When two or more hubs are active, the hub name is automatically prepended to every device name (e.g. `tablica-wtp: Energy Meter 1`) to prevent collisions between identically-named devices on different hubs.
+
+The prefix is added dynamically — it appears as soon as a second hub config entry is loaded and disappears if the count drops back to one (after an HA restart).

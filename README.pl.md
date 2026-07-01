@@ -19,7 +19,7 @@
 - **12 platform encji**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
 - **7 lokalnych powierzchni API**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — odpytywane równolegle co 30 s
 - **Aktualizacje w czasie rzeczywistym** przez WebSocket (opóźnienie \< 1 s), most MQTT jako wariant awaryjny
-- **1 675 przechodzących testów** w 46 plikach, CC ≤ 4 w każdej funkcji, czysty ruff i mypy
+- **1 689 przechodzących testów** w 46 plikach, CC ≤ 4 w każdej funkcji, czysty ruff i mypy
 
 ---
 
@@ -139,6 +139,8 @@ Jeśli token lub hasło ulegną zmianie, HA wyświetli powiadomienie. Kliknij **
 
 Wiele central Sinum można dodać jako oddzielne wpisy konfiguracyjne. Usługi (`sinum.send_notification`, `sinum.update_schedule`, `sinum.upload_mqtt_bridge`) akceptują opcjonalne pole `entry_id` wskazujące konkretną centralę.
 
+Gdy aktywne są dwie lub więcej central, nazwy urządzeń automatycznie otrzymują prefiks z nazwą centrali (np. `tablica-wtp: Energy Meter 1`), aby zapobiec kolizjom. W instalacjach z jedną centralą nazwy są wyświetlane bez prefiksu.
+
 ---
 
 ## Usługi HA
@@ -212,7 +214,8 @@ Read-only smoke, API coverage, HIL smoke i testy WebSocket przeszły na żywym s
 | **Integratory rolet wirtualnych** | Raportują `position = None` gdy brak podłączonych sterowników fizycznych (kwestia konfiguracji centrali). |
 | **Energy Center** | Sensory pojawiają się tylko gdy firmware eksponuje `/api/v1/energy-center/*`. |
 | **Harmonogramy** | Tylko odczyt + usługa `sinum.update_schedule`. Pełny edytor UI harmonogramów nie jest zaimplementowany. |
-| **LoRa / SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Przekaźniki i liczniki energii SLINK są mapowane; kamery używają RTSP dla miniatur (gdy dane logowania są dostępne) i WebRTC dla widoku na żywo, ze snapshotem przez hub jako fallback. Zapis LoRa jest zaimplementowany, ale wymaga walidacji na przekaźniku LoRa. |
+| **Czujniki LoRa** | Encje temperature, humidity, opening, flood, smoke i two-state-input zweryfikowane na sprzęcie (czujnik ACW THO). EUI widoczne jako numer seryjny, `software_version` jako firmware w rejestrze urządzeń HA. Zapis LoRa (przekaźnik) jest zaimplementowany, ale nie zweryfikowany sprzętowo. |
+| **SLINK / Video** | Wymagają specyficznych modułów sprzętowych. Przekaźniki i liczniki energii SLINK są mapowane; kamery używają RTSP dla miniatur (gdy dane logowania są dostępne) i WebRTC dla widoku na żywo, ze snapshotem przez hub jako fallback. |
 | **Błędy 408 firmware alpha** | Sporadyczne przy odpytywaniu magistral. Integracja ponawia raz, potem serwuje stan z cache. |
 
 ---
