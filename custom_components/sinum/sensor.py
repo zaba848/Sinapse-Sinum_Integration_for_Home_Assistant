@@ -205,6 +205,7 @@ async def _try_add_energy_center_detail_sensors(
             "energy_center_data_consumption",
             "mdi:lightning-bolt",
             client.get_energy_center_consumption,
+            value_path=("total", "total_consumption"),
         )
         entities.append(sensor)
     except (SinumConnectionError, SinumNotSupportedError):
@@ -219,6 +220,7 @@ async def _try_add_energy_center_detail_sensors(
             "energy_center_data_production",
             "mdi:solar-power",
             client.get_energy_center_production,
+            value_path=("total", "all"),
         )
         entities.append(sensor)
     except (SinumConnectionError, SinumNotSupportedError):

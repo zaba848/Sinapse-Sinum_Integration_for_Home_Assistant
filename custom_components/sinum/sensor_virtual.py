@@ -480,6 +480,14 @@ def _ec_first_numeric(data: dict[str, Any]) -> float | None:
     return None
 
 
+def _ec_traverse(data: Any, path: tuple[str, ...]) -> Any:
+    for key in path:
+        if not isinstance(data, dict):
+            return None
+        data = data.get(key)
+    return data
+
+
 def _energy_center_device_info(entry_id: str) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_energy")},
@@ -507,12 +515,18 @@ class SinumEnergyCenterFlowSensor(SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        v = self._data.get("power")
+        v = self._data.get("summary", {}).get("building", {}).get("value")
         return float(v) if isinstance(v, (int, float)) else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {k: v for k, v in self._data.items() if k != "power"}
+        d = self._data
+        return {
+            "pv_power": _ec_traverse(d, ("summary", "pv", "value")),
+            "grid_power": _ec_traverse(d, ("summary", "grid", "value")),
+            "battery_power": _ec_traverse(d, ("summary", "battery", "value")),
+            "battery_soc": _ec_traverse(d, ("summary", "battery", "state_of_charge", "value")),
+        }
 
     async def async_update(self) -> None:
         try:
@@ -522,10 +536,11 @@ class SinumEnergyCenterFlowSensor(SensorEntity):
 
 
 class SinumEnergyCenterDataSensor(SensorEntity):
-    """Flexible sensor for energy-center consumption / production endpoint data.
+    """Sensor for energy-center consumption / production endpoint data.
 
-    native_value tries a list of common field names in priority order;
+    value_path navigates nested keys to find the primary numeric value;
     extra_state_attributes exposes the full raw response for inspection.
+    Falls back to _ec_first_numeric when no value_path is given.
     """
 
     _attr_has_entity_name = True
@@ -540,10 +555,12 @@ class SinumEnergyCenterDataSensor(SensorEntity):
         translation_key: str,
         icon: str,
         getter: Any,
+        value_path: tuple[str, ...] = (),
     ) -> None:
         self._client = client
         self._data = initial
         self._getter = getter
+        self._value_path = value_path
         self._attr_translation_key = translation_key
         self._attr_icon = icon
         self._attr_unique_id = f"{entry_id}_energy_center_{unique_suffix}"
@@ -551,7 +568,10 @@ class SinumEnergyCenterDataSensor(SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        return _ec_first_numeric(self._data)
+        if not self._value_path:
+            return _ec_first_numeric(self._data)
+        v = _ec_traverse(self._data, self._value_path)
+        return float(v) if isinstance(v, (int, float)) else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
