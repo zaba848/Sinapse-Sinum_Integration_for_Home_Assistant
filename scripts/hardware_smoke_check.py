@@ -167,8 +167,15 @@ def _endpoint_code(results: dict[str, str], path: str) -> str:
 def _parse_lora_devices(body: bytes) -> list[dict]:
     try:
         payload = json.loads(body)
-        devices = payload.get("data", {}).get("lora", {}).get("devices", [])
-        return devices if isinstance(devices, list) else []
+        data = payload.get("data", [])
+        # Hub returns data as a flat list of device dicts
+        if isinstance(data, list):
+            return [d for d in data if isinstance(d, dict)]
+        # Fallback: older/alternative structure data.lora.devices
+        if isinstance(data, dict):
+            devices = data.get("lora", {}).get("devices", [])
+            return devices if isinstance(devices, list) else []
+        return []
     except (TypeError, ValueError, KeyError):
         return []
 
