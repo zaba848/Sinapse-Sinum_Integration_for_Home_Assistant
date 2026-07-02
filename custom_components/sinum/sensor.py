@@ -198,9 +198,13 @@ async def _try_add_energy_center_detail_sensors(
     try:
         data = await client.get_energy_center_consumption()
         sensor = SinumEnergyCenterDataSensor(
-            client, data, entry_id,
-            "consumption", "energy_center_data_consumption",
-            "mdi:lightning-bolt", client.get_energy_center_consumption,
+            client,
+            data,
+            entry_id,
+            "consumption",
+            "energy_center_data_consumption",
+            "mdi:lightning-bolt",
+            client.get_energy_center_consumption,
         )
         entities.append(sensor)
     except (SinumConnectionError, SinumNotSupportedError):
@@ -208,9 +212,13 @@ async def _try_add_energy_center_detail_sensors(
     try:
         data = await client.get_energy_center_production()
         sensor = SinumEnergyCenterDataSensor(
-            client, data, entry_id,
-            "production", "energy_center_data_production",
-            "mdi:solar-power", client.get_energy_center_production,
+            client,
+            data,
+            entry_id,
+            "production",
+            "energy_center_data_production",
+            "mdi:solar-power",
+            client.get_energy_center_production,
         )
         entities.append(sensor)
     except (SinumConnectionError, SinumNotSupportedError):
