@@ -1,15 +1,12 @@
 # Hardware Smoke Test (Latest)
 
-Generated: 2026-06-30 06:32:51Z
+Generated: 2026-07-02 05:51:02Z
 
-| Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual |
-|---|---:|---:|---:|---:|---:|
-| tablica-wtp (http://10.0.61.132) | TOKEN | 200 | 200 | 200 | 200 |
-| sinum-tablica-sbus-1 (http://10.0.62.167) | TOKEN | 200 | 200 | 200 | 200 |
-| tablica-video-nowa (http://10.0.62.117) | TOKEN | 200 | 200 | 200 | 200 |
-| tablicaKlimak (http://10.0.61.114) | TOKEN | 200 | 200 | 200 | 200 |
-| sinum-tablica-sbus2 (http://10.0.62.209) | TOKEN | 200 | 200 | 200 | 200 |
+| Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual | /devices/lora | /devices/slink | /devices/modbus |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| WTP (http://10.0.61.132) | NO_AUTH | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| SBUS (http://10.0.62.167) | NO_AUTH | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 
 ## Result
 
-PASS
+FAIL
