@@ -100,6 +100,20 @@
         }
       }
     },
+    "fan": {
+      "fan_coil_fan": {
+        "name": "Fan",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "1": "Speed 1",
+              "2": "Speed 2",
+              "3": "Speed 3"
+            }
+          }
+        }
+      }
+    },
     "climate": {
       "fan_coil": {
         "state_attributes": {

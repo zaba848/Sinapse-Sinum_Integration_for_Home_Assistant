@@ -100,6 +100,20 @@
         }
       }
     },
+    "fan": {
+      "fan_coil_fan": {
+        "name": "Wentylator",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "1": "Bieg 1",
+              "2": "Bieg 2",
+              "3": "Bieg 3"
+            }
+          }
+        }
+      }
+    },
     "climate": {
       "fan_coil": {
         "state_attributes": {
