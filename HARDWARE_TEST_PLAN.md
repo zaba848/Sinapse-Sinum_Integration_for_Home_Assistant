@@ -7,6 +7,7 @@ Znane huby testowe:
 | SBUS | `http://<SBUS_HUB_IP>` | może używać statycznego tokenu API |
 | WTP | `http://<WTP_HUB_IP>` | login hasłem przez `/api/v1/login` |
 | Video | `http://<VIDEO_HUB_IP>` | kamery IP/ONVIF, wymaga osobnej walidacji |
+| LoRa | `http://<LORA_HUB_IP>` | gateway LoRa, ACW THO (temp/wilgotność), token `SINUM_LORA_TOKEN` |
 
 Sekrety nie mogą być zapisane w repozytorium. Testy live uruchamiaj przez env:
 
@@ -17,7 +18,25 @@ export SINUM_PASSWORD="<hub-password>"
 python3 scripts/hardware_smoke_check.py
 ```
 
-Dla hubów z tokenem można użyć zmiennej per label, np. `SINUM_SBUS_TOKEN`.
+Dla hubów z tokenem można użyć zmiennej per label, np. `SINUM_SBUS_TOKEN`, `SINUM_LORA_TOKEN`.
+
+### Smoke test samego huba LoRa
+
+```bash
+export SINUM_LORA_TOKEN="<lora-api-token>"
+python3 scripts/hardware_smoke_check.py --hub LORA=http://<LORA_HUB_IP>
+```
+
+Wyniki sprawdź w `docs/hardware_smoke_latest.md`. Powinna pojawić się sekcja **LoRa Devices** z EUI urządzeń.
+
+### Czego sprawdzić po deployu na RPi (LoRa)
+
+1. W HA → Settings → Devices & Services → Sinum (sinum-lora) — sprawdź czy pojawiły się urządzenia LoRa
+2. Na karcie urządzenia sprawdź:
+   - **Serial number** = EUI (np. `70B3D59BA000A200`)
+   - **Firmware** = `sw_version` z API
+3. Sensory: temperatura, wilgotność, poziom baterii, RSSI — weryfikacja odczytu
+4. Jeśli hub ma przekaźnik LoRa: test zapisu (OSTROŻNIE — fizycznie przełącza)
 Token HA podawaj wyłącznie poza repo, np. jako sekret CI lub lokalny env.
 
 ---

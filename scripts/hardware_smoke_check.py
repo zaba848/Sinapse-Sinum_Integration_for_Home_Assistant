@@ -9,6 +9,7 @@ Examples:
     SINUM_SMOKE_HUBS="WTP=http://10.0.61.132,SBUS=http://10.0.62.167" \
       SINUM_PASSWORD=... python3 scripts/hardware_smoke_check.py
     SINUM_SBUS_TOKEN=... python3 scripts/hardware_smoke_check.py --hub SBUS=10.0.62.167
+    SINUM_LORA_TOKEN=... python3 scripts/hardware_smoke_check.py --hub LORA=10.0.x.y
 """
 
 from __future__ import annotations
@@ -19,18 +20,29 @@ import os
 import re
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_HUBS = "WTP=http://10.0.61.132,SBUS=http://10.0.62.167"
 DEFAULT_USERNAME = "admin"
-ENDPOINTS = (
+
+# These must return 200 on every hub — failure makes the hub FAIL.
+REQUIRED_ENDPOINTS = (
     "/api/v1/info",
     "/api/v1/devices/wtp",
     "/api/v1/devices/sbus",
     "/api/v1/devices/virtual",
 )
+
+# 404 here means "bus not present on this firmware" — not a failure.
+OPTIONAL_ENDPOINTS = (
+    "/api/v1/devices/lora",
+    "/api/v1/devices/slink",
+    "/api/v1/devices/modbus",
+)
+
+ALL_ENDPOINTS = REQUIRED_ENDPOINTS + OPTIONAL_ENDPOINTS
 
 
 @dataclass(frozen=True)
@@ -39,12 +51,13 @@ class Hub:
     url: str
 
 
-@dataclass(frozen=True)
+@dataclass
 class HubResult:
     hub: Hub
     login: str
-    endpoint_codes: dict[str, str]
-    ok: bool
+    endpoint_codes: dict[str, str] = field(default_factory=dict)
+    lora_devices: list[dict] = field(default_factory=list)
+    ok: bool = False
 
 
 def _env_label(label: str) -> str:
@@ -151,20 +164,63 @@ def _endpoint_code(results: dict[str, str], path: str) -> str:
     return results.get(path, "N/A")
 
 
+def _parse_lora_devices(body: bytes) -> list[dict]:
+    try:
+        payload = json.loads(body)
+        devices = payload.get("data", {}).get("lora", {}).get("devices", [])
+        return devices if isinstance(devices, list) else []
+    except (TypeError, ValueError, KeyError):
+        return []
+
+
 def check_hub(hub: Hub) -> HubResult:
     login_status, token = _login_session(hub)
     if not token:
-        return HubResult(hub=hub, login=login_status, endpoint_codes={}, ok=False)
+        return HubResult(hub=hub, login=login_status)
 
     headers = {"Authorization": f"Bearer {token}"}
-    results: dict[str, str] = {}
+    endpoint_codes: dict[str, str] = {}
     ok = True
-    for path in ENDPOINTS:
-        code, _ = _request_json(f"{hub.url}{path}", headers=headers)
-        results[path] = str(code or "ERR")
+
+    for path in ALL_ENDPOINTS:
+        code, body = _request_json(f"{hub.url}{path}", headers=headers)
+        endpoint_codes[path] = str(code or "ERR")
+
         if code != 200:
-            ok = False
-    return HubResult(hub=hub, login=login_status, endpoint_codes=results, ok=ok)
+            if path in REQUIRED_ENDPOINTS:
+                ok = False
+            elif code not in {404, 0}:
+                # Unexpected error on optional endpoint — still report but don't fail
+                pass
+
+    lora_devices: list[dict] = []
+    lora_code = endpoint_codes.get("/api/v1/devices/lora", "N/A")
+    if lora_code == "200":
+        _, lora_body = _request_json(
+            f"{hub.url}/api/v1/devices/lora", headers=headers
+        )
+        lora_devices = _parse_lora_devices(lora_body)
+
+    result = HubResult(
+        hub=hub,
+        login=login_status,
+        endpoint_codes=endpoint_codes,
+        lora_devices=lora_devices,
+        ok=ok,
+    )
+    return result
+
+
+def _lora_device_summary(devices: list[dict]) -> str:
+    if not devices:
+        return ""
+    lines = []
+    for d in devices:
+        eui = d.get("eui") or d.get("EUI") or "?"
+        name = d.get("name") or d.get("_device_name") or "unnamed"
+        sw = d.get("sw_version") or d.get("firmware") or ""
+        lines.append(f"  EUI={eui} name={name!r}" + (f" fw={sw}" if sw else ""))
+    return "\n".join(lines)
 
 
 def _report_lines(results: list[HubResult]) -> list[str]:
@@ -173,8 +229,9 @@ def _report_lines(results: list[HubResult]) -> list[str]:
         "",
         f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')}",
         "",
-        "| Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual"
+        " | /devices/lora | /devices/slink | /devices/modbus |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for result in results:
         label = f"{result.hub.label} ({result.hub.url})"
@@ -183,8 +240,20 @@ def _report_lines(results: list[HubResult]) -> list[str]:
             f" | {_endpoint_code(result.endpoint_codes, '/api/v1/info')}"
             f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/wtp')}"
             f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/sbus')}"
-            f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/virtual')} |"
+            f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/virtual')}"
+            f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/lora')}"
+            f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/slink')}"
+            f" | {_endpoint_code(result.endpoint_codes, '/api/v1/devices/modbus')} |"
         )
+
+    # LoRa device details
+    lora_hubs = [r for r in results if r.lora_devices]
+    if lora_hubs:
+        lines.extend(["", "## LoRa Devices"])
+        for result in lora_hubs:
+            lines.append(f"\n### {result.hub.label}")
+            summary = _lora_device_summary(result.lora_devices)
+            lines.append(summary if summary else "(none)")
 
     lines.extend(["", "## Result", "", "PASS" if all(r.ok for r in results) else "FAIL"])
     return lines
@@ -212,6 +281,12 @@ def main() -> int:
     out_md.parent.mkdir(parents=True, exist_ok=True)
     out_md.write_text("\n".join(lines), encoding="utf-8")
     print(f"Smoke report written to {out_md}")
+
+    # Print LoRa device details to stdout for quick verification
+    for result in results:
+        if result.lora_devices:
+            print(f"\n{result.hub.label} — {len(result.lora_devices)} LoRa device(s):")
+            print(_lora_device_summary(result.lora_devices))
 
     return 0 if all(result.ok for result in results) else 1
 
