@@ -31,6 +31,7 @@ from .sensor_schedule import (
 )
 from .sensor_virtual import (
     ENERGY_SENSORS,
+    STORAGE_SENSORS,
     VIRTUAL_SENSORS,
     WEATHER_SENSORS,
     SinumAutomationStatusSensor,
@@ -38,6 +39,8 @@ from .sensor_virtual import (
     SinumEnergyCenterFlowSensor,
     SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
+    SinumEnergyStorageSensor,
+    SinumEnergyStorageStatusSensor,
     SinumHubFirmwareSensor,
     SinumHubUptimeSensor,
     SinumHubWifiSensor,
@@ -227,6 +230,21 @@ async def _try_add_energy_center_detail_sensors(
         _LOGGER.debug("Energy Center production not available")
 
 
+async def _try_add_energy_storage_sensors(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
+    client = coordinator.client
+    try:
+        data = await client.get_energy_center_storage()
+        for suffix, tkey, icon, path, dc, sc, unit in STORAGE_SENSORS:
+            entities.append(
+                SinumEnergyStorageSensor(client, data, entry_id, suffix, tkey, icon, path, dc, sc, unit)
+            )
+        entities.append(SinumEnergyStorageStatusSensor(client, data, entry_id))
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Energy Center storage not available")
+
+
 def _add_hub_sensors(
     coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
 ) -> None:
@@ -248,6 +266,7 @@ async def _add_optional_sensors(
     await _try_add_energy_sensors(coordinator, entities, entry_id)
     await _try_add_energy_center_sensor(coordinator, entities, entry_id)
     await _try_add_energy_center_detail_sensors(coordinator, entities, entry_id)
+    await _try_add_energy_storage_sensors(coordinator, entities, entry_id)
     _add_hub_sensors(coordinator, entities, entry_id)
 
 

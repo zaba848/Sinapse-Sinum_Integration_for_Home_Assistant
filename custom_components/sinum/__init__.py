@@ -73,6 +73,7 @@ PLATFORMS: list[Platform] = [
     Platform.LIGHT,
     Platform.NOTIFY,
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
     Platform.UPDATE,

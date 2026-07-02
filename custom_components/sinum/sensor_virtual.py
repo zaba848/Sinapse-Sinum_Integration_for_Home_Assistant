@@ -584,6 +584,125 @@ class SinumEnergyCenterDataSensor(SensorEntity):
             _LOGGER.warning("Energy Center data update failed: %s", err)
 
 
+# ── Energy Storage sensors (battery) ──────────────────────────────────────────
+
+STORAGE_SENSORS: tuple[tuple[str, str, str, tuple[str, ...], Any, Any, Any], ...] = (
+    # (unique_suffix, translation_key, icon, value_path, device_class, state_class, unit)
+    (
+        "storage_soc",
+        "energy_storage_soc",
+        "mdi:battery",
+        ("state_of_charge", "value"),
+        SensorDeviceClass.BATTERY,
+        SensorStateClass.MEASUREMENT,
+        PERCENTAGE,
+    ),
+    (
+        "storage_power",
+        "energy_storage_power",
+        "mdi:battery-charging",
+        ("power",),
+        SensorDeviceClass.POWER,
+        SensorStateClass.MEASUREMENT,
+        UnitOfPower.WATT,
+    ),
+    (
+        "storage_charged_today",
+        "energy_storage_charged_today",
+        "mdi:battery-plus",
+        ("energy_charged_today",),
+        SensorDeviceClass.ENERGY,
+        SensorStateClass.MEASUREMENT,
+        UnitOfEnergy.WATT_HOUR,
+    ),
+    (
+        "storage_discharged_today",
+        "energy_storage_discharged_today",
+        "mdi:battery-minus",
+        ("energy_discharged_today",),
+        SensorDeviceClass.ENERGY,
+        SensorStateClass.MEASUREMENT,
+        UnitOfEnergy.WATT_HOUR,
+    ),
+)
+
+
+class SinumEnergyStorageSensor(SensorEntity):
+    """Sensor for a single field from the energy-center/energy-storage endpoint."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        client: Any,
+        initial: dict[str, Any],
+        entry_id: str,
+        unique_suffix: str,
+        translation_key: str,
+        icon: str,
+        value_path: tuple[str, ...],
+        device_class: Any,
+        state_class: Any,
+        unit: Any,
+    ) -> None:
+        self._client = client
+        self._data = initial
+        self._value_path = value_path
+        self._attr_translation_key = translation_key
+        self._attr_icon = icon
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+        self._attr_native_unit_of_measurement = unit
+        self._attr_unique_id = f"{entry_id}_energy_{unique_suffix}"
+        self._attr_device_info = _energy_center_device_info(entry_id)
+
+    @property
+    def native_value(self) -> float | None:
+        v = _ec_traverse(self._data, self._value_path)
+        return float(v) if isinstance(v, (int, float)) else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        status = self._data.get("status")
+        available = self._data.get("available")
+        attrs: dict[str, Any] = {}
+        if status is not None:
+            attrs["status"] = status
+        if available is not None:
+            attrs["available"] = available
+        return attrs
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._client.get_energy_center_storage()
+        except (SinumConnectionError, SinumNotSupportedError) as err:
+            _LOGGER.warning("Energy Storage update failed: %s", err)
+
+
+class SinumEnergyStorageStatusSensor(SensorEntity):
+    """Text-state status sensor for the battery storage (idle/charging/discharging)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "energy_storage_status"
+    _attr_icon = "mdi:battery-heart-outline"
+
+    def __init__(self, client: Any, initial: dict[str, Any], entry_id: str) -> None:
+        self._client = client
+        self._data = initial
+        self._attr_unique_id = f"{entry_id}_energy_storage_status"
+        self._attr_device_info = _energy_center_device_info(entry_id)
+
+    @property
+    def native_value(self) -> str | None:
+        return self._data.get("status")
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._client.get_energy_center_storage()
+        except (SinumConnectionError, SinumNotSupportedError) as err:
+            _LOGGER.warning("Energy Storage status update failed: %s", err)
+
+
 # ── Hub diagnostic sensors ─────────────────────────────────────────────────────
 
 

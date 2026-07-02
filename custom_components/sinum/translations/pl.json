@@ -340,6 +340,21 @@
       },
       "target_temperature_dhw": {
         "name": "Zadana temperatura CWU"
+      },
+      "energy_storage_soc": {
+        "name": "Naładowanie baterii"
+      },
+      "energy_storage_power": {
+        "name": "Moc baterii"
+      },
+      "energy_storage_charged_today": {
+        "name": "Energia naładowana dziś"
+      },
+      "energy_storage_discharged_today": {
+        "name": "Energia rozładowana dziś"
+      },
+      "energy_storage_status": {
+        "name": "Stan baterii"
       }
     },
     "binary_sensor": {
@@ -373,6 +388,17 @@
     "update": {
       "parent_firmware": {
         "name": "Oprogramowanie"
+      }
+    },
+    "select": {
+      "fan_coil_work_mode": {
+        "name": "Tryb pracy",
+        "state": {
+          "heating": "Ogrzewanie",
+          "cooling": "Chłodzenie",
+          "automatic": "Automatyczny",
+          "off": "Wyłączony"
+        }
       }
     }
   },

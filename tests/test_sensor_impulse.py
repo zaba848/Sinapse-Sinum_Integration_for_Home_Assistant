@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.sinum.api import SinumConnectionError
+from custom_components.sinum.api import SinumConnectionError, SinumNotSupportedError
 from custom_components.sinum.sensor import SinumSensor, async_setup_entry
 
 
@@ -33,6 +33,9 @@ def _make_coordinator(*, sbus=None, hub_info=None, lora=None):
     )
     c.client.get_energy_center_production = AsyncMock(
         side_effect=SinumConnectionError("no production")
+    )
+    c.client.get_energy_center_storage = AsyncMock(
+        side_effect=SinumNotSupportedError("no storage")
     )
     c.client.decode_temperature = lambda raw: raw / 10
     return c

@@ -64,6 +64,9 @@ def _make_coordinator(
     c.client.get_energy_center_production = AsyncMock(
         side_effect=SinumConnectionError("no production")
     )
+    c.client.get_energy_center_storage = AsyncMock(
+        side_effect=SinumNotSupportedError("no storage")
+    )
     c.client.decode_temperature = lambda raw: raw / 10
     return c
 

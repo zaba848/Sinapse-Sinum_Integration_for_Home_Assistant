@@ -91,6 +91,9 @@ def _make_client(**overrides):
     client.get_energy_center_production = AsyncMock(
         side_effect=SinumConnectionError("no production")
     )
+    client.get_energy_center_storage = AsyncMock(
+        side_effect=SinumNotSupportedError("no storage")
+    )
     client.decode_temperature = lambda raw: raw / 10
     for k, v in overrides.items():
         setattr(client, k, v)

@@ -340,6 +340,21 @@
       },
       "target_temperature_dhw": {
         "name": "DHW Target Temperature"
+      },
+      "energy_storage_soc": {
+        "name": "Battery Charge"
+      },
+      "energy_storage_power": {
+        "name": "Battery Power"
+      },
+      "energy_storage_charged_today": {
+        "name": "Energy Charged Today"
+      },
+      "energy_storage_discharged_today": {
+        "name": "Energy Discharged Today"
+      },
+      "energy_storage_status": {
+        "name": "Battery Status"
       }
     },
     "binary_sensor": {
@@ -373,6 +388,17 @@
     "update": {
       "parent_firmware": {
         "name": "Firmware"
+      }
+    },
+    "select": {
+      "fan_coil_work_mode": {
+        "name": "Work Mode",
+        "state": {
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "automatic": "Automatic",
+          "off": "Off"
+        }
       }
     }
   },
