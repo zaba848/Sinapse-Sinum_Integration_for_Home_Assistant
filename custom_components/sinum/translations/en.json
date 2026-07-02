@@ -185,6 +185,15 @@
       "energy_center_status": {
         "name": "Energy Center status"
       },
+      "energy_center_flow_power": {
+        "name": "Flow Power"
+      },
+      "energy_center_data_consumption": {
+        "name": "Energy Center Consumption"
+      },
+      "energy_center_data_production": {
+        "name": "Energy Center Production"
+      },
       "thermostat_output_group": {
         "name": "Output group"
       },

@@ -34,6 +34,8 @@ from .sensor_virtual import (
     VIRTUAL_SENSORS,
     WEATHER_SENSORS,
     SinumAutomationStatusSensor,
+    SinumEnergyCenterDataSensor,
+    SinumEnergyCenterFlowSensor,
     SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
     SinumHubFirmwareSensor,
@@ -184,6 +186,37 @@ async def _try_add_energy_center_sensor(
         _LOGGER.debug("Energy Center endpoints not available on this hub")
 
 
+async def _try_add_energy_center_detail_sensors(
+    coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
+) -> None:
+    client = coordinator.client
+    try:
+        data = await client.get_energy_center_flow_monitor()
+        entities.append(SinumEnergyCenterFlowSensor(client, data, entry_id))
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Energy Center flow monitor not available")
+    try:
+        data = await client.get_energy_center_consumption()
+        sensor = SinumEnergyCenterDataSensor(
+            client, data, entry_id,
+            "consumption", "energy_center_data_consumption",
+            "mdi:lightning-bolt", client.get_energy_center_consumption,
+        )
+        entities.append(sensor)
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Energy Center consumption not available")
+    try:
+        data = await client.get_energy_center_production()
+        sensor = SinumEnergyCenterDataSensor(
+            client, data, entry_id,
+            "production", "energy_center_data_production",
+            "mdi:solar-power", client.get_energy_center_production,
+        )
+        entities.append(sensor)
+    except (SinumConnectionError, SinumNotSupportedError):
+        _LOGGER.debug("Energy Center production not available")
+
+
 def _add_hub_sensors(
     coordinator: SinumCoordinator, entities: list[SensorEntity], entry_id: str
 ) -> None:
@@ -204,6 +237,7 @@ async def _add_optional_sensors(
     await _try_add_weather_sensors(coordinator, entities, entry_id)
     await _try_add_energy_sensors(coordinator, entities, entry_id)
     await _try_add_energy_center_sensor(coordinator, entities, entry_id)
+    await _try_add_energy_center_detail_sensors(coordinator, entities, entry_id)
     _add_hub_sensors(coordinator, entities, entry_id)
 
 

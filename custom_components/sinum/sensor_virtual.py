@@ -11,6 +11,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfEnergy,
     UnitOfIrradiance,
+    UnitOfPower,
     UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
@@ -455,6 +456,112 @@ class SinumEnergyCenterStatusSensor(SensorEntity):
             self._data = await self._client.get_energy_center_summary()
         except (SinumConnectionError, SinumNotSupportedError) as err:
             _LOGGER.warning("Energy Center status update failed: %s", err)
+
+
+# ── Energy Center detail sensors (flow / consumption / production) ─────────────
+
+_EC_CANDIDATE_FIELDS: tuple[str, ...] = (
+    "power",
+    "power_kw",
+    "value",
+    "value_kwh",
+    "total",
+    "total_kwh",
+    "energy_kwh",
+    "current_power",
+)
+
+
+def _ec_first_numeric(data: dict[str, Any]) -> float | None:
+    for field in _EC_CANDIDATE_FIELDS:
+        v = data.get(field)
+        if isinstance(v, (int, float)):
+            return float(v)
+    return None
+
+
+def _energy_center_device_info(entry_id: str) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_energy")},
+        name="Sinum Energy Center",
+        manufacturer="TECH Sterowniki",
+        model="Sinum EH-01 Energy",
+    )
+
+
+class SinumEnergyCenterFlowSensor(SensorEntity):
+    """Current power from the Energy Center flow monitor endpoint."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "energy_center_flow_power"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, client: Any, initial: dict[str, Any], entry_id: str) -> None:
+        self._client = client
+        self._data = initial
+        self._attr_unique_id = f"{entry_id}_energy_center_flow_power"
+        self._attr_device_info = _energy_center_device_info(entry_id)
+
+    @property
+    def native_value(self) -> float | None:
+        v = self._data.get("power")
+        return float(v) if isinstance(v, (int, float)) else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {k: v for k, v in self._data.items() if k != "power"}
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._client.get_energy_center_flow_monitor()
+        except (SinumConnectionError, SinumNotSupportedError) as err:
+            _LOGGER.warning("Energy Center flow update failed: %s", err)
+
+
+class SinumEnergyCenterDataSensor(SensorEntity):
+    """Flexible sensor for energy-center consumption / production endpoint data.
+
+    native_value tries a list of common field names in priority order;
+    extra_state_attributes exposes the full raw response for inspection.
+    """
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        client: Any,
+        initial: dict[str, Any],
+        entry_id: str,
+        unique_suffix: str,
+        translation_key: str,
+        icon: str,
+        getter: Any,
+    ) -> None:
+        self._client = client
+        self._data = initial
+        self._getter = getter
+        self._attr_translation_key = translation_key
+        self._attr_icon = icon
+        self._attr_unique_id = f"{entry_id}_energy_center_{unique_suffix}"
+        self._attr_device_info = _energy_center_device_info(entry_id)
+
+    @property
+    def native_value(self) -> float | None:
+        return _ec_first_numeric(self._data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict(self._data)
+
+    async def async_update(self) -> None:
+        try:
+            self._data = await self._getter()
+        except (SinumConnectionError, SinumNotSupportedError) as err:
+            _LOGGER.warning("Energy Center data update failed: %s", err)
 
 
 # ── Hub diagnostic sensors ─────────────────────────────────────────────────────
