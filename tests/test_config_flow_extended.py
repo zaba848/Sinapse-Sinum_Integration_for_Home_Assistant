@@ -293,3 +293,49 @@ class TestWebsocketPath:
 
     def test_path_with_slash_returned_as_is(self):
         assert self._ws_path("/api/v1/ws") == "/api/v1/ws"
+
+
+class TestProbeRetryExhausted:
+    """Line 277: _run_probe_with_retry raises when all attempts return _PROBE_MISSING."""
+
+    @pytest.mark.asyncio
+    async def test_run_probe_raises_after_exhausted_retries(self, hass, mock_aiohttp_session):
+        from unittest.mock import AsyncMock, patch
+
+        from custom_components.sinum.api import SinumConnectionError
+        from custom_components.sinum.config_flow import SinumConfigFlow, _PROBE_MISSING
+
+        flow = SinumConfigFlow()
+        flow.hass = hass
+        flow._host = "192.168.1.100"
+
+        with patch(
+            "custom_components.sinum.config_flow._try_probe",
+            new=AsyncMock(return_value=_PROBE_MISSING),
+        ):
+            with pytest.raises(SinumConnectionError, match="probe failed after retries"):
+                await flow._run_probe_with_retry(AsyncMock())
+
+
+class TestHubNameFromPasswordGenericError:
+    """Lines 317-318: generic exception from get_hub_info after successful login."""
+
+    @pytest.mark.asyncio
+    async def test_get_hub_info_generic_error_returns_unknown(self, hass, mock_aiohttp_session):
+        with patch("custom_components.sinum.config_flow.SinumClient") as MockClient:
+            client = MagicMock()
+            client.login = AsyncMock(return_value=None)
+            client.get_hub_info = AsyncMock(side_effect=RuntimeError("unexpected"))
+            MockClient.return_value = client
+
+            from custom_components.sinum.config_flow import SinumConfigFlow
+
+            flow = SinumConfigFlow()
+            flow.hass = hass
+            flow._host = "192.168.1.100"
+
+            result = await flow.async_step_password(
+                {"username": "admin", "password": "pass", "scan_interval": 30}
+            )
+
+        assert result["errors"]["base"] == "unknown"
