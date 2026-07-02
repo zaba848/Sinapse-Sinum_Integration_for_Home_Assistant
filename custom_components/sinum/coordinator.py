@@ -10,6 +10,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from ._webrtc import WebRtcSessionManager
 from .api import SinumAuthError, SinumClient, SinumConnectionError
 from .const import DOMAIN
 
@@ -51,43 +52,23 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
         self.removed_ids: dict[str, frozenset[int]] = {}
-        self._webrtc_sessions: dict[
-            str, tuple[int, Any]
-        ] = {}  # session_id → (device_id, send_message)
+        self._webrtc = WebRtcSessionManager(client)
         self._motion_events: dict[int, dict[str, Any]] = {}
 
     def register_webrtc_session(self, session_id: str, device_id: int, send_message: Any) -> None:
-        self._webrtc_sessions[session_id] = (device_id, send_message)
+        self._webrtc.register(session_id, device_id, send_message)
 
     def dispatch_webrtc_answer(self, session_id: str, answer_sdp: str) -> None:
-        session = self._webrtc_sessions.get(session_id)
-        if session:
-            from homeassistant.components.camera.webrtc import WebRTCAnswer
-
-            session[1](WebRTCAnswer(answer=answer_sdp))
+        self._webrtc.dispatch_answer(session_id, answer_sdp)
 
     def dispatch_webrtc_candidate(self, session_id: str, candidate_dict: dict[str, Any]) -> None:
-        session = self._webrtc_sessions.get(session_id)
-        if session:
-            from homeassistant.components.camera.webrtc import WebRTCCandidate
-            from webrtc_models import RTCIceCandidateInit
-
-            candidate = RTCIceCandidateInit(
-                candidate=candidate_dict.get("candidate", ""),
-                sdp_mid=candidate_dict.get("sdp_mid") or None,
-                sdp_m_line_index=candidate_dict.get("sdp_m_line_index"),
-            )
-            session[1](WebRTCCandidate(candidate=candidate))
+        self._webrtc.dispatch_candidate(session_id, candidate_dict)
 
     def dispatch_webrtc_error(self, session_id: str, code: str, message: str) -> None:
-        session = self._webrtc_sessions.pop(session_id, None)
-        if session:
-            from homeassistant.components.camera.webrtc import WebRTCError
-
-            session[1](WebRTCError(code=code, message=message))
+        self._webrtc.dispatch_error(session_id, code, message)
 
     def close_webrtc_session(self, session_id: str) -> None:
-        self._webrtc_sessions.pop(session_id, None)
+        self._webrtc.close(session_id)
 
     def dispatch_motion_detected(self, device_id: int, payload: dict[str, Any]) -> None:
         """Store motion detection event from WebSocket for event entities."""
@@ -102,14 +83,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self._motion_events.pop(device_id, None)
 
     async def forward_webrtc_candidate(self, session_id: str, candidate: Any) -> None:
-        session = self._webrtc_sessions.get(session_id)
-        if session is None:
-            return
-        device_id, _ = session
-        try:
-            await self.client.post_video_candidate(device_id, session_id, candidate)
-        except Exception as exc:
-            _LOGGER.debug("Cannot forward ICE candidate to hub: %s", exc)
+        await self._webrtc.forward_candidate(session_id, candidate)
 
     @property
     def hub_name(self) -> str:
