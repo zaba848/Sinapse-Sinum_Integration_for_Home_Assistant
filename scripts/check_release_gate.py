@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 REPO = os.getenv("GITHUB_REPOSITORY", "zaba848/Sinapse-Sinum_Integration_for_Home_Assistant")
 API_URL = f"https://api.github.com/repos/{REPO}/actions/runs?per_page=100"
+_GH_TOKEN = os.getenv("GITHUB_TOKEN", "")
 REQUIRED = {
     "CI",
     "CodeQL Security Analysis",
@@ -37,9 +39,18 @@ ALLOW_PENDING = (
 
 
 def fetch_runs() -> list[dict]:
-    req = urllib.request.Request(API_URL, headers={"Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        payload = json.load(resp)
+    headers = {"Accept": "application/vnd.github+json"}
+    if _GH_TOKEN:
+        headers["Authorization"] = f"Bearer {_GH_TOKEN}"
+    req = urllib.request.Request(API_URL, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = json.load(resp)
+    except urllib.error.HTTPError as exc:
+        print(f"GitHub API error: {exc.code} {exc.reason}")
+        if exc.code in {401, 403}:
+            print("Tip: set GITHUB_TOKEN env var to avoid rate-limit failures on shared runners.")
+        raise
     return payload.get("workflow_runs", [])
 
 
