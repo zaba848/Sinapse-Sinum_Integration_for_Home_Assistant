@@ -1,7 +1,7 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-02 (released: v0.7.5 ✅)
-> Current manifest version: v0.7.5 (deployed to RPi pending)
+> Last updated: 2026-07-02 (released: v0.7.6 ✅)
+> Current manifest version: v0.7.6 (deployed to RPi pending)
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 743 passing, 5 skipped (~9 s)
+Tests:  1 849 passing, 5 skipped (~9 s)
 Coverage: 100% line coverage — all 28 modules
 Ruff:   0 errors
 mypy:   0 errors
@@ -90,6 +90,7 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 | v0.7.3 | LoRa EUI as serial_number + software_version in device registry | 1 682 |
 | v0.7.4 | Hub name prefix only in multi-hub setups | 1 689 |
 | v0.7.5 | Delete dead scene.py, 100% line coverage all 28 modules, LoRa smoke check verified | 1 743 |
+| v0.7.6 | FAN platform for fan_coil gear control, Energy Center flow/consumption/production sensors, climate/light refactor integration tests, real API field paths for EC sensors | 1 849 |
 
 ---
 
@@ -134,10 +135,9 @@ Assessed 2026-07-02 via radon MI, CC, dependency mapping.
 
 | Item | Status |
 |---|---|
-| Deploy v0.7.5 to RPi | ✅ Done |
-| Create GitHub release v0.7.5 | ✅ Done |
-| Fix translation inconsistencies | ✅ Done |
-| Update smoke check LoRa parser (flat list response) | ✅ Done (8a17b0c) |
+| Deploy v0.7.6 to RPi | ⏳ Pending (run `SINUM_SSH_PASS=… bash scripts/deploy_rpi.sh`) |
+| Create GitHub release v0.7.6 | ⏳ Pending |
+| Tag v0.7.6 pushed | ✅ Done (4f4dd54) |
 
 ### Phase B — Climate refactor (next)
 
@@ -160,20 +160,23 @@ Split `light.py` (815 lines, MI=C) into:
 Benefits: each module ≤ 300 lines. WTP vs SBUS rgb control paths clearly separated.
 Risk: medium — Lua scene management currently in `light.py`; move cleanly.
 
-### Phase D — FAN platform for fan_coil gear control
+### Phase D — FAN platform for fan_coil gear control ✅ Done (v0.7.6)
 
-Add `Platform.FAN` to PLATFORMS:
-- `SinumFanCoilFan` entity: `fan_mode` = `gear_1`/`gear_2`/`gear_3`/`off`
-- Maps to `SET_FAN_MODE` WTP command
-- Gear states already visible as binary_sensor attrs — this promotes them to first-class HA entities
+### Phase E — Energy center sensors ✅ Done (v0.7.6)
 
-### Phase E — Energy center sensors
+Live API schema confirmed 2026-07-02 by querying hubs directly.
+Sensors use correct field paths after `_request()` unwraps `data` key:
+- `SinumEnergyCenterFlowSensor.native_value` → `summary.building.value` (W, building consumption)
+  - `extra_state_attributes`: `pv_power`, `grid_power`, `battery_power`, `battery_soc`
+- `SinumEnergyCenterDataSensor` consumption → `total.total_consumption` (Wh, all-time)
+  - `extra_state_attributes`: full dict with `today` and `total` breakdown
+- `SinumEnergyCenterDataSensor` production → `total.all` (Wh, all-time)
+  - `extra_state_attributes`: full dict with `today` and `total` breakdown
 
-API already has `get_energy_center_summary`, `get_energy_center_consumption`, `get_energy_center_production`.
-Add `SinumEnergyCenter*` sensor group to `sensor_virtual.py` or new `sensor_energy.py`:
-- Production (kW, kWh today/total)
-- Consumption (kW, kWh today/total)
-- Grid flow direction
+Possible Phase E follow-up:
+- Add `today.total_consumption` / `today.all` as separate `MEASUREMENT` sensors (daily reset)
+- Add `summary.pv.value` (current PV power), `summary.grid.value` (grid import/export) sensors
+- Test against a hub with actual PV/battery (current hubs have `available: false` for these)
 
 ### Phase F — Integration tests
 
