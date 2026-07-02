@@ -165,24 +165,43 @@ def _device_info(
     )
 
 
-class SinumRelaySwitch(
+class _SinumVirtualSwitch(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
 ):
+    """Base for switch entities backed by a virtual device."""
+
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_icon = "mdi:electric-switch"
 
-    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+    def __init__(
+        self,
+        coordinator: SinumCoordinator,
+        device_id: int,
+        entry_id: str,
+        model_name: str,
+    ) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
-        self._attr_device_info = _device_info(
-            coordinator, device_id, entry_id, "Sinum Relay Integrator"
-        )
+        self._attr_device_info = _device_info(coordinator, device_id, entry_id, model_name)
 
     @property
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
+
+    async def _patch(self, payload: dict[str, Any]) -> None:
+        updated = await self.coordinator.client.patch_virtual_device(
+            self._device_id, payload
+        )
+        self.coordinator.virtual_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+
+class SinumRelaySwitch(_SinumVirtualSwitch):
+    _attr_icon = "mdi:electric-switch"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator, device_id, entry_id, "Sinum Relay Integrator")
 
     @property
     def is_on(self) -> bool:
@@ -190,43 +209,24 @@ class SinumRelaySwitch(
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"state": True}
-            )
+            await self._patch({"state": True})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"state": False}
-            )
+            await self._patch({"state": False})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn off: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
 
 
-class SinumWicketSwitch(
-    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
-):
+class SinumWicketSwitch(_SinumVirtualSwitch):
     """Wicket (electric strike) — on = unlock, off = lock."""
 
-    _attr_has_entity_name = True
-    _attr_name = None
     _attr_icon = "mdi:door-sliding"
 
     def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._device_id = device_id
-        self._attr_unique_id = f"{entry_id}_virtual_{device_id}"
-        self._attr_device_info = _device_info(coordinator, device_id, entry_id, "Sinum Wicket")
-
-    @property
-    def _device(self) -> dict[str, Any]:
-        return self.coordinator.virtual_devices.get(self._device_id, {})
+        super().__init__(coordinator, device_id, entry_id, "Sinum Wicket")
 
     @property
     def is_on(self) -> bool:
@@ -234,23 +234,15 @@ class SinumWicketSwitch(
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "unlock"}
-            )
+            await self._patch({"command": "unlock"})
         except Exception as err:
             raise HomeAssistantError(f"Cannot unlock wicket: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "lock"}
-            )
+            await self._patch({"command": "lock"})
         except Exception as err:
             raise HomeAssistantError(f"Cannot lock wicket: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
 
 
 def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> dict[str, Any]:

@@ -41,29 +41,98 @@ class SinumSensorDescription(SensorEntityDescription):
     zero_is_unavailable: bool = False
 
 
-# ── WTP device sensors ─────────────────────────────────────────────────────────
+# ── Shared WTP+SBUS sensor kwargs (source injected by _with_source) ────────────
 
-WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
-    SinumSensorDescription(
+_COMMON_SENSOR_KWARGS: tuple[dict, ...] = (
+    dict(
         key="temperature",
         api_key="temperature",
-        source="wtp",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         scale=0.1,
         suggested_display_precision=1,
     ),
-    SinumSensorDescription(
+    dict(
         key="humidity",
         api_key="humidity",
-        source="wtp",
         device_class=SensorDeviceClass.HUMIDITY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         scale=0.1,
         suggested_display_precision=0,
     ),
+    dict(
+        key="illuminance",
+        api_key="illuminance",
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=LIGHT_LUX,
+        suggested_display_precision=0,
+    ),
+    dict(
+        key="active_power",
+        api_key="active_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    dict(
+        key="voltage",
+        api_key="voltage",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        scale=0.001,
+        suggested_display_precision=1,
+    ),
+    dict(
+        key="current",
+        api_key="current",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        scale=0.001,
+        suggested_display_precision=3,
+    ),
+    dict(
+        key="energy_consumed_total",
+        api_key="energy_consumed_total",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+    ),
+    dict(
+        key="energy_consumed_today",
+        api_key="energy_consumed_today",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_today",
+    ),
+    dict(
+        key="energy_consumed_yesterday",
+        api_key="energy_consumed_yesterday",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        suggested_display_precision=0,
+        translation_key="energy_consumed_yesterday",
+    ),
+)
+
+
+def _with_source(source: str) -> tuple[SinumSensorDescription, ...]:
+    return tuple(SinumSensorDescription(source=source, **kw) for kw in _COMMON_SENSOR_KWARGS)
+
+
+# ── WTP device sensors ─────────────────────────────────────────────────────────
+
+WTP_SENSORS: tuple[SinumSensorDescription, ...] = _with_source("wtp") + (
     SinumSensorDescription(
         key="co2",
         api_key="co2",
@@ -110,15 +179,6 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         suggested_display_precision=1,
     ),
     SinumSensorDescription(
-        key="illuminance",
-        api_key="illuminance",
-        source="wtp",
-        device_class=SensorDeviceClass.ILLUMINANCE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=LIGHT_LUX,
-        suggested_display_precision=0,
-    ),
-    SinumSensorDescription(
         key="pressure",
         api_key="pressure",
         source="wtp",
@@ -142,65 +202,6 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
         source="wtp",
         icon="mdi:air-filter",
         is_text=True,
-    ),
-    SinumSensorDescription(
-        key="active_power",
-        api_key="active_power",
-        source="wtp",
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPower.WATT,
-        scale=0.001,
-        suggested_display_precision=1,
-    ),
-    SinumSensorDescription(
-        key="voltage",
-        api_key="voltage",
-        source="wtp",
-        device_class=SensorDeviceClass.VOLTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        scale=0.001,
-        suggested_display_precision=1,
-    ),
-    SinumSensorDescription(
-        key="current",
-        api_key="current",
-        source="wtp",
-        device_class=SensorDeviceClass.CURRENT,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        scale=0.001,
-        suggested_display_precision=3,
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_total",
-        api_key="energy_consumed_total",
-        source="wtp",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_today",
-        api_key="energy_consumed_today",
-        source="wtp",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-        translation_key="energy_consumed_today",
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_yesterday",
-        api_key="energy_consumed_yesterday",
-        source="wtp",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-        translation_key="energy_consumed_yesterday",
     ),
     SinumSensorDescription(
         key="room_temperature",
@@ -274,36 +275,7 @@ WTP_SENSORS: tuple[SinumSensorDescription, ...] = (
 
 # ── SBUS device sensors ────────────────────────────────────────────────────────
 
-SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
-    SinumSensorDescription(
-        key="temperature",
-        api_key="temperature",
-        source="sbus",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        scale=0.1,
-        suggested_display_precision=1,
-    ),
-    SinumSensorDescription(
-        key="humidity",
-        api_key="humidity",
-        source="sbus",
-        device_class=SensorDeviceClass.HUMIDITY,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
-        scale=0.1,
-        suggested_display_precision=0,
-    ),
-    SinumSensorDescription(
-        key="illuminance",
-        api_key="illuminance",
-        source="sbus",
-        device_class=SensorDeviceClass.ILLUMINANCE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=LIGHT_LUX,
-        suggested_display_precision=0,
-    ),
+SBUS_SENSORS: tuple[SinumSensorDescription, ...] = _with_source("sbus") + (
     SinumSensorDescription(
         key="analog_value",
         api_key="value",
@@ -386,65 +358,6 @@ SBUS_SENSORS: tuple[SinumSensorDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:valve",
         translation_key="valve_position",
-    ),
-    SinumSensorDescription(
-        key="active_power",
-        api_key="active_power",
-        source="sbus",
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPower.WATT,
-        scale=0.001,
-        suggested_display_precision=1,
-    ),
-    SinumSensorDescription(
-        key="voltage",
-        api_key="voltage",
-        source="sbus",
-        device_class=SensorDeviceClass.VOLTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        scale=0.001,
-        suggested_display_precision=1,
-    ),
-    SinumSensorDescription(
-        key="current",
-        api_key="current",
-        source="sbus",
-        device_class=SensorDeviceClass.CURRENT,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        scale=0.001,
-        suggested_display_precision=3,
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_total",
-        api_key="energy_consumed_total",
-        source="sbus",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_today",
-        api_key="energy_consumed_today",
-        source="sbus",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-        translation_key="energy_consumed_today",
-    ),
-    SinumSensorDescription(
-        key="energy_consumed_yesterday",
-        api_key="energy_consumed_yesterday",
-        source="sbus",
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        suggested_display_precision=0,
-        translation_key="energy_consumed_yesterday",
     ),
 )
 
