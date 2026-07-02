@@ -105,6 +105,43 @@ class TestWtpFanCoilValve:
         assert attrs["hotel_mode"] is False
 
 
+class TestFanCoilGearActive:
+    def test_extra_attrs_omits_gears_when_absent(self):
+        """_fan_coil_gear_active returns None (line 182) when gear key missing."""
+        device = {"id": 4, "type": "fan_coil", "class": "wtp", "name": "Fan Coil", "valve_state": True}
+        coordinator = _make_wtp_coordinator(4, device)
+        entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
+        attrs = entity.extra_state_attributes
+        assert "gear_1_active" not in attrs
+        assert "gear_2_active" not in attrs
+        assert "gear_3_active" not in attrs
+
+    def test_extra_attrs_omits_gear_when_value_not_dict(self):
+        """_fan_coil_gear_active returns None when gear value is not a dict."""
+        device = {"id": 4, "type": "fan_coil", "class": "wtp", "name": "Fan Coil",
+                  "valve_state": True, "gear_1": "broken"}
+        coordinator = _make_wtp_coordinator(4, device)
+        entity = SinumBinarySensor(coordinator, 4, _desc("valve"), "test_entry")
+        attrs = entity.extra_state_attributes
+        assert "gear_1_active" not in attrs
+
+
+class TestIsOnStatusFallback:
+    def test_is_on_falls_back_to_status_when_state_absent(self):
+        """When state_key='state' and 'state' absent, is_on uses 'status' field (line 314)."""
+        device = {"id": 1, "type": "opening_sensor", "status": "open"}
+        coordinator = _make_wtp_coordinator(1, device)
+        entity = SinumBinarySensor(coordinator, 1, _desc("opening"), "test_entry")
+        assert entity.is_on is True
+
+    def test_is_on_status_fallback_returns_none_when_both_absent(self):
+        """When both 'state' and 'status' absent, is_on returns None."""
+        device = {"id": 1, "type": "opening_sensor"}
+        coordinator = _make_wtp_coordinator(1, device)
+        entity = SinumBinarySensor(coordinator, 1, _desc("opening"), "test_entry")
+        assert entity.is_on is None
+
+
 class TestThermostatAttributes:
     def test_thermostat_exposes_heating_cooling_targets(self):
         """Thermostat exposes target_temperature_heating/cooling as attributes."""

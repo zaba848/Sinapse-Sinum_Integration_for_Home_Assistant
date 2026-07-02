@@ -771,6 +771,21 @@ def test_apply_device_state_updates_sbus_blind_position():
     coordinator.async_set_updated_data.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_run_one_cycle_resets_reconnect_attempt_on_success():
+    """_run_one_cycle resets _reconnect_attempt to 0 after successful _consume_loop (line 81)."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()  # prevent _wait_reconnect from blocking
+    bridge._reconnect_attempt = 5
+
+    async def _succeed():
+        pass
+
+    bridge._consume_loop = _succeed  # type: ignore[assignment]
+    await bridge._run_one_cycle()
+    assert bridge._reconnect_attempt == 0
+
+
 def test_apply_device_state_updates_sbus_blind_position_and_tilt():
     """P5.3: device_state_changed updates SBUS blind position and tilt."""
     bridge, _hass, coordinator = _bridge()

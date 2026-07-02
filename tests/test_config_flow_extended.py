@@ -221,3 +221,75 @@ class TestReauthPasswordPath:
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect"
+
+
+class TestNormalizeHostInput:
+    """Direct tests for _normalize_host_input edge cases."""
+
+    def _normalize(self, value: str) -> str:
+        from custom_components.sinum.config_flow import _normalize_host_input
+        return _normalize_host_input(value)
+
+    def test_empty_string_raises(self):
+        with pytest.raises(ValueError, match="empty host"):
+            self._normalize("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(ValueError, match="empty host"):
+            self._normalize("   ")
+
+    def test_unsupported_scheme_raises(self):
+        with pytest.raises(ValueError, match="unsupported scheme"):
+            self._normalize("ftp://192.168.1.100")
+
+    def test_url_with_scheme_but_no_netloc_raises(self):
+        with pytest.raises(ValueError, match="missing host"):
+            self._normalize("http://")
+
+    def test_url_with_path_raises(self):
+        with pytest.raises(ValueError, match="path/query/fragment not allowed"):
+            self._normalize("http://192.168.1.100/api")
+
+    def test_url_with_query_raises(self):
+        with pytest.raises(ValueError, match="path/query/fragment not allowed"):
+            self._normalize("http://192.168.1.100?foo=bar")
+
+    def test_url_with_whitespace_netloc_raises(self):
+        # http://  / — scheme present, netloc is whitespace, path is /
+        with pytest.raises(ValueError, match="invalid host"):
+            self._normalize("http://  /")
+
+    def test_plain_ip_accepted(self):
+        assert self._normalize("192.168.1.100") == "192.168.1.100"
+
+    def test_http_url_accepted(self):
+        assert self._normalize("http://192.168.1.100") == "192.168.1.100"
+
+
+class TestWebsocketPath:
+    """Tests for _websocket_path validator."""
+
+    def _ws_path(self, value: str) -> str:
+        from custom_components.sinum.config_flow import _websocket_path
+        return _websocket_path(value)
+
+    def test_empty_returns_default(self):
+        from custom_components.sinum.const import DEFAULT_WS_PATH
+        assert self._ws_path("") == DEFAULT_WS_PATH
+        assert self._ws_path("   ") == DEFAULT_WS_PATH
+
+    def test_full_url_raises(self):
+        import voluptuous as vol
+        with pytest.raises(vol.Invalid, match="endpoint path"):
+            self._ws_path("ws://hub.local/api/v1/ws")
+
+    def test_https_url_raises(self):
+        import voluptuous as vol
+        with pytest.raises(vol.Invalid, match="endpoint path"):
+            self._ws_path("https://hub.local/api/v1/ws")
+
+    def test_path_without_slash_gets_prefixed(self):
+        assert self._ws_path("api/v1/ws") == "/api/v1/ws"
+
+    def test_path_with_slash_returned_as_is(self):
+        assert self._ws_path("/api/v1/ws") == "/api/v1/ws"

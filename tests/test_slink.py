@@ -280,3 +280,21 @@ class TestSlinkInApplyOptionalStores:
         coordinator.slink_devices = existing
         _apply_optional_stores(coordinator, None, None, None)
         assert coordinator.slink_devices is existing
+
+    def test_native_value_with_scale(self):
+        """SinumSlinkSensor.native_value applies scale when != 1.0."""
+        from custom_components.sinum.sensor_modbus import (
+            SinumModbusSensorDescription,
+            SinumSlinkSensor,
+        )
+
+        dev = dict(FIXTURES["slink_energy_meter"])
+        coordinator = _make_coordinator(slink={2: dev})
+        desc = SinumModbusSensorDescription(
+            key="active_power_kw",
+            field_path="active_power",
+            scale=0.001,
+        )
+        entity = SinumSlinkSensor(coordinator, 2, "entry", desc)
+        entity.hass = MagicMock()
+        assert entity.native_value == pytest.approx(1.5, abs=1e-3)

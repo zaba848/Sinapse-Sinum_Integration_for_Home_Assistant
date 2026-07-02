@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Przykładowe odpowiedzi API centrali używane w testach
   ├── test_code_quality.py     Bramka CC — wszystkie funkcje muszą mieć CC ≤ 4
   ├── hardware_in_loop/        Skrypty HIL do smoke testów na żywej centrali
-  └── test_*.py                1715 przechodzących testów dla wszystkich platform i typów urządzeń
+  └── test_*.py                1741 przechodzących testów dla wszystkich platform i typów urządzeń
 ```
 
 ---
@@ -102,7 +102,7 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Statystyki testów: **1715 przechodzących testów, 5 pominiętych testów live-write, 46 plików testów**, czas wykonania ~10 s. Wszystkie testy niesprzętowe muszą przejść przed mergem.
+Statystyki testów: **1741 przechodzących testów, 5 pominiętych testów live-write, 46 plików testów**, czas wykonania ~10 s. Wszystkie testy niesprzętowe muszą przejść przed mergem.
 
 Markery pomijania:
 - testy live-write w `tests/test_api_endpoint_write.py` są pomijane bez `SINUM_WRITE_TESTS=1` i danych dostępowych do live huba
@@ -120,7 +120,7 @@ Wszystkie pull requesty muszą przejść:
 | Format | `ruff format` | Brak różnic |
 | Typy | `mypy` | Zero błędów |
 | Złożoność cyklomatyczna | `radon` przez `tests/test_code_quality.py` | Wszystkie funkcje CC ≤ 4 |
-| Testy | `pytest` | Wszystkie 1715 testów niesprzętowych przechodzą |
+| Testy | `pytest` | Wszystkie 1741 testów niesprzętowych przechodzą |
 | HACS | hacs-action | Poprawne `hacs.json` i manifest |
 
 ```bash
@@ -395,7 +395,7 @@ Szybka lista kontrolna przed zgłoszeniem PR:
 - [ ] `ruff check custom_components/` przechodzi
 - [ ] `ruff format custom_components/` nie daje różnic
 - [ ] `mypy custom_components/sinum/` przechodzi
-- [ ] `pytest tests/` — wszystkie 1715 testów niesprzętowych przechodzą
+- [ ] `pytest tests/` — wszystkie 1741 testów niesprzętowych przechodzą
 - [ ] `pytest tests/test_code_quality.py` — bramka CC czysta (bez nowych wpisów `_LEGACY_ALLOWANCE`)
 - [ ] Nowe typy urządzeń mają stałe w `const.py`
 - [ ] Nowa funkcjonalność ma co najmniej 3 testy

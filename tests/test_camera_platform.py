@@ -621,3 +621,24 @@ class TestCameraWebRtc:
         provider, coordinator = _make_provider()
         provider.async_close_session("sess-abc")
         coordinator.close_webrtc_session.assert_called_once_with("sess-abc")
+
+    def test_provider_is_supported_returns_false_on_parse_exception(self):
+        """async_is_supported returns False when urlparse().hostname raises (lines 116-117)."""
+        from unittest.mock import patch
+
+        provider, _ = _make_provider()
+        with patch("urllib.parse.urlparse", side_effect=ValueError("bad URL")):
+            result = provider.async_is_supported("rtsp://bad:url")
+        assert result is False
+
+
+class TestCameraUrl3Attribute:
+    def test_url3_present_when_set(self):
+        """extra_state_attributes includes url3_path when url3 is non-empty (line 226)."""
+        d = {**_CAMERA_RTSP, "url3": "/ch03"}
+        attrs = _make_camera(d).extra_state_attributes
+        assert attrs["url3_path"] == "/ch03"
+
+    def test_url3_excluded_when_empty(self):
+        attrs = _make_camera(_CAMERA_RTSP).extra_state_attributes
+        assert "url3_path" not in attrs

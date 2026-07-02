@@ -289,6 +289,21 @@ class TestAlarmModes:
         with pytest.raises(HomeAssistantError, match="Cannot arm alarm in home mode"):
             await entity.async_alarm_arm_home("1234")
 
+    @pytest.mark.asyncio
+    async def test_alarm_arm_night_connection_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock(
+            side_effect=SinumConnectionError("Connection lost")
+        )
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        with pytest.raises(HomeAssistantError, match="Cannot arm alarm in night mode"):
+            await entity.async_alarm_arm_night("1234")
+
 
 class TestAlarmBypass:
     """Test zone bypass and unbypass functionality."""
@@ -349,6 +364,31 @@ class TestAlarmBypass:
 
         with pytest.raises(HomeAssistantError, match="Cannot bypass zone"):
             await entity.async_bypass_zone("1234")
+
+    @pytest.mark.asyncio
+    async def test_unbypass_zone_without_code_raises_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        entity = _make_entity(zone)
+
+        with pytest.raises(HomeAssistantError, match="PIN code is required to unbypass zone"):
+            await entity.async_unbypass_zone(None)
+
+    @pytest.mark.asyncio
+    async def test_unbypass_zone_connection_error(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.patch_alarm_device = AsyncMock(
+            side_effect=SinumConnectionError("Connection lost")
+        )
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+
+        with pytest.raises(HomeAssistantError, match="Cannot unbypass zone"):
+            await entity.async_unbypass_zone("1234")
 
     def test_attributes_with_armed_mode(self):
         zone = _make_zone(zone_id=1, armed_mode="home")

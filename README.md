@@ -6,7 +6,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1715%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1741%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
 [![Version](https://img.shields.io/badge/version-0.7.5-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
@@ -252,7 +252,7 @@ python3 scripts/hardware_in_loop/websocket_listener.py \
 | Metric | Value | Target |
 |---|---|---|
 | Test files | 46 | ≥40 |
-| Test cases | 1715 | ≥1600 |
+| Test cases | 1741 | ≥1600 |
 | Ruff violations | 0 | 0 |
 | MyPy errors | 0 | 0 |
 | CC > 4 functions | 0 | 0 |
