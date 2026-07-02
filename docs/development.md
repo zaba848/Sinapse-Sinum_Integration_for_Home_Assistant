@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Sample hub API payloads used across tests
   ├── test_code_quality.py     CC gate — all functions must have CC ≤ 4
   ├── hardware_in_loop/        HIL scripts for live hub smoke testing
-  └── test_*.py                1689 passing tests across all platforms and device types
+  └── test_*.py                1715 passing tests across all platforms and device types
 ```
 
 ---
@@ -102,7 +102,7 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Test statistics: **1689 passing tests, 5 skipped live-write tests, 46 test files**, ~10 s runtime. All non-hardware tests must pass before merging.
+Test statistics: **1715 passing tests, 5 skipped live-write tests, 46 test files**, ~10 s runtime. All non-hardware tests must pass before merging.
 
 Skip markers:
 - live-write tests in `tests/test_api_endpoint_write.py` are skipped unless `SINUM_WRITE_TESTS=1` and live credentials are provided
@@ -120,7 +120,7 @@ All pull requests must pass:
 | Format | `ruff format` | No diffs |
 | Types | `mypy` | Zero errors |
 | Cyclomatic complexity | `radon` via `tests/test_code_quality.py` | All functions CC ≤ 4 |
-| Tests | `pytest` | All 1689 non-hardware tests pass |
+| Tests | `pytest` | All 1715 non-hardware tests pass |
 | HACS | hacs-action | Valid `hacs.json` and manifest |
 
 ```bash
@@ -523,7 +523,7 @@ Quick checklist before submitting a PR:
 - [ ] `ruff check custom_components/` passes
 - [ ] `ruff format custom_components/` produces no diffs
 - [ ] `mypy custom_components/sinum/` passes
-- [ ] `pytest tests/` — all 1689 non-hardware tests pass
+- [ ] `pytest tests/` — all 1715 non-hardware tests pass
 - [ ] `pytest tests/test_code_quality.py` — CC gate clean (no `_LEGACY_ALLOWANCE` entries added)
 - [ ] New device types have constants in `const.py`
 - [ ] New functionality has at least 3 tests

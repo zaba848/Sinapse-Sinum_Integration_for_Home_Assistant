@@ -9,6 +9,7 @@ import pytest
 from custom_components.sinum.const import DOMAIN
 from custom_components.sinum.device_trigger import (
     TRIGGER_TYPE_PRESSED,
+    TRIGGER_TYPE_SCENE_ACTIVATED,
     async_attach_trigger,
     async_get_triggers,
     async_validate_trigger_config,
@@ -382,3 +383,109 @@ class TestAttachTrigger:
         hass.async_run_hass_job.assert_called_once()
         payload = hass.async_run_hass_job.call_args[0][1]
         assert payload["action"] is None
+
+
+class TestTriggerPayloadFallthrough:
+    """Direct tests for _trigger_payload with non-standard trigger type."""
+
+    def test_unknown_type_returns_minimal_payload(self):
+        from custom_components.sinum.device_trigger import _trigger_payload
+
+        new_state = MagicMock()
+        new_state.entity_id = "scene.test"
+        config = {"type": "unknown_type", "device_id": "dev-x"}
+
+        result = _trigger_payload(config, new_state)
+
+        assert result["entity_id"] == "scene.test"
+        assert result["trigger"] is config
+
+
+class TestSceneActivatedTrigger:
+    """Tests for TRIGGER_TYPE_SCENE_ACTIVATED paths in device_trigger.py."""
+
+    def _scene_config(self, device_id: str = "dev-abc") -> dict:
+        return {
+            "platform": "device",
+            "domain": DOMAIN,
+            "device_id": device_id,
+            "type": TRIGGER_TYPE_SCENE_ACTIVATED,
+        }
+
+    @pytest.mark.asyncio
+    async def test_scene_attach_returns_noop_when_no_scene_entities(self):
+        hass = _make_hass()
+        with (
+            patch("custom_components.sinum.device_trigger.er.async_get"),
+            patch(
+                "custom_components.sinum.device_trigger.er.async_entries_for_device",
+                return_value=[],
+            ),
+        ):
+            result = await async_attach_trigger(
+                hass, self._scene_config(), MagicMock(), MagicMock()
+            )
+        assert callable(result)
+        assert result() is None
+
+    @pytest.mark.asyncio
+    async def test_scene_attach_registers_listener(self):
+        scene_entity_id = "scene.sinum_my_scene"
+        scene_entry = _make_entry(scene_entity_id, domain="scene")
+        hass = _make_hass()
+        captured: list = []
+
+        def capture_listen(event_type, listener):
+            captured.append(listener)
+            return MagicMock()
+
+        hass.bus.async_listen = capture_listen
+
+        with (
+            patch("custom_components.sinum.device_trigger.er.async_get"),
+            patch(
+                "custom_components.sinum.device_trigger.er.async_entries_for_device",
+                return_value=[scene_entry],
+            ),
+        ):
+            await async_attach_trigger(hass, self._scene_config(), MagicMock(), MagicMock())
+
+        assert len(captured) == 1
+
+    @pytest.mark.asyncio
+    async def test_scene_trigger_fires_action(self):
+        scene_entity_id = "scene.sinum_my_scene"
+        scene_entry = _make_entry(scene_entity_id, domain="scene")
+        hass = _make_hass()
+        captured: list = []
+
+        def capture_listen(event_type, listener):
+            captured.append(listener)
+            return MagicMock()
+
+        hass.bus.async_listen = capture_listen
+
+        with (
+            patch("custom_components.sinum.device_trigger.er.async_get"),
+            patch(
+                "custom_components.sinum.device_trigger.er.async_entries_for_device",
+                return_value=[scene_entry],
+            ),
+        ):
+            await async_attach_trigger(hass, self._scene_config(), MagicMock(), MagicMock())
+
+        listener = captured[0]
+        listener(_make_state_changed_event(scene_entity_id))
+        hass.async_run_hass_job.assert_called_once()
+        payload = hass.async_run_hass_job.call_args[0][1]
+        assert payload["entity_id"] == scene_entity_id
+        assert "description" in payload["trigger"]
+        assert "scene activated" in payload["trigger"]["description"]
+
+    @pytest.mark.asyncio
+    async def test_unknown_trigger_type_returns_noop(self):
+        hass = _make_hass()
+        config = {"platform": "device", "domain": DOMAIN, "device_id": "dev-x", "type": "unknown"}
+        result = await async_attach_trigger(hass, config, MagicMock(), MagicMock())
+        assert callable(result)
+        assert result() is None

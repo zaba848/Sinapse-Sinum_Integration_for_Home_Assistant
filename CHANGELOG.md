@@ -23,6 +23,17 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-07-02
+
+### Removed
+- **`scene.py` deleted** — dead code (0% coverage, not registered in PLATFORMS, used obsolete `hass.data[DOMAIN]` pattern). Scenes are already exposed via the `button` platform (`SinumSceneButton`).
+
+### Tests
+- **+26 tests** (1 689 → 1 715 passing) covering motion event entities (`SinumMotionEvent`), coordinator motion dispatch, `device_trigger` scene-activated paths, `__init__` service handlers (`run_scene`, `upload_mqtt_bridge`), notification error paths, WS bridge start failure, WS bridge stop, and stale cleanup callback.
+- Coverage: 98% → 99%; `__init__.py`, `coordinator.py`, `event.py`, `device_trigger.py` all at 100%.
+
+---
+
 ## [0.7.4] — 2026-07-01
 
 ### Changed

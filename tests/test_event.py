@@ -6,14 +6,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.sinum.event import SinumButtonEvent, async_setup_entry
+from custom_components.sinum.event import SinumButtonEvent, SinumMotionEvent, async_setup_entry
 from custom_components.sinum.sensor import SinumButtonSensor
 
 
-def _make_coordinator(wtp_devices=None, sbus_devices=None):
+def _make_coordinator(wtp_devices=None, sbus_devices=None, virtual_devices=None):
     coordinator = MagicMock()
     coordinator.wtp_devices = wtp_devices or {}
     coordinator.sbus_devices = sbus_devices or {}
+    coordinator.virtual_devices = virtual_devices or {}
+    coordinator.hass.config_entries.async_entries.return_value = []
     return coordinator
 
 
@@ -233,3 +235,130 @@ class TestEventSetupFiltering:
             )
 
         assert added == []
+
+
+class TestSinumMotionEvent:
+    def _make_coordinator(self, virtual_devices=None):
+        coordinator = MagicMock()
+        coordinator.virtual_devices = virtual_devices or {}
+        coordinator.wtp_devices = {}
+        coordinator.sbus_devices = {}
+        coordinator.hass.config_entries.async_entries.return_value = []
+        return coordinator
+
+    def _make_entity(self, device_type="ip_camera"):
+        device = {
+            "id": 10,
+            "type": device_type,
+            "name": "Camera 1",
+            "_device_name": "Camera 1",
+            "_area": "Front Door",
+            "_parent_model": "Sinum IP Camera",
+        }
+        coordinator = self._make_coordinator(virtual_devices={10: device})
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            entity = SinumMotionEvent(coordinator, 10, "test_entry")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity, coordinator
+
+    def test_unique_id(self):
+        entity, _ = self._make_entity()
+        assert entity.unique_id == "test_entry_motion_10"
+
+    def test_event_types(self):
+        entity, _ = self._make_entity()
+        assert entity.event_types == ["motion_detected"]
+
+    def test_translation_key(self):
+        entity, _ = self._make_entity()
+        assert entity._attr_translation_key == "motion_detected"
+
+    def test_device_info_name_no_prefix_single_hub(self):
+        entity, _ = self._make_entity()
+        assert entity._attr_device_info["name"] == "Camera 1"
+
+    def test_motion_event_fires_trigger(self):
+        entity, coordinator = self._make_entity()
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.get_motion_event.return_value = {"timestamp": 1234567890, "device_id": 10}
+        entity._handle_coordinator_update()
+
+        assert len(fired) == 1
+        assert fired[0][0] == "motion_detected"
+        assert fired[0][1]["timestamp"] == 1234567890
+        entity.async_write_ha_state.assert_called_once()
+
+    def test_no_event_when_no_motion(self):
+        entity, coordinator = self._make_entity()
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.get_motion_event.return_value = None
+        entity._handle_coordinator_update()
+
+        assert fired == []
+        entity.async_write_ha_state.assert_not_called()
+
+    def test_motion_event_with_none_timestamp(self):
+        entity, coordinator = self._make_entity()
+        fired = []
+        entity._trigger_event = lambda t, a: fired.append((t, a))
+
+        coordinator.get_motion_event.return_value = {"device_id": 10}
+        entity._handle_coordinator_update()
+
+        assert len(fired) == 1
+        assert fired[0][1]["timestamp"] is None
+
+    @pytest.mark.asyncio
+    async def test_setup_creates_motion_entity_for_ip_camera(self):
+        device = {"id": 10, "type": "ip_camera", "name": "Front Camera", "_device_name": "Front Camera"}
+        coordinator = self._make_coordinator(virtual_devices={10: device})
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(
+                MagicMock(), entry, lambda entities, **_: added.extend(entities)
+            )
+
+        motion = [e for e in added if isinstance(e, SinumMotionEvent)]
+        assert len(motion) == 1
+
+    @pytest.mark.asyncio
+    async def test_setup_creates_motion_entity_for_onvif_camera(self):
+        device = {"id": 11, "type": "onvif_camera", "name": "ONVIF Cam", "_device_name": "ONVIF Cam"}
+        coordinator = self._make_coordinator(virtual_devices={11: device})
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(
+                MagicMock(), entry, lambda entities, **_: added.extend(entities)
+            )
+
+        motion = [e for e in added if isinstance(e, SinumMotionEvent)]
+        assert len(motion) == 1
+
+    @pytest.mark.asyncio
+    async def test_setup_skips_non_camera_virtual_devices(self):
+        device = {"id": 20, "type": "thermostat", "name": "Thermostat"}
+        coordinator = self._make_coordinator(virtual_devices={20: device})
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.entry_id = "test_entry"
+
+        added = []
+        with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+            await async_setup_entry(
+                MagicMock(), entry, lambda entities, **_: added.extend(entities)
+            )
+
+        assert not any(isinstance(e, SinumMotionEvent) for e in added)

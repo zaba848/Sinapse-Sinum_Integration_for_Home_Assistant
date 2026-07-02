@@ -1,7 +1,7 @@
 # Sinapse - Implementation Plan & Status
 
 > Last updated: 2026-07-01 (released: v0.7.3 ✅)
-> Current manifest version: v0.7.4 (pending deploy)
+> Current manifest version: v0.7.5 (pending deploy)
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 689 passing, 5 skipped (~10 s)
+Tests:  1 715 passing, 5 skipped (~10 s)
 Ruff:   0 errors
 mypy:   0 errors
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
@@ -103,6 +103,7 @@ export SINUM_SBUS_TOKEN="<api-token>"
 | v0.7.2 | Hub firmware version sensor, Sinapse title in UI, ruff CI pin, camera.py cleanup | 1 678 |
 | v0.7.3 | LoRa EUI as serial_number + software_version as sw_version in device registry | 1 682 |
 | v0.7.4 | Hub name prefix only in multi-hub setups (no prefix for single-hub installs) | 1 689 |
+| v0.7.5 | Delete dead scene.py, +26 tests — coverage 98%→99%, __init__/coordinator/event/device_trigger at 100% | 1 715 |
 
 ---
 

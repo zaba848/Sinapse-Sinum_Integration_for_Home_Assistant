@@ -540,12 +540,25 @@ class TestDeviceInfoMixinWithHubPrefix:
         assert info.get("name") == "Energy Meter 1"
 
     def test_device_info_unchanged_when_device_name_missing(self):
-        """Skip prefix when device_info has no name field."""
+        """Skip prefix when device_info has no name field (single hub — hub_name is None)."""
         from homeassistant.helpers.device_registry import DeviceInfo
 
         entity = self._make_mixin_entity(
             "tablica-wtp",
             DeviceInfo(identifiers={("sinum", "e1_wtp_1")}),
+        )
+        info = entity.device_info
+        assert info is not None
+        assert info.get("name") is None
+
+    def test_device_info_unchanged_when_multi_hub_but_no_device_name(self):
+        """Skip prefix when device_info exists but has no name — even in multi-hub setup."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        entity = self._make_mixin_entity(
+            "tablica-wtp",
+            DeviceInfo(identifiers={("sinum", "e1_wtp_1")}),
+            num_entries=2,
         )
         info = entity.device_info
         assert info is not None
@@ -599,3 +612,46 @@ class TestEffectiveHubName:
 
         coord = self._make_coordinator("tablica-wtp", 1)
         assert hub_prefixed_name(coord, "Energy Meter 1") == "Energy Meter 1"
+
+
+class TestMotionEventDispatch:
+    """Tests for coordinator motion event queue (dispatch_motion_detected / get_motion_event)."""
+
+    def _make_coordinator(self):
+        from custom_components.sinum.coordinator import SinumCoordinator
+
+        coord = MagicMock(spec=SinumCoordinator)
+        coord._motion_events = {}
+        coord.data = {}
+        coord.async_set_updated_data = MagicMock()
+        coord.dispatch_motion_detected = SinumCoordinator.dispatch_motion_detected.__get__(coord)
+        coord.get_motion_event = SinumCoordinator.get_motion_event.__get__(coord)
+        return coord
+
+    def test_dispatch_stores_event_and_triggers_update(self):
+        coord = self._make_coordinator()
+        payload = {"timestamp": 1234567890}
+
+        coord.dispatch_motion_detected(42, payload)
+
+        assert coord._motion_events[42]["timestamp"] == 1234567890
+        assert coord._motion_events[42]["device_id"] == 42
+        coord.async_set_updated_data.assert_called_once()
+
+    def test_get_motion_event_returns_and_clears(self):
+        coord = self._make_coordinator()
+        coord._motion_events[42] = {"timestamp": 999, "device_id": 42}
+
+        event = coord.get_motion_event(42)
+
+        assert event["timestamp"] == 999
+        assert 42 not in coord._motion_events
+
+    def test_get_motion_event_returns_none_when_missing(self):
+        coord = self._make_coordinator()
+        assert coord.get_motion_event(99) is None
+
+    def test_dispatch_missing_timestamp_stored_as_none(self):
+        coord = self._make_coordinator()
+        coord.dispatch_motion_detected(7, {})
+        assert coord._motion_events[7]["timestamp"] is None
