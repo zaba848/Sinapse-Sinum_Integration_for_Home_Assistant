@@ -1027,7 +1027,7 @@ class TestHelperFunctions:
 
     def test_dict_list_returns_empty_for_non_list_input(self):
         """Line 70: _dict_list(non-list) → []."""
-        from custom_components.sinum.api import _dict_list
+        from custom_components.sinum._api_helpers import _dict_list
 
         assert _dict_list("not-a-list") == []
         assert _dict_list(None) == []
@@ -1035,7 +1035,7 @@ class TestHelperFunctions:
 
     def test_list_result_single_id_dict_wrapped_in_list(self):
         """Line 111: _list_result({'id': 1, ...}) → [{'id': 1, ...}]."""
-        from custom_components.sinum.api import _list_result
+        from custom_components.sinum._api_helpers import _list_result
 
         device = {"id": 1, "type": "flood_sensor"}
         result = _list_result(device)

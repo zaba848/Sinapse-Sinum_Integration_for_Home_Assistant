@@ -8,31 +8,18 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 
+from ._api_energy import EnergyMixin
+from ._api_helpers import _list_result
+from ._api_scene import SceneMixin
 from .const import (
     API_ALARM_COMMAND,
     API_ALARM_DEVICE,
     API_ALARM_DEVICES,
-    API_AUTOMATION,
-    API_AUTOMATION_LOGS,
-    API_AUTOMATION_LUA,
-    API_AUTOMATION_LUA_EXTENSIONS,
-    API_AUTOMATION_SCHEMA,
-    API_AUTOMATIONS,
-    API_ENERGY,
-    API_ENERGY_CENTER_ASSOCIATIONS,
-    API_ENERGY_CENTER_CONSUMPTION,
-    API_ENERGY_CENTER_FLOW_MONITOR,
-    API_ENERGY_CENTER_PRICES,
-    API_ENERGY_CENTER_PRICES_SETTINGS,
-    API_ENERGY_CENTER_PRICES_SOURCES,
-    API_ENERGY_CENTER_PRODUCTION,
-    API_ENERGY_CENTER_STORAGE,
     API_FLOORS,
     API_INFO,
     API_LOGIN,
     API_LORA_DEVICE,
     API_LORA_DEVICES,
-    API_LUA_INFO,
     API_MODBUS_DEVICE,
     API_MODBUS_DEVICES,
     API_NOTIFICATIONS,
@@ -41,26 +28,14 @@ from .const import (
     API_ROOMS,
     API_SBUS_DEVICE,
     API_SBUS_DEVICES,
-    API_SCENE,
-    API_SCENE_ACTIVATE,
-    API_SCENE_LOGS,
-    API_SCENE_LUA,
-    API_SCENE_LUA_EXTENSIONS,
-    API_SCENE_SCHEMA,
-    API_SCENES,
-    API_SCHEDULE,
-    API_SCHEDULES,
     API_SLINK_DEVICE,
     API_SLINK_DEVICES,
-    API_VARIABLE,
-    API_VARIABLES,
     API_VIDEO_DEVICE,
     API_VIDEO_DEVICES,
     API_VIDEO_SNAPSHOT,
     API_VIDEO_STREAM,
     API_VIRTUAL_DEVICE,
     API_VIRTUAL_DEVICES,
-    API_WEATHER,
     API_WTP_DEVICE,
     API_WTP_DEVICES,
     ATTR_REFRESH_TOKEN,
@@ -71,88 +46,6 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 25
-
-
-def _dict_list(items: Any) -> list[dict[str, Any]]:
-    """Return only dictionary items from a list-like API collection."""
-    if not isinstance(items, list):
-        return []
-    return [item for item in items if isinstance(item, dict)]
-
-
-def _extract_from_value(value: Any) -> list[dict[str, Any]] | None:
-    if isinstance(value, list):
-        return _dict_list(value)
-    if isinstance(value, dict):
-        nested = _list_result(value)
-        return nested or None
-    return None
-
-
-def _extract_by_keys(result: dict[str, Any], keys: tuple[str, ...]) -> list[dict[str, Any]] | None:
-    for key in keys:
-        extracted = _extract_from_value(result.get(key))
-        if extracted is not None:
-            return extracted
-    return None
-
-
-def _flatten_values(result: dict[str, Any]) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for value in result.values():
-        _append_value_to_flat_list(out, value)
-    return out
-
-
-def _append_value_to_flat_list(out: list[dict[str, Any]], value: Any) -> None:
-    if isinstance(value, list):
-        out.extend(_dict_list(value))
-    elif isinstance(value, dict) and "id" in value:
-        out.append(value)
-
-
-def _partition_energy_results(
-    keys: tuple[str, ...], results: list[Any]
-) -> tuple[dict[str, Any], list[str]]:
-    available: dict[str, Any] = {}
-    missing: list[str] = []
-    for key, result in zip(keys, results):
-        _classify_energy_result(key, result, available, missing)
-    return available, missing
-
-
-def _classify_energy_result(
-    key: str, result: Any, available: dict[str, Any], missing: list[str]
-) -> None:
-    if result is not None:
-        available[key] = result
-    else:
-        missing.append(key)
-
-
-def _list_result_from_dict(
-    result: dict[str, Any], preferred_keys: tuple[str, ...]
-) -> list[dict[str, Any]]:
-    extracted = _extract_by_keys(result, (*preferred_keys, "items", "devices", "results", "data"))
-    if extracted is not None:
-        return extracted
-    if "id" in result:
-        return [result]
-    return _flatten_values(result)
-
-
-def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
-    """Normalize Sinum list responses across firmware variants.
-
-    Most documented endpoints return a bare list after the {"data": ...} envelope
-    is unwrapped. Some firmware builds return maps keyed by id/bus, or wrap the
-    list once more in keys such as "items" or "devices".
-    """
-    if isinstance(result, list):
-        return _dict_list(result)
-    if not isinstance(result, dict):
-        return []
-    return _list_result_from_dict(result, preferred_keys)
 
 
 class SinumAuthError(Exception):
@@ -183,7 +76,7 @@ async def _read_json(resp: aiohttp.ClientResponse, path: str) -> dict[str, Any]:
         ) from err
 
 
-class SinumClient:
+class SinumClient(SceneMixin, EnergyMixin):
     """Async HTTP client for the Sinum EH-01 hub REST API.
 
     Authentication modes:
@@ -559,118 +452,6 @@ class SinumClient:
     async def patch_slink_device(self, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request("PATCH", API_SLINK_DEVICE.format(id=device_id), json=payload)
 
-    # --------------------------------------------------------------- scenes
-
-    async def get_scenes(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_SCENES)
-        return _list_result(result, "scenes")
-
-    async def get_scene(self, scene_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_SCENE.format(id=scene_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_scene_lua(self, scene_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_SCENE_LUA.format(id=scene_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_scene_lua_extensions(self, scene_id: int) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_SCENE_LUA_EXTENSIONS.format(id=scene_id))
-        return _list_result(result, "lua_extensions", "extensions")
-
-    async def get_scene_schema(self, scene_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_SCENE_SCHEMA.format(id=scene_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_scene_logs(self, scene_id: int) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_SCENE_LOGS.format(id=scene_id))
-        return _list_result(result, "logs")
-
-    async def run_scene(self, scene_id: int) -> None:
-        await self._request("POST", API_SCENE_ACTIVATE.format(id=scene_id))
-
-    async def create_scene(self, name: str, lua: str) -> int:
-        """Create a code-type scene and return its ID."""
-        result = await self._request(
-            "POST", API_SCENES, json={"name": name, "type": "code", "lua": lua}
-        )
-        if isinstance(result, dict) and result.get("id"):
-            return int(result["id"])
-        raise SinumConnectionError(f"Scene creation failed: {result}")
-
-    async def patch_scene_lua(self, scene_id: int, lua: str) -> None:
-        """Replace the Lua code of an existing scene."""
-        await self._request("PATCH", API_SCENE.format(id=scene_id), json={"lua": lua})
-
-    async def delete_scene(self, scene_id: int) -> None:
-        """Delete a scene by ID."""
-        await self._request("DELETE", API_SCENE.format(id=scene_id))
-
-    async def find_scene_by_name(self, name: str) -> int | None:
-        """Return the ID of the first scene matching *name*, or None."""
-        scenes = await self.get_scenes()
-        for s in scenes:
-            if s.get("name") == name:
-                return int(s["id"])
-        return None
-
-    async def get_or_create_scene(self, name: str) -> int:
-        """Return ID of a named scene, creating it if it doesn't exist."""
-        existing = await self.find_scene_by_name(name)
-        if existing is not None:
-            return existing
-        return await self.create_scene(name, "-- HA RGB placeholder")
-
-    # ------------------------------------------------------------ automations
-
-    async def get_automations(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_AUTOMATIONS)
-        return _list_result(result, "automations")
-
-    async def get_automation(self, automation_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_AUTOMATION.format(id=automation_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_automation_lua(self, automation_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_AUTOMATION_LUA.format(id=automation_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_automation_lua_extensions(self, automation_id: int) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_AUTOMATION_LUA_EXTENSIONS.format(id=automation_id))
-        return _list_result(result, "lua_extensions", "extensions")
-
-    async def get_automation_schema(self, automation_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_AUTOMATION_SCHEMA.format(id=automation_id))
-        return result if isinstance(result, dict) else {}
-
-    async def get_automation_logs(self, automation_id: int) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_AUTOMATION_LOGS.format(id=automation_id))
-        return _list_result(result, "logs")
-
-    # ------------------------------------------------------------ variables
-
-    async def get_variables(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_VARIABLES)
-        return _list_result(result, "variables")
-
-    async def set_variable(self, variable_id: int, value: Any) -> dict[str, Any]:
-        return await self._request(
-            "PATCH", API_VARIABLE.format(id=variable_id), json={"value": value}
-        )
-
-    # ------------------------------------------------------------- schedules
-
-    async def get_schedules(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_SCHEDULES)
-        return _list_result(result, "schedules")
-
-    async def get_schedule(self, schedule_id: int) -> dict[str, Any]:
-        result = await self._request("GET", API_SCHEDULE.format(id=schedule_id))
-        return result if isinstance(result, dict) else {}
-
-    async def patch_schedule(self, schedule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-        result = await self._request("PATCH", API_SCHEDULE.format(id=schedule_id), json=payload)
-        return result if isinstance(result, dict) else {}
-
     # --------------------------------------------------------------- alarms
 
     async def get_alarm_devices(self) -> list[dict[str, Any]]:
@@ -777,105 +558,6 @@ class SinumClient:
     async def send_notification(self, title: str, message: str) -> None:
         payload = {"title": title, "message": message}
         await self._request("POST", API_NOTIFICATIONS, json=payload)
-
-    # -------------------------------------------------------------- weather
-
-    async def get_weather(self) -> dict[str, Any]:
-        return await self._request("GET", API_WEATHER)
-
-    # --------------------------------------------------------------- energy
-
-    async def get_energy(self) -> dict[str, Any]:
-        return await self._request("GET", API_ENERGY)
-
-    async def get_energy_center_associations(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_ASSOCIATIONS)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_flow_monitor(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_FLOW_MONITOR)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_prices(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_prices_settings(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SETTINGS)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_prices_sources(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SOURCES)
-        return _list_result(result, "sources")
-
-    async def get_energy_center_storage(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_STORAGE)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_consumption(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_CONSUMPTION)
-        return result if isinstance(result, dict) else {}
-
-    async def get_energy_center_production(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRODUCTION)
-        return result if isinstance(result, dict) else {}
-
-    @staticmethod
-    def _energy_center_keys() -> tuple[str, ...]:
-        return (
-            "associations",
-            "flow_monitor",
-            "prices",
-            "prices_settings",
-            "prices_sources",
-            "storage",
-            "consumption",
-            "production",
-        )
-
-    def _energy_center_getters(self) -> tuple[Any, ...]:
-        return (
-            self.get_energy_center_associations,
-            self.get_energy_center_flow_monitor,
-            self.get_energy_center_prices,
-            self.get_energy_center_prices_settings,
-            self.get_energy_center_prices_sources,
-            self.get_energy_center_storage,
-            self.get_energy_center_consumption,
-            self.get_energy_center_production,
-        )
-
-    async def _safe_get_energy_center_value(self, getter: Any) -> Any:
-        try:
-            return await getter()
-        except Exception:
-            return None
-
-    @staticmethod
-    def _build_energy_center_summary(keys: tuple[str, ...], results: list[Any]) -> dict[str, Any]:
-        available, missing = _partition_energy_results(keys, results)
-        if not available:
-            raise SinumConnectionError("Energy Center endpoints unavailable")
-        return {
-            **available,
-            "available_endpoints": list(available.keys()),
-            "missing_endpoints": missing,
-        }
-
-    async def get_energy_center_summary(self) -> dict[str, Any]:
-        keys = self._energy_center_keys()
-        getters = self._energy_center_getters()
-        results = await asyncio.gather(
-            *(self._safe_get_energy_center_value(getter) for getter in getters)
-        )
-        return self._build_energy_center_summary(keys, list(results))
-
-    # ----------------------------------------- Lua HTTP server (optional)
-    # Only available when sinapse_api.lua is installed on the hub.
-    # Provides Wi-Fi signal and SSID — not exposed by the regular REST API.
-
-    async def get_lua_hub_info(self) -> dict[str, Any]:
-        return await self._request("GET", API_LUA_INFO)
 
     # -------------------------------------------------- temperature encoding
 

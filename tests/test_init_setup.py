@@ -151,7 +151,8 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_setup_entry_mqtt_bridge_started_when_enabled(self, hass):
-        from custom_components.sinum import _MQTT_BRIDGES, async_setup_entry
+        from custom_components.sinum import async_setup_entry
+        from custom_components.sinum.lifecycle import _MQTT_BRIDGES
 
         entry = MagicMock()
         entry.entry_id = "mqtt_entry"
@@ -169,7 +170,7 @@ class TestAsyncSetupEntry:
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
             patch("custom_components.sinum.SinumClient") as MockClient,
             patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
-            patch("custom_components.sinum.SinumMqttBridge") as MockBridge,
+            patch("custom_components.sinum.lifecycle.SinumMqttBridge") as MockBridge,
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
         ):
             client = MagicMock()
@@ -194,7 +195,8 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_setup_entry_mqtt_bridge_not_started_when_disabled(self, hass):
-        from custom_components.sinum import _MQTT_BRIDGES, async_setup_entry
+        from custom_components.sinum import async_setup_entry
+        from custom_components.sinum.lifecycle import _MQTT_BRIDGES
 
         entry = MagicMock()
         entry.entry_id = "no_mqtt_entry"
@@ -212,7 +214,7 @@ class TestAsyncSetupEntry:
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
             patch("custom_components.sinum.SinumClient") as MockClient,
             patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
-            patch("custom_components.sinum.SinumMqttBridge") as MockBridge,
+            patch("custom_components.sinum.lifecycle.SinumMqttBridge") as MockBridge,
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
         ):
             client = MagicMock()
@@ -235,7 +237,8 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_setup_entry_ws_bridge_started_when_enabled(self, hass):
-        from custom_components.sinum import _WS_BRIDGES, async_setup_entry
+        from custom_components.sinum import async_setup_entry
+        from custom_components.sinum.lifecycle import _WS_BRIDGES
 
         entry = MagicMock()
         entry.entry_id = "ws_entry"
@@ -252,8 +255,8 @@ class TestAsyncSetupEntry:
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
             patch("custom_components.sinum.SinumClient") as MockClient,
             patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
-            patch("custom_components.sinum.SinumWebSocketBridge") as MockWsBridge,
-            patch("custom_components.sinum.SinumMqttBridge") as MockMqttBridge,
+            patch("custom_components.sinum.lifecycle.SinumWebSocketBridge") as MockWsBridge,
+            patch("custom_components.sinum.lifecycle.SinumMqttBridge") as MockMqttBridge,
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
         ):
             client = MagicMock()
@@ -286,7 +289,8 @@ class TestAsyncSetupEntry:
     @pytest.mark.asyncio
     async def test_setup_entry_ws_bridge_start_failure_falls_back_to_mqtt(self, hass):
         """When WS bridge async_start returns False, setup succeeds via MQTT fallback."""
-        from custom_components.sinum import _WS_BRIDGES, async_setup_entry
+        from custom_components.sinum import async_setup_entry
+        from custom_components.sinum.lifecycle import _WS_BRIDGES
 
         entry = MagicMock()
         entry.entry_id = "ws_fail_entry"
@@ -303,8 +307,8 @@ class TestAsyncSetupEntry:
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
             patch("custom_components.sinum.SinumClient") as MockClient,
             patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
-            patch("custom_components.sinum.SinumWebSocketBridge") as MockWsBridge,
-            patch("custom_components.sinum.SinumMqttBridge"),
+            patch("custom_components.sinum.lifecycle.SinumWebSocketBridge") as MockWsBridge,
+            patch("custom_components.sinum.lifecycle.SinumMqttBridge"),
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
         ):
             client = MagicMock()
@@ -330,7 +334,8 @@ class TestAsyncSetupEntry:
 class TestAsyncUnloadEntry:
     @pytest.mark.asyncio
     async def test_unload_entry_stops_mqtt_bridge(self, hass):
-        from custom_components.sinum import _MQTT_BRIDGES, async_unload_entry
+        from custom_components.sinum import async_unload_entry
+        from custom_components.sinum.lifecycle import _MQTT_BRIDGES
 
         bridge = MagicMock()
         bridge.async_stop = AsyncMock()
@@ -351,7 +356,8 @@ class TestAsyncUnloadEntry:
 
     @pytest.mark.asyncio
     async def test_unload_entry_stops_ws_bridge(self, hass):
-        from custom_components.sinum import _WS_BRIDGES, async_unload_entry
+        from custom_components.sinum import async_unload_entry
+        from custom_components.sinum.lifecycle import _WS_BRIDGES
 
         ws_bridge = MagicMock()
         ws_bridge.async_stop = AsyncMock()
@@ -435,7 +441,7 @@ class TestSendNotificationService:
             patch("custom_components.sinum.SinumCoordinator", return_value=coord),
             patch("custom_components.sinum.SinumClient", return_value=mock_client),
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
-            patch("custom_components.sinum.SinumMqttBridge"),
+            patch("custom_components.sinum.lifecycle.SinumMqttBridge"),
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
         ):
             await async_setup_entry(hass, entry)
@@ -960,13 +966,13 @@ class TestStaleEntityCleanup:
     """Tests for stale device cleanup helpers."""
 
     def test_stale_uid_prefixes_empty_when_no_removed_ids(self):
-        from custom_components.sinum import _stale_uid_prefixes
+        from custom_components.sinum.lifecycle import _stale_uid_prefixes
 
         result = _stale_uid_prefixes("entry1", {"wtp": frozenset(), "sbus": frozenset()})
         assert result == set()
 
     def test_stale_uid_prefixes_builds_correct_prefixes(self):
-        from custom_components.sinum import _stale_uid_prefixes
+        from custom_components.sinum.lifecycle import _stale_uid_prefixes
 
         result = _stale_uid_prefixes("abc", {"wtp": frozenset({10, 20}), "sbus": frozenset({5})})
         assert "abc_wtp_10" in result
@@ -975,35 +981,35 @@ class TestStaleEntityCleanup:
         assert len(result) == 3
 
     def test_is_stale_entity_matches_exact_uid(self):
-        from custom_components.sinum import _is_stale_entity
+        from custom_components.sinum.lifecycle import _is_stale_entity
 
         entity = MagicMock()
         entity.unique_id = "abc_wtp_10"
         assert _is_stale_entity(entity, {"abc_wtp_10"}) is True
 
     def test_is_stale_entity_matches_prefixed_uid(self):
-        from custom_components.sinum import _is_stale_entity
+        from custom_components.sinum.lifecycle import _is_stale_entity
 
         entity = MagicMock()
         entity.unique_id = "abc_wtp_10_temperature"
         assert _is_stale_entity(entity, {"abc_wtp_10"}) is True
 
     def test_is_stale_entity_does_not_match_partial_prefix(self):
-        from custom_components.sinum import _is_stale_entity
+        from custom_components.sinum.lifecycle import _is_stale_entity
 
         entity = MagicMock()
         entity.unique_id = "abc_wtp_100_temperature"
         assert _is_stale_entity(entity, {"abc_wtp_10"}) is False
 
     def test_is_stale_entity_no_match_for_different_bus(self):
-        from custom_components.sinum import _is_stale_entity
+        from custom_components.sinum.lifecycle import _is_stale_entity
 
         entity = MagicMock()
         entity.unique_id = "abc_sbus_10_state"
         assert _is_stale_entity(entity, {"abc_wtp_10"}) is False
 
     def test_is_stale_entity_returns_false_when_no_prefixes(self):
-        from custom_components.sinum import _is_stale_entity
+        from custom_components.sinum.lifecycle import _is_stale_entity
 
         entity = MagicMock()
         entity.unique_id = "abc_wtp_10"
@@ -1011,15 +1017,15 @@ class TestStaleEntityCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_noop_when_no_removed(self, hass):
-        from custom_components.sinum import _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
 
-        with patch("custom_components.sinum.er") as mock_er:
+        with patch("custom_components.sinum.lifecycle.er") as mock_er:
             await _cleanup_stale_entities(hass, "entry1", {"wtp": frozenset(), "sbus": frozenset()})
             mock_er.async_get.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_removes_matching_entities(self, hass):
-        from custom_components.sinum import _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
 
         stale_entity = MagicMock()
         stale_entity.unique_id = "e1_wtp_42_temperature"
@@ -1032,7 +1038,7 @@ class TestStaleEntityCleanup:
         mock_reg = MagicMock()
         mock_reg.entities.get_entries_for_config_entry_id.return_value = [stale_entity, live_entity]
 
-        with patch("custom_components.sinum.er") as mock_er:
+        with patch("custom_components.sinum.lifecycle.er") as mock_er:
             mock_er.async_get.return_value = mock_reg
             await _cleanup_stale_entities(hass, "e1", {"wtp": frozenset({42})})
 
@@ -1040,7 +1046,7 @@ class TestStaleEntityCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_removes_exact_uid_match(self, hass):
-        from custom_components.sinum import _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
 
         entity = MagicMock()
         entity.unique_id = "e1_sbus_7"
@@ -1049,8 +1055,8 @@ class TestStaleEntityCleanup:
         mock_reg = MagicMock()
         mock_reg.entities.get_entries_for_config_entry_id.return_value = [entity]
 
-        with patch("custom_components.sinum.er") as mock_er, \
-             patch("custom_components.sinum.dr") as mock_dr:
+        with patch("custom_components.sinum.lifecycle.er") as mock_er, \
+             patch("custom_components.sinum.lifecycle.dr") as mock_dr:
             mock_er.async_get.return_value = mock_reg
             mock_dr.async_get.return_value = MagicMock(async_get_device=MagicMock(return_value=None))
             await _cleanup_stale_entities(hass, "e1", {"sbus": frozenset({7})})
@@ -1179,7 +1185,7 @@ class TestStaleDeviceRegistryCleanup:
     """Tests for device registry cleanup helpers."""
 
     def test_stale_identifiers_builds_correct_set(self):
-        from custom_components.sinum import _stale_identifiers
+        from custom_components.sinum.lifecycle import _stale_identifiers
 
         result = _stale_identifiers("abc", {"wtp": frozenset({10}), "sbus": frozenset({5})})
         assert ("sinum", "abc_wtp_10") in result
@@ -1187,13 +1193,13 @@ class TestStaleDeviceRegistryCleanup:
         assert len(result) == 2
 
     def test_stale_identifiers_empty_when_no_removed(self):
-        from custom_components.sinum import _stale_identifiers
+        from custom_components.sinum.lifecycle import _stale_identifiers
 
         result = _stale_identifiers("abc", {"wtp": frozenset(), "sbus": frozenset()})
         assert result == set()
 
     def test_remove_stale_devices_removes_found_device(self):
-        from custom_components.sinum import _remove_stale_devices
+        from custom_components.sinum.lifecycle import _remove_stale_devices
 
         mock_device = MagicMock()
         mock_device.id = "dev-uuid-123"
@@ -1203,20 +1209,20 @@ class TestStaleDeviceRegistryCleanup:
         mock_reg.async_get_device.return_value = mock_device
 
         hass = MagicMock()
-        with patch("custom_components.sinum.dr") as mock_dr:
+        with patch("custom_components.sinum.lifecycle.dr") as mock_dr:
             mock_dr.async_get.return_value = mock_reg
             _remove_stale_devices(hass, "e1", {("sinum", "e1_wtp_10")})
 
         mock_reg.async_remove_device.assert_called_once_with("dev-uuid-123")
 
     def test_remove_stale_devices_noop_when_device_not_found(self):
-        from custom_components.sinum import _remove_stale_devices
+        from custom_components.sinum.lifecycle import _remove_stale_devices
 
         mock_reg = MagicMock()
         mock_reg.async_get_device.return_value = None
 
         hass = MagicMock()
-        with patch("custom_components.sinum.dr") as mock_dr:
+        with patch("custom_components.sinum.lifecycle.dr") as mock_dr:
             mock_dr.async_get.return_value = mock_reg
             _remove_stale_devices(hass, "e1", {("sinum", "e1_wtp_10")})
 

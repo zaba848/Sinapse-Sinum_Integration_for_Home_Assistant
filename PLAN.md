@@ -1,7 +1,7 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-02 (released: v0.7.6 ✅)
-> Current manifest version: v0.7.6 (deployed to RPi pending)
+> Last updated: 2026-07-02 (released: v0.7.7 pending push)
+> Current manifest version: v0.7.7
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,10 +9,10 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 849 passing, 5 skipped (~9 s)
-Coverage: 100% line coverage — all 28 modules
+Tests:  1 890 passing, 5 skipped (~10 s)
+Coverage: 100% line coverage — all 30 modules
 Ruff:   0 errors
-mypy:   0 errors
+mypy:   0 errors (errors in HA library stubs only, not our code)
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
 ```
 
@@ -184,13 +184,49 @@ Add `tests/test_integration.py` with real HA config-entry fixtures (using homeas
 - Full `async_setup_entry` → coordinator `_fetch_all` → platform setup → entity attributes
 - No real hub needed — mock at HTTP level via `aioresponses`
 
-### Phase G — api.py ISP facade (long-term)
+### Phase G — api.py mixin extraction ✅ Done (v0.7.7)
 
-Introduce thin facades keeping backwards compat:
-- `SinumDeviceClient` — get/patch per bus
-- `SinumSceneClient` — scene/lua management
-- `SinumEnergyClient` — energy center
-- `SinumClient` remains as aggregate facade
+Split 889-line `api.py` into focused modules using Python mixin pattern:
+- `_api_helpers.py` — `_list_result`, `_dict_list`, `_partition_energy_results` and normalisation helpers (shared)
+- `_api_scene.py` — `SceneMixin`: scenes, automations, variables, schedules (38 methods)
+- `_api_energy.py` — `EnergyMixin`: weather, energy center, Lua hub info (17 methods)
+- `api.py` now: `SinumClient(SceneMixin, EnergyMixin)` — transport + auth only (~430 lines)
+- Deferred import pattern for `SinumConnectionError` inside `_api_scene.py::create_scene` and `_api_energy.py::_build_energy_center_summary` to avoid circular imports
+- Tests updated: `_dict_list` / `_list_result` now imported from `_api_helpers` not `api`
+
+### Phase H — sensor_bus_descriptions DRY refactor ✅ Done (v0.7.7)
+
+- `_COMMON_SENSOR_KWARGS` tuple: 9 shared sensors (temp, humidity, illuminance, power, voltage, current, energy × 3)
+- `_with_source(source)` helper generates typed `SinumSensorDescription` tuples
+- `WTP_SENSORS = _with_source("wtp") + (co2, pm*, pressure, iaq, air_quality, room_temperature, dew_point, battery, signal, wtp_regulator sensors)`
+- `SBUS_SENSORS = _with_source("sbus") + (analog_value, impulse_*, pwm_*, valve_*)`
+- Saved ~90 duplicate lines
+
+### Phase I — switch.py base class extraction ✅ Done (v0.7.7)
+
+- `_SinumVirtualSwitch` base: `SinumDeviceAvailableMixin + CoordinatorEntity + SwitchEntity`
+- `SinumRelaySwitch` and `SinumWicketSwitch` now single-method subclasses
+- `_patch()` helper on base: calls `patch_virtual_device` and calls `async_write_ha_state`
+
+### Phase J — cover.py split ✅ Done (v0.7.7)
+
+Follows `_climate_helpers.py` pattern:
+- `_cover_helpers.py` — `_label`, `_virtual_device_info`, `_apply_restored_position/tilt`, `_restore_cover_from_last_state`, `_compare_target_current`
+- `cover_wtp.py` — `SinumWtpBlindCover` (position only, no tilt)
+- `cover_sbus.py` — `SinumSbusBlindCover` (position + conditional tilt)
+- `cover.py` — thin dispatcher, imports and re-exports all classes, backward-compatible
+
+### Phase K — coordinator.py WebRTC extraction ✅ Done (v0.7.7)
+
+- `_webrtc.py` — `WebRtcSessionManager` class: tracks sessions dict, dispatches ICE/SDP/error events to HA via lazy imports of `WebRTCAnswer/Candidate/Error`, forwards ICE candidates to hub
+- `coordinator.py` — `self._webrtc = WebRtcSessionManager(client)`, 6 thin stub methods
+
+### Phase L — __init__.py lifecycle extraction ✅ Done (v0.7.7)
+
+- `lifecycle.py` — bridge lifecycle (`start_mqtt_bridge`, `start_ws_bridge`, `start_realtime_bridge`, `stop_mqtt_bridge`, `stop_ws_bridge`) + stale entity cleanup (`_stale_uid_prefixes`, `_stale_identifiers`, `_is_stale_entity`, `_remove_stale_devices`, `cleanup_stale_entities`)
+- Module-level `_MQTT_BRIDGES` / `_WS_BRIDGES` dicts now live in `lifecycle.py`
+- `__init__.py` reduced from 502 → ~390 lines, imports 4 public functions from lifecycle
+- Tests updated: patch targets and `_MQTT_BRIDGES` / `_WS_BRIDGES` imports updated to lifecycle module
 
 ---
 
