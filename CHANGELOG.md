@@ -29,8 +29,8 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 - **`scene.py` deleted** — dead code (0% coverage, not registered in PLATFORMS, used obsolete `hass.data[DOMAIN]` pattern). Scenes are already exposed via the `button` platform (`SinumSceneButton`).
 
 ### Tests
-- **+52 tests** (1 689 → 1 741 passing) covering motion event entities (`SinumMotionEvent`), coordinator motion dispatch, `device_trigger` scene-activated paths, `__init__` service handlers (`run_scene`, `upload_mqtt_bridge`), notification error paths, WS bridge start failure, WS bridge stop, stale cleanup callback, alarm night/unbypass errors, binary sensor gear-absent and status-fallback paths, camera `url3` attribute and `async_is_supported` parse exception, WebSocket reconnect-attempt reset, config flow host normalisation, WebSocket path validator, and SLINK scale factor.
-- Coverage: 98% → 99%; `__init__.py`, `coordinator.py`, `event.py`, `device_trigger.py`, `alarm_control_panel.py`, `binary_sensor.py`, `camera.py`, `websocket.py`, `sensor_modbus.py` all at 100%.
+- **+54 tests** (1 689 → 1 743 passing) covering motion event entities (`SinumMotionEvent`), coordinator motion dispatch, `device_trigger` scene-activated paths, `__init__` service handlers (`run_scene`, `upload_mqtt_bridge`), notification error paths, WS bridge start failure/stop, stale cleanup callback, alarm night/unbypass errors, binary sensor gear-absent and status-fallback paths, camera `url3` attribute and `async_is_supported` parse exception, WebSocket reconnect-attempt reset, config flow host normalisation, WebSocket path validator, probe-retry exhaustion, and SLINK scale factor.
+- **100% line coverage** on all 28 modules — first time the integration has zero missing lines.
 - Smoke check extended with LoRa/SLINK/Modbus optional endpoints and LoRa device EUI/firmware report.
 
 ---
