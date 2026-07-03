@@ -11,12 +11,23 @@ import asyncio
 import contextlib
 import json
 import logging
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from .const import DEFAULT_WS_PATH
+from ._websocket_helpers import (  # noqa: F401
+    _as_int,
+    _device_class,
+    _ensure_leading_slash,
+    _filter_dicts,
+    _find_nested_list,
+    _is_full_url,
+    _iter_events,
+    _normalize_ws_path,
+    _patch_device,
+    _ws_should_continue,
+)
+from ._websocket_video import _WebSocketVideoMixin
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -29,7 +40,7 @@ _RECONNECT_DELAY_MIN = 5
 _RECONNECT_DELAY_MAX = 60
 
 
-class SinumWebSocketBridge:
+class SinumWebSocketBridge(_WebSocketVideoMixin):
     """Bridges Sinum websocket events to the coordinator data store."""
 
     def __init__(
@@ -158,58 +169,6 @@ class SinumWebSocketBridge:
             return False
         return self._apply_device_state(data)
 
-    def _handle_video_stream_message(self, data: dict[str, Any]) -> None:
-        payload = data.get("payload", {})
-        inner = payload.get("data", {})
-        session_id = inner.get("session_id", "")
-        if not session_id:
-            return
-        self._dispatch_video_message(payload.get("type"), session_id, inner)
-
-    def _dispatch_video_message(
-        self, msg_type: str | None, session_id: str, inner: dict[str, Any]
-    ) -> None:
-        if msg_type == "answer":
-            self._handle_video_answer(session_id, inner)
-        elif msg_type == "candidate":
-            self._handle_video_candidate(session_id, inner)
-        elif msg_type in ("bye", "error"):
-            self._handle_video_bye(session_id, inner, msg_type)
-
-    def _handle_video_answer(self, session_id: str, inner: dict[str, Any]) -> None:
-        sdp = inner.get("description", {}).get("sdp", "")
-        if sdp:
-            self._coordinator.dispatch_webrtc_answer(session_id, sdp)
-
-    def _handle_video_candidate(self, session_id: str, inner: dict[str, Any]) -> None:
-        candidate_dict = inner.get("candidate", {})
-        if candidate_dict:
-            self._coordinator.dispatch_webrtc_candidate(session_id, candidate_dict)
-
-    def _handle_video_bye(self, session_id: str, inner: dict[str, Any], msg_type: str) -> None:
-        reason = inner.get("reason", msg_type)
-        _LOGGER.debug("WebRTC %s session %s: %s", msg_type, session_id, reason)
-        self._coordinator.dispatch_webrtc_error(session_id, msg_type, reason)
-
-    def _handle_motion_detected(self, data: dict[str, Any]) -> None:
-        """Handle motion detection event from camera WebSocket."""
-        payload = data.get("payload", {})
-        device_id = payload.get("device_id")
-        timestamp = payload.get("timestamp")
-
-        if not device_id:
-            _LOGGER.debug("Motion event missing device_id: %s", payload)
-            return
-
-        _LOGGER.debug(
-            "Motion detected on device %s at %s",
-            device_id,
-            timestamp,
-        )
-
-        # Publish motion event to coordinator for event entities to trigger
-        self._coordinator.dispatch_motion_detected(device_id, payload)
-
     def _mark_auth_failed(self) -> None:
         self._auth_failed = True
         _LOGGER.warning(
@@ -263,82 +222,3 @@ class SinumWebSocketBridge:
                 "video": self._coordinator.video_devices,
             }
         )
-
-
-def _patch_device(
-    store: dict[int, dict[str, Any]],
-    device_id: int,
-    details: Any,
-    payload: dict[str, Any],
-) -> None:
-    current = store.get(device_id, {"id": device_id})
-    if isinstance(details, str) and details and details in payload:
-        current[details] = payload[details]
-    else:
-        current.update(payload)
-    store[device_id] = current
-
-
-def _normalize_ws_path(path: str | None) -> str:
-    raw = (path or DEFAULT_WS_PATH).strip()
-    if not raw or _is_full_url(raw):
-        return DEFAULT_WS_PATH
-    return _ensure_leading_slash(raw)
-
-
-def _ensure_leading_slash(raw: str) -> str:
-    return raw if raw.startswith("/") else f"/{raw}"
-
-
-def _is_full_url(raw: str) -> bool:
-    return raw.startswith(("ws://", "wss://", "http://", "https://"))
-
-
-def _iter_events(payload: Any) -> Iterator[dict[str, Any]]:
-    if isinstance(payload, list):
-        yield from _filter_dicts(payload)
-        return
-    if not isinstance(payload, dict):
-        return
-    nested = _find_nested_list(payload)
-    if nested is not None:
-        yield from _filter_dicts(nested)
-        return
-    yield payload
-
-
-def _filter_dicts(lst: list[Any]) -> Iterator[dict[str, Any]]:
-    for item in lst:
-        if isinstance(item, dict):
-            yield item
-
-
-def _find_nested_list(payload: dict[str, Any]) -> list[Any] | None:
-    for key in ("events", "items"):
-        val = payload.get(key)
-        if isinstance(val, list):
-            return val
-    return None
-
-
-def _ws_should_continue(msg_type: aiohttp.WSMsgType) -> bool:
-    if msg_type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING):
-        return False
-    if msg_type == aiohttp.WSMsgType.ERROR:
-        raise RuntimeError("WS message stream entered error state")
-    return True
-
-
-def _as_int(value: Any) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _device_class(value: Any) -> str:
-    cls = str(value or "").lower()
-    for prefix in ("virtual", "wtp", "sbus", "lora", "modbus", "video"):
-        if cls.startswith(prefix):
-            return prefix
-    return ""

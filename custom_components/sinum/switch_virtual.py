@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin

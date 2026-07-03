@@ -39,7 +39,7 @@ class _BusClimateMixin:
 
     @property
     def _device(self) -> dict[str, Any]:
-        return self._device_dict(self.coordinator)  # type: ignore[attr-defined]
+        return self._device_dict(self.coordinator)
 
     @property
     def current_temperature(self) -> float | None:
@@ -103,5 +103,5 @@ class _BusClimateMixin:
 
     async def _patch(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self._bus_name == "sbus":
-            return await self.coordinator.client.patch_sbus_device(self._device_id, payload)  # type: ignore[attr-defined]
-        return await self.coordinator.client.patch_wtp_device(self._device_id, payload)  # type: ignore[attr-defined]
+            return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
+        return await self.coordinator.client.patch_wtp_device(self._device_id, payload)

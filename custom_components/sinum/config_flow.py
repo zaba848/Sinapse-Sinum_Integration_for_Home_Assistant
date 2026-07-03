@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TypeVar, cast
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -59,9 +59,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
 
 class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     VERSION = 1
@@ -176,7 +173,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         for attempt in range(1, _PROBE_RETRIES + 1):
             result = await _try_probe(operation, attempt)
             if result is not _PROBE_MISSING:
-                return cast(T, result)
+                return result
         raise SinumConnectionError("probe failed after retries")
 
     @staticmethod
