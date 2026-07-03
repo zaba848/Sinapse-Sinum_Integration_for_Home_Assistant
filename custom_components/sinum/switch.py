@@ -247,13 +247,13 @@ class SinumWicketSwitch(_SinumVirtualSwitch):
 
 
 def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> dict[str, Any]:
-    if bus == "wtp":
-        return coordinator.wtp_devices.get(device_id, {})
-    if bus == "sbus":
-        return coordinator.sbus_devices.get(device_id, {})
-    if bus == "slink":
-        return coordinator.slink_devices.get(device_id, {})
-    return coordinator.lora_devices.get(device_id, {})
+    store = {
+        "wtp": coordinator.wtp_devices,
+        "sbus": coordinator.sbus_devices,
+        "slink": coordinator.slink_devices,
+        "lora": coordinator.lora_devices,
+    }.get(bus, coordinator.lora_devices)
+    return store.get(device_id, {})
 
 
 class SinumBusRelaySwitch(
@@ -292,26 +292,15 @@ class SinumBusRelaySwitch(
         return bool(self._device.get("state"))
 
     async def _patch_state(self, state: bool) -> None:
-        if self._bus == "wtp":
-            updated = await self.coordinator.client.patch_wtp_device(
-                self._device_id, {"state": state}
-            )
-            self.coordinator.wtp_devices[self._device_id].update(updated)
-        elif self._bus == "sbus":
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"state": state}
-            )
-            self.coordinator.sbus_devices[self._device_id].update(updated)
-        elif self._bus == "slink":
-            updated = await self.coordinator.client.patch_slink_device(
-                self._device_id, {"state": state}
-            )
-            self.coordinator.slink_devices[self._device_id].update(updated)
-        else:
-            updated = await self.coordinator.client.patch_lora_device(
-                self._device_id, {"state": state}
-            )
-            self.coordinator.lora_devices[self._device_id].update(updated)
+        _BUS_STORES = {
+            "wtp": (self.coordinator.wtp_devices, "patch_wtp_device"),
+            "sbus": (self.coordinator.sbus_devices, "patch_sbus_device"),
+            "slink": (self.coordinator.slink_devices, "patch_slink_device"),
+            "lora": (self.coordinator.lora_devices, "patch_lora_device"),
+        }
+        store, method_name = _BUS_STORES.get(self._bus, _BUS_STORES["lora"])
+        updated = await getattr(self.coordinator.client, method_name)(self._device_id, {"state": state})
+        store[self._device_id].update(updated)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         try:
