@@ -45,9 +45,7 @@ class _WebSocketVideoMixin:
         if candidate_dict:
             self._coordinator.dispatch_webrtc_candidate(session_id, candidate_dict)
 
-    def _handle_video_bye(
-        self, session_id: str, inner: dict[str, Any], msg_type: str
-    ) -> None:
+    def _handle_video_bye(self, session_id: str, inner: dict[str, Any], msg_type: str) -> None:
         reason = inner.get("reason", msg_type)
         _LOGGER.debug("WebRTC %s session %s: %s", msg_type, session_id, reason)
         self._coordinator.dispatch_webrtc_error(session_id, msg_type, reason)

@@ -25,6 +25,8 @@ from ._config_flow_helpers import (  # noqa: F401
     _extract_plain_host,
     _mqtt_topic_prefix,
     _normalize_host_input,
+    _normalize_options_input,
+    _options_schema,
     _reauth_cooldown_remaining,
     _reauth_record_failure,
     _reauth_reset,
@@ -42,23 +44,13 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_HOST,
-    CONF_MQTT_CLIENT_ID,
-    CONF_MQTT_ENABLED,
-    CONF_MQTT_SCENE_ID,
-    CONF_MQTT_TOPIC_PREFIX,
     CONF_PASSWORD,
     CONF_USERNAME,
-    CONF_WS_ENABLED,
-    CONF_WS_PATH,
-    DEFAULT_MQTT_CLIENT_ID,
-    DEFAULT_MQTT_SCENE_ID,
-    DEFAULT_MQTT_TOPIC_PREFIX,
-    DEFAULT_SCAN_INTERVAL,
-    DEFAULT_WS_PATH,
     DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     VERSION = 1
@@ -330,42 +322,6 @@ class SinumOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            if CONF_MQTT_TOPIC_PREFIX in user_input:
-                user_input[CONF_MQTT_TOPIC_PREFIX] = _mqtt_topic_prefix(
-                    user_input[CONF_MQTT_TOPIC_PREFIX]
-                )
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title="", data=_normalize_options_input(user_input))
 
-        schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_SCAN_INTERVAL,
-                    default=self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                ): vol.All(int, vol.Range(min=10, max=300)),
-                vol.Optional(
-                    CONF_MQTT_ENABLED,
-                    default=self._opt(CONF_MQTT_ENABLED, False),
-                ): bool,
-                vol.Optional(
-                    CONF_MQTT_TOPIC_PREFIX,
-                    default=self._opt(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
-                ): _mqtt_topic_prefix,
-                vol.Optional(
-                    CONF_MQTT_SCENE_ID,
-                    default=self._opt(CONF_MQTT_SCENE_ID, DEFAULT_MQTT_SCENE_ID),
-                ): vol.All(int, vol.Range(min=1)),
-                vol.Optional(
-                    CONF_MQTT_CLIENT_ID,
-                    default=self._opt(CONF_MQTT_CLIENT_ID, DEFAULT_MQTT_CLIENT_ID),
-                ): vol.All(int, vol.Range(min=1)),
-                vol.Optional(
-                    CONF_WS_ENABLED,
-                    default=self._opt(CONF_WS_ENABLED, True),
-                ): bool,
-                vol.Optional(
-                    CONF_WS_PATH,
-                    default=self._opt(CONF_WS_PATH, DEFAULT_WS_PATH),
-                ): _websocket_path,
-            }
-        )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="init", data_schema=_options_schema(self._opt))

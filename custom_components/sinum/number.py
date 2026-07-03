@@ -151,5 +151,3 @@ def _hub_model(hub_info: dict[str, Any]) -> str:
         "sinum": "Sinum EH-01",
     }
     return hub_info.get("model") or model_map.get(hub_info.get("device_type", "")) or "Sinum EH-01"
-
-

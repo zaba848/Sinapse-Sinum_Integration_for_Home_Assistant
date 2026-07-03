@@ -64,32 +64,26 @@ class SinumGateCover(
     def is_closing(self) -> bool:
         return self._device.get("state") == GATE_STATE_CLOSING
 
-    async def async_open_cover(self, **kwargs: Any) -> None:
+    async def _patch_command(self, payload: dict[str, Any], err_msg: str) -> None:
         try:
-            await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "full_open"}
-            )
+            await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:
-            raise HomeAssistantError(f"Cannot open gate: {err}") from err
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
+
+    async def _command_and_set_state(self, command: str, next_state: str, err_msg: str) -> None:
+        await self._patch_command({"command": command}, err_msg)
         # Hub returns 304 for gate commands (async relay pulse) — update optimistically
-        self.coordinator.virtual_devices[self._device_id]["state"] = GATE_STATE_OPENING
+        self.coordinator.virtual_devices[self._device_id]["state"] = next_state
         self.async_write_ha_state()
+
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        await self._command_and_set_state("full_open", GATE_STATE_OPENING, "Cannot open gate")
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        try:
-            await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "close"}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot close gate: {err}") from err
-        self.coordinator.virtual_devices[self._device_id]["state"] = GATE_STATE_CLOSING
-        self.async_write_ha_state()
+        await self._command_and_set_state("close", GATE_STATE_CLOSING, "Cannot close gate")
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
-        try:
-            await self.coordinator.client.patch_virtual_device(self._device_id, {"command": "stop"})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot stop gate: {err}") from err
+        await self._patch_command({"command": "stop"}, "Cannot stop gate")
         # Re-fetch actual state: gate may have stopped at unknown position
         updated = await self.coordinator.client.get_virtual_device(self._device_id)
         if updated:

@@ -151,7 +151,6 @@ def _add_lora_sensors(
                 entities.append(SinumSensor(coordinator, device_id, desc, entry_id))
 
 
-
 def _add_schedule_sensors(
     coordinator: SinumCoordinator,
     entities: list[SensorEntity],

@@ -30,6 +30,7 @@ class SceneMixin:
     """Mixin providing scene, automation, variable and schedule API methods."""
 
     if TYPE_CHECKING:
+
         async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...
 
     # ---------------------------------------------------------------- scenes

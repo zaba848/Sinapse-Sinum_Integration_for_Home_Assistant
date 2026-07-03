@@ -147,58 +147,38 @@ class SinumBlindCover(
     def is_closing(self) -> bool:
         return bool(self._device.get("action_in_progress")) and bool(self.is_closed)
 
-    async def async_open_cover(self, **kwargs: Any) -> None:
+    async def _patch_and_apply(self, payload: dict[str, Any], err_msg: str) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "open", "opening_percentage": 100}
-            )
+            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:
-            raise HomeAssistantError(f"Cannot open cover: {err}") from err
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
+
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        await self._patch_and_apply(
+            {"command": "open", "opening_percentage": 100}, "Cannot open cover"
+        )
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "open", "opening_percentage": 0}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot close cover: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_and_apply(
+            {"command": "open", "opening_percentage": 0}, "Cannot close cover"
+        )
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "stop"}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot stop cover: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_and_apply({"command": "stop"}, "Cannot stop cover")
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
-        position = kwargs[ATTR_POSITION]
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "open", "opening_percentage": position}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot set cover position: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_and_apply(
+            {"command": "open", "opening_percentage": kwargs[ATTR_POSITION]},
+            "Cannot set cover position",
+        )
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
-        tilt = kwargs[ATTR_TILT_POSITION]
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"command": "tilt", "tilt_percentage": tilt}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot set cover tilt: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
-
+        await self._patch_and_apply(
+            {"command": "tilt", "tilt_percentage": kwargs[ATTR_TILT_POSITION]},
+            "Cannot set cover tilt",
+        )
 
 
 __all__ = [

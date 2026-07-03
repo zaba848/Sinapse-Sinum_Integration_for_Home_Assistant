@@ -105,7 +105,9 @@ async def _try_add_energy_storage_sensors(
         data = await client.get_energy_center_storage()
         for suffix, tkey, icon, path, dc, sc, unit in STORAGE_SENSORS:
             entities.append(
-                SinumEnergyStorageSensor(client, data, entry_id, suffix, tkey, icon, path, dc, sc, unit)
+                SinumEnergyStorageSensor(
+                    client, data, entry_id, suffix, tkey, icon, path, dc, sc, unit
+                )
             )
         entities.append(SinumEnergyStorageStatusSensor(client, data, entry_id))
     except (SinumConnectionError, SinumNotSupportedError):

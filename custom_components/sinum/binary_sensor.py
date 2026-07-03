@@ -332,5 +332,3 @@ class SinumBinarySensor(
         if "hotel_mode" in d:
             attrs["hotel_mode"] = d["hotel_mode"]
         return attrs
-
-

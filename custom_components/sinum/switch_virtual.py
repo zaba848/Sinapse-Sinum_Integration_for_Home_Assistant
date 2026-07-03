@@ -73,12 +73,13 @@ class _SinumVirtualSwitch(
     def _device(self) -> dict[str, Any]:
         return self.coordinator.virtual_devices.get(self._device_id, {})
 
-    async def _patch(self, payload: dict[str, Any]) -> None:
-        updated = await self.coordinator.client.patch_virtual_device(
-            self._device_id, payload
-        )
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+    async def _patch(self, payload: dict[str, Any], err_msg: str) -> None:
+        try:
+            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
+            self.coordinator.virtual_devices[self._device_id].update(updated)
+            self.async_write_ha_state()
+        except Exception as err:
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
 
 
 class SinumRelaySwitch(_SinumVirtualSwitch):
@@ -92,16 +93,10 @@ class SinumRelaySwitch(_SinumVirtualSwitch):
         return bool(self._device.get("state"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        try:
-            await self._patch({"state": True})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn on: {err}") from err
+        await self._patch({"state": True}, "Cannot turn on")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        try:
-            await self._patch({"state": False})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn off: {err}") from err
+        await self._patch({"state": False}, "Cannot turn off")
 
 
 class SinumWicketSwitch(_SinumVirtualSwitch):
@@ -117,16 +112,10 @@ class SinumWicketSwitch(_SinumVirtualSwitch):
         return self._device.get("state") in ("unlocked", "open")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        try:
-            await self._patch({"command": "unlock"})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot unlock wicket: {err}") from err
+        await self._patch({"command": "unlock"}, "Cannot unlock wicket")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        try:
-            await self._patch({"command": "lock"})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot lock wicket: {err}") from err
+        await self._patch({"command": "lock"}, "Cannot lock wicket")
 
 
 class SinumDhwSwitch(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity):
@@ -162,24 +151,17 @@ class SinumDhwSwitch(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
             return {}
         return _dhw_attrs(dhw, self.coordinator.client.decode_temperature)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def _patch_virtual(self, payload: dict[str, Any], err_msg: str) -> None:
         try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"dhw_control": {"enabled": True}}
-            )
+            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:
-            raise HomeAssistantError(f"Cannot enable DHW: {err}") from err
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._patch_virtual({"dhw_control": {"enabled": True}}, "Cannot enable DHW")
+
     async def async_turn_off(self, **kwargs: Any) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"dhw_control": {"enabled": False}}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot disable DHW: {err}") from err
-        if updated:
-            self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_virtual({"dhw_control": {"enabled": False}}, "Cannot disable DHW")

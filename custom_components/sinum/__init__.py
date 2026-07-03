@@ -116,6 +116,7 @@ RUN_SCENE_SCHEMA = vol.Schema(
 
 SinumConfigEntry: TypeAlias = ConfigEntry[SinumCoordinator]
 
+
 def _notification_clients(hass: HomeAssistant) -> dict[str, SinumClient]:
     domain_data = hass.data.setdefault(DOMAIN, {})
     return cast(dict[str, SinumClient], domain_data.setdefault(DATA_NOTIFICATION_CLIENTS, {}))

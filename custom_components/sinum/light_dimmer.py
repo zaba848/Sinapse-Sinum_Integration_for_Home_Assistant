@@ -132,5 +132,3 @@ class SinumDimmerLight(
             raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
-
-

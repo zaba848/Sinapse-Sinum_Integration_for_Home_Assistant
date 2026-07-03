@@ -38,6 +38,7 @@ class EnergyMixin:
     """Mixin providing energy center and weather API methods."""
 
     if TYPE_CHECKING:
+
         async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...
 
     # --------------------------------------------------------------- weather

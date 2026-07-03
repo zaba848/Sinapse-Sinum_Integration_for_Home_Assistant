@@ -66,7 +66,9 @@ class SinumBusRelaySwitch(
             "lora": (self.coordinator.lora_devices, "patch_lora_device"),
         }
         store, method_name = _BUS_STORES.get(self._bus, _BUS_STORES["lora"])
-        updated = await getattr(self.coordinator.client, method_name)(self._device_id, {"state": state})
+        updated = await getattr(self.coordinator.client, method_name)(
+            self._device_id, {"state": state}
+        )
         store[self._device_id].update(updated)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -121,22 +123,16 @@ class SinumCommonValveSwitch(
         d = self._device
         return {k: d[k] for k in ("blockade", "emergency_behaviour", "blockade_reasons") if k in d}
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def _patch_sbus(self, payload: dict[str, Any], err_msg: str) -> None:
         try:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"enabled": True}
-            )
+            updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
         except Exception as err:
-            raise HomeAssistantError(f"Cannot open valve: {err}") from err
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
         self.coordinator.sbus_devices[self._device_id].update(updated)
         self.async_write_ha_state()
 
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._patch_sbus({"enabled": True}, "Cannot open valve")
+
     async def async_turn_off(self, **kwargs: Any) -> None:
-        try:
-            updated = await self.coordinator.client.patch_sbus_device(
-                self._device_id, {"enabled": False}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot close valve: {err}") from err
-        self.coordinator.sbus_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_sbus({"enabled": False}, "Cannot close valve")

@@ -65,6 +65,18 @@ def _bus_store_rgb(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[st
     return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
 
 
+async def _patch_bus_rgb(
+    coordinator: SinumCoordinator,
+    bus: str,
+    device_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    client = coordinator.client
+    if bus == "wtp":
+        return await client.patch_wtp_device(device_id, payload)
+    return await client.patch_sbus_device(device_id, payload)
+
+
 class SinumBusRgbLight(
     SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], LightEntity, RestoreEntity
 ):
@@ -90,9 +102,7 @@ class SinumBusRgbLight(
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
         self._lua_scene_id: int | None = None
-        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
-            device_id, {}
-        )
+        device = _bus_store_rgb(coordinator, bus).get(device_id, {})
         label = _label(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -111,10 +121,7 @@ class SinumBusRgbLight(
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        return _bus_store_rgb(self.coordinator, self._bus).get(self._device_id, {})
 
     @property
     def is_on(self) -> bool:
@@ -241,35 +248,26 @@ class SinumBusRgbLight(
             payload.update(self._wtp_color_payload(**kwargs))
         return payload
 
+    async def _patch_bus(self, payload: dict[str, Any], err_msg: str) -> dict[str, Any]:
+        try:
+            updated = await _patch_bus_rgb(
+                self.coordinator,
+                self._bus,
+                self._device_id,
+                payload,
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
+        return updated or {}
+
     async def _patch_on(
         self, store: dict[int, dict[str, Any]], rest_payload: dict[str, Any]
     ) -> None:
-        try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, rest_payload
-                )
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": True}
-                )
-            store[self._device_id].update(updated or {})
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn on: {err}") from err
+        payload = rest_payload if self._bus == "wtp" else {"state": True}
+        store[self._device_id].update(await self._patch_bus(payload, "Cannot turn on"))
 
     async def _patch_off(self) -> dict[str, Any]:
-        try:
-            if self._bus == "wtp":
-                result = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"state": False}
-                )
-            else:
-                result = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": False}
-                )
-            return result or {}
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn off: {err}") from err
+        return await self._patch_bus({"state": False}, "Cannot turn off")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         store = _bus_store_rgb(self.coordinator, self._bus)

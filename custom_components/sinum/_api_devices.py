@@ -34,6 +34,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
+
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...  # noqa: E704
 
 
@@ -45,6 +46,7 @@ class DevicesMixin:
     """
 
     if TYPE_CHECKING:
+
         async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...  # noqa: E704
 
     # ------------------------------------------------------------------ hub info

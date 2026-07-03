@@ -19,6 +19,14 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_HOST,
+    CONF_MQTT_CLIENT_ID,
+    CONF_MQTT_ENABLED,
+    CONF_MQTT_SCENE_ID,
+    CONF_MQTT_TOPIC_PREFIX,
+    CONF_WS_ENABLED,
+    CONF_WS_PATH,
+    DEFAULT_MQTT_CLIENT_ID,
+    DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_WS_PATH,
@@ -66,6 +74,7 @@ STEP_PASSWORD_SCHEMA = vol.Schema(
 
 # ── Probe helpers ──────────────────────────────────────────────────────────────
 
+
 async def _try_probe(
     operation: Callable[[], Awaitable[Any]],
     attempt: int,
@@ -83,6 +92,7 @@ async def _try_probe(
 
 
 # ── Reauth helpers ─────────────────────────────────────────────────────────────
+
 
 def _reauth_schema(auth_mode: str) -> vol.Schema:
     return STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
@@ -114,6 +124,7 @@ def _reauth_reset(hass: Any, entry_id: str) -> None:
 
 
 # ── Host input validation ──────────────────────────────────────────────────────
+
 
 def _normalize_host_input(value: str) -> str:
     """Normalize host input from GUI and reject malformed endpoint strings."""
@@ -154,6 +165,7 @@ def _extract_plain_host(raw: str) -> str:
 
 # ── Options-flow validators ────────────────────────────────────────────────────
 
+
 def _mqtt_topic_prefix(value: str) -> str:
     """Validate and normalize MQTT topic prefix for one Sinum hub."""
     prefix = value.strip().strip("/")
@@ -172,3 +184,46 @@ def _websocket_path(value: str) -> str:
     if path.startswith(("ws://", "wss://", "http://", "https://")):
         raise vol.Invalid("Provide only endpoint path, e.g. /api/v1/events")
     return path if path.startswith("/") else f"/{path}"
+
+
+def _normalize_options_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    data = dict(user_input)
+    if CONF_MQTT_TOPIC_PREFIX in data:
+        data[CONF_MQTT_TOPIC_PREFIX] = _mqtt_topic_prefix(data[CONF_MQTT_TOPIC_PREFIX])
+    return data
+
+
+def _options_schema(option_value: Callable[[str, object], object]) -> vol.Schema:
+    """Build the options-flow schema with persisted options as defaults."""
+    return vol.Schema(
+        {
+            vol.Optional(
+                CONF_SCAN_INTERVAL,
+                default=option_value(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+            ): vol.All(int, vol.Range(min=10, max=300)),
+            vol.Optional(
+                CONF_MQTT_ENABLED,
+                default=option_value(CONF_MQTT_ENABLED, False),
+            ): bool,
+            vol.Optional(
+                CONF_MQTT_TOPIC_PREFIX,
+                default=option_value(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+            ): _mqtt_topic_prefix,
+            vol.Optional(
+                CONF_MQTT_SCENE_ID,
+                default=option_value(CONF_MQTT_SCENE_ID, DEFAULT_MQTT_SCENE_ID),
+            ): vol.All(int, vol.Range(min=1)),
+            vol.Optional(
+                CONF_MQTT_CLIENT_ID,
+                default=option_value(CONF_MQTT_CLIENT_ID, DEFAULT_MQTT_CLIENT_ID),
+            ): vol.All(int, vol.Range(min=1)),
+            vol.Optional(
+                CONF_WS_ENABLED,
+                default=option_value(CONF_WS_ENABLED, True),
+            ): bool,
+            vol.Optional(
+                CONF_WS_PATH,
+                default=option_value(CONF_WS_PATH, DEFAULT_WS_PATH),
+            ): _websocket_path,
+        }
+    )
