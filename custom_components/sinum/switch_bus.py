@@ -1,0 +1,142 @@
+"""Bus relay and common-valve switch entities (WTP / SBUS / SLINK / LoRa)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from homeassistant.components.switch import SwitchEntity
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN, MANUFACTURER
+from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
+
+
+def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> dict[str, Any]:
+    store = {
+        "wtp": coordinator.wtp_devices,
+        "sbus": coordinator.sbus_devices,
+        "slink": coordinator.slink_devices,
+        "lora": coordinator.lora_devices,
+    }.get(bus, coordinator.lora_devices)
+    return store.get(device_id, {})
+
+
+class SinumBusRelaySwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
+    """Physical relay on WTP, SBUS, SLINK or LoRa bus."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_icon = "mdi:toggle-switch"
+
+    def __init__(
+        self, coordinator: SinumCoordinator, device_id: int, entry_id: str, bus: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._bus = bus
+        self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
+        device = _relay_device(coordinator, bus, device_id)
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
+            name=name,
+            manufacturer=MANUFACTURER,
+            model=device.get("_parent_model") or f"Sinum {bus.upper()} Relay",
+            suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return _relay_device(self.coordinator, self._bus, self._device_id)
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._device.get("state"))
+
+    async def _patch_state(self, state: bool) -> None:
+        _BUS_STORES = {
+            "wtp": (self.coordinator.wtp_devices, "patch_wtp_device"),
+            "sbus": (self.coordinator.sbus_devices, "patch_sbus_device"),
+            "slink": (self.coordinator.slink_devices, "patch_slink_device"),
+            "lora": (self.coordinator.lora_devices, "patch_lora_device"),
+        }
+        store, method_name = _BUS_STORES.get(self._bus, _BUS_STORES["lora"])
+        updated = await getattr(self.coordinator.client, method_name)(self._device_id, {"state": state})
+        store[self._device_id].update(updated)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        try:
+            await self._patch_state(True)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn on: {err}") from err
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        try:
+            await self._patch_state(False)
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot turn off: {err}") from err
+        self.async_write_ha_state()
+
+
+class SinumCommonValveSwitch(
+    SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], SwitchEntity
+):
+    """SBUS common_valve — enabled bool, complex calibration settings as attributes."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_icon = "mdi:valve"
+
+    def __init__(self, coordinator: SinumCoordinator, device_id: int, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"{entry_id}_sbus_{device_id}"
+        device = coordinator.sbus_devices.get(device_id, {})
+        name = device.get("_device_name") or device.get("name", str(device_id))
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
+            name=name,
+            manufacturer=MANUFACTURER,
+            model=device.get("_parent_model") or "Sinum SBUS Common Valve",
+            suggested_area=device.get("_area") or None,
+            via_device=via_device_for(device, entry_id),
+        )
+
+    @property
+    def _device(self) -> dict[str, Any]:
+        return self.coordinator.sbus_devices.get(self._device_id, {})
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._device.get("enabled"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._device
+        return {k: d[k] for k in ("blockade", "emergency_behaviour", "blockade_reasons") if k in d}
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"enabled": True}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot open valve: {err}") from err
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        try:
+            updated = await self.coordinator.client.patch_sbus_device(
+                self._device_id, {"enabled": False}
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Cannot close valve: {err}") from err
+        self.coordinator.sbus_devices[self._device_id].update(updated)
+        self.async_write_ha_state()

@@ -463,12 +463,9 @@ class TestSinumDhwSwitchFalsyUpdate:
         with pytest.raises(HomeAssistantError, match="Cannot disable DHW"):
             await entity.async_turn_off()
 
-    def test_copy_helpers_skip_missing_source_keys(self):
-        attrs: dict[str, object] = {}
-
-        SinumDhwSwitch._copy_decoded_temperature(
-            attrs, {}, "target_temperature", "dhw_target_temperature", lambda v: v
-        )
-        SinumDhwSwitch._copy_if_present(attrs, {}, "state", "dhw_state")
-
-        assert attrs == {}
+    def test_missing_dhw_keys_absent_from_extra_attributes(self):
+        coordinator = MagicMock()
+        coordinator.virtual_devices = {5: {"id": 5, "type": VTYPE_HEAT_PUMP_MANAGER, "dhw_control": {}}}
+        coordinator.client.decode_temperature = lambda v: v / 10
+        entity = SinumDhwSwitch(coordinator, 5, "test_entry")
+        assert entity.extra_state_attributes == {}
