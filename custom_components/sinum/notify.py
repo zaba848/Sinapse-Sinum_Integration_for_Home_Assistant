@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumNotSupportedError
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator
 
 
@@ -41,7 +41,7 @@ class SinumNotifyEntity(CoordinatorEntity[SinumCoordinator], NotifyEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
             name=hub.get("name", "Sinum Hub"),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=hub.get("model") or "Sinum Hub",
         )
 

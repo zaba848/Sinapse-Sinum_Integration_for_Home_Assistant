@@ -13,7 +13,7 @@ from homeassistant.const import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator
 
 _MODEL_MAP: dict[str, str] = {
@@ -30,7 +30,7 @@ def _hub_device_info(entry_id: str, hub_info: dict[str, Any]) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_hub")},
         name=name or "Sinum Hub",
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=model,
         sw_version=hub_info.get("version"),
         hw_version=hub_info.get("uid"),

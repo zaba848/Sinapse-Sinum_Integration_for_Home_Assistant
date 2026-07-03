@@ -34,7 +34,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError, SinumNotSupportedError
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
 PARALLEL_UPDATES = 0
@@ -104,7 +104,7 @@ class SinumAlarmZone(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_alarm_{self._zone_id}")},
             name=name,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Alarm Zone",
             suggested_area=device.get("_area") or None,
         )

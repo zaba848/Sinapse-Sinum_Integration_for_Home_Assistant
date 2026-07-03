@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .const import DOMAIN, STYPE_BUTTON, WTYPE_BUTTON
+from .const import DOMAIN, MANUFACTURER, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator, hub_prefixed_name
 
 PARALLEL_UPDATES = 0
@@ -53,7 +53,7 @@ def _button_event_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
         name=hub_prefixed_name(coordinator, label),
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
         suggested_area=device.get("_area") or None,
     )
@@ -189,7 +189,7 @@ class SinumMotionEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_video_{device_id}")},
             name=hub_prefixed_name(coordinator, label),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum Video Camera",
             suggested_area=device.get("_area") or None,
         )

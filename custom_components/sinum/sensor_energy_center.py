@@ -15,7 +15,7 @@ from homeassistant.const import (
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .api import SinumConnectionError, SinumNotSupportedError
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def _energy_center_device_info(entry_id: str) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_energy")},
         name="Sinum Energy Center",
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model="Sinum EH-01 Energy",
     )
 

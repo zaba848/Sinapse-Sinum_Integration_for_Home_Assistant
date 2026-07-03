@@ -28,6 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from .const import DOMAIN
 from .coordinator import SinumCoordinator, hub_prefixed_name
 
 if TYPE_CHECKING:
@@ -105,7 +106,7 @@ class SinumWebRTCProvider(CameraWebRTCProvider):
 
     @property
     def domain(self) -> str:
-        return "sinum"
+        return DOMAIN
 
     @callback
     def async_is_supported(self, stream_source: str) -> bool:

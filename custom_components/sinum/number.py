@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError, SinumNotSupportedError
-from .const import DOMAIN, STYPE_ANALOG_OUTPUT, STYPE_PWM
+from .const import DOMAIN, MANUFACTURER, STYPE_ANALOG_OUTPUT, STYPE_PWM
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 PARALLEL_UPDATES = 0
@@ -106,7 +106,7 @@ class SinumVariableNumber(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_variables")},
             name="Sinum Variables",
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=_hub_model(coordinator.hub_info),
         )
 
@@ -157,7 +157,7 @@ def _analog_output_device_info(device: dict, entry_id: str, device_id: int) -> D
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
         name=name,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or "Sinum SBUS Analog Output",
         suggested_area=device.get("_area") or None,
         via_device=via_device_for(device, entry_id),
@@ -226,7 +226,7 @@ class SinumPwmNumber(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinat
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=name,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum SBUS PWM",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),

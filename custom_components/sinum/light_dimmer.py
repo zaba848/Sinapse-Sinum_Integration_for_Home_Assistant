@@ -22,7 +22,7 @@ from ._light_helpers import (
     _restore_light_state,
     _supported_color_modes,
 )
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
@@ -45,7 +45,7 @@ class SinumDimmerLight(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
             name=_label(device),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum Dimmer/RGB Controller",
             suggested_area=device.get("_area") or None,
         )
@@ -158,7 +158,7 @@ class SinumBusDimmerLight(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or f"Sinum {bus.upper()} Dimmer",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),

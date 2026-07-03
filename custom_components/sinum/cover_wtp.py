@@ -20,7 +20,7 @@ from ._cover_helpers import (
     _label,
     _restore_cover_from_last_state,
 )
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
@@ -48,7 +48,7 @@ class SinumWtpBlindCover(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_wtp_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum WTP Blind Controller",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),

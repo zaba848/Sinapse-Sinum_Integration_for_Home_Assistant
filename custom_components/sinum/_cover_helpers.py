@@ -8,7 +8,7 @@ from homeassistant.components.cover import ATTR_CURRENT_POSITION, ATTR_CURRENT_T
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator
 
 
@@ -24,7 +24,7 @@ def _virtual_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
         name=label,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=model,
         suggested_area=device.get("_area") or None,
     )

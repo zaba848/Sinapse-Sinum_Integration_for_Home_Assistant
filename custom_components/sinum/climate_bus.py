@@ -23,7 +23,7 @@ from ._climate_helpers import (
     _state_action_from_text,
     _target_temperature_mode_value,
 )
-from .const import DOMAIN, STYPE_FAN_COIL, TEMP_MAX, TEMP_MIN, WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2
+from .const import DOMAIN, MANUFACTURER, STYPE_FAN_COIL, TEMP_MAX, TEMP_MIN, WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2
 from .coordinator import SinumCoordinator, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def _fan_coil_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
         name=label,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or f"Sinum {source.upper()} Fan Coil",
         suggested_area=area,
         via_device=via_device_for(device, entry_id),
@@ -90,7 +90,7 @@ def _regulator_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{bus}_regulator_{device_id}")},
         name=label,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or "Sinum Temperature Regulator",
         suggested_area=area,
         via_device=via_device_for(device, entry_id),

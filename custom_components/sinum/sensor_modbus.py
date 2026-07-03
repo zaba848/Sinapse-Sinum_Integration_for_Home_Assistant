@@ -22,7 +22,7 @@ from homeassistant.const import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
 
@@ -498,7 +498,7 @@ class SinumModbusSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordi
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_modbus_{device_id}")},
             name=device.get("name", f"Modbus {device_id}"),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Modbus Energy Meter",
             sw_version=device.get("software_version"),
         )
@@ -605,7 +605,7 @@ class SinumSlinkSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordin
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_slink_{device_id}")},
             name=device.get("name", f"SLINK {device_id}"),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum SLINK Energy Meter",
             sw_version=device.get("software_version"),
         )

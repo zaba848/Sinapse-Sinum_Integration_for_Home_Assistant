@@ -7,7 +7,7 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, hub_prefixed_name
 
 
@@ -32,7 +32,7 @@ class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
             name=hub_prefixed_name(
                 coordinator, f"Schedule {schedule.get('name', self._schedule_id)}"
             ),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Schedule",
         )
 

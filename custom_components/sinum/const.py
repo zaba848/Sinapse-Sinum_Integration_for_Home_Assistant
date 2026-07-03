@@ -1,4 +1,5 @@
 DOMAIN = "sinum"
+MANUFACTURER = "TECH Sterowniki"
 
 # Config entry keys
 CONF_HOST = "host"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    MANUFACTURER,
     LTYPE_FLOOD_SENSOR,
     LTYPE_OPENING_SENSOR,
     LTYPE_SMOKE_SENSOR,
@@ -204,7 +205,12 @@ def _add_sensors_for_bus(
             entities.append(SinumBinarySensor(coordinator, device_id, description, entry_id))
         if _needs_target_reached(target_reached_desc, dev_type, device):
             entities.append(
-                SinumBinarySensor(coordinator, device_id, target_reached_desc, entry_id)  # type: ignore[arg-type]
+                SinumBinarySensor(
+                    coordinator,
+                    device_id,
+                    cast(SinumBinarySensorDescription, target_reached_desc),
+                    entry_id,
+                )
             )
 
 
@@ -286,7 +292,7 @@ class SinumBinarySensor(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{self._source}_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model")
             or f"Sinum {self._source.upper()} {description.wtp_type.replace('_', ' ').title()}",
             sw_version=device.get("software_version"),
@@ -353,7 +359,7 @@ class SinumParentOnlineSensor(CoordinatorEntity[SinumCoordinator], BinarySensorE
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, unique_key)},
             name=hub_prefixed_name(coordinator, label),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=parent.get("model") or parent_class.replace("_", " ").title(),
             sw_version=parent.get("version"),
         )
@@ -408,7 +414,7 @@ class SinumParentErrorSensor(CoordinatorEntity[SinumCoordinator], BinarySensorEn
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_parent_{parent_class}_{self._parent_id}")},
             name=hub_prefixed_name(coordinator, label),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=parent.get("model") or parent_class.replace("_", " ").title(),
             sw_version=parent.get("version"),
         )

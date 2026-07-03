@@ -23,7 +23,7 @@ from ._climate_helpers import (
     _scaled_or_default,
     _target_temperature_mode_value,
 )
-from .const import DOMAIN, TEMP_MAX, TEMP_MIN, VTYPE_HEAT_PUMP_MANAGER
+from .const import DOMAIN, MANUFACTURER, TEMP_MAX, TEMP_MIN, VTYPE_HEAT_PUMP_MANAGER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
 
 
@@ -81,7 +81,7 @@ class SinumThermostat(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
             name=self._build_name(device),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Virtual Thermostat",
             suggested_area=area or None,
         )
@@ -225,7 +225,7 @@ class SinumHeatPumpManagerClimate(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Heat Pump Manager",
             suggested_area=area or None,
         )

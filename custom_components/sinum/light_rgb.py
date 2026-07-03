@@ -28,7 +28,7 @@ from ._light_helpers import (
     _supported_color_modes,
     _supports_color_temperature,
 )
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class SinumBusRgbLight(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or f"Sinum {bus.upper()} RGB Controller",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),
@@ -313,7 +313,7 @@ class SinumButtonLight(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=label,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum Button",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),

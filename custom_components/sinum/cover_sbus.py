@@ -21,7 +21,7 @@ from ._cover_helpers import (
     _label,
     _restore_cover_from_last_state,
 )
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
@@ -40,7 +40,7 @@ def _sbus_blind_device_info(device: dict[str, Any], entry_id: str, device_id: in
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
         name=_label(device),
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or "Sinum SBUS Blind Controller",
         suggested_area=device.get("_area") or None,
         via_device=via_device_for(device, entry_id),

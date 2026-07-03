@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
 from .api import SinumConnectionError, SinumNotSupportedError
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator
 
 PARALLEL_UPDATES = 0
@@ -62,7 +62,7 @@ class SinumSceneButton(ButtonEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_scenes")},
             name=f"{hub_name} Scenes",
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=model,
             sw_version=sw_version,
         )

@@ -18,7 +18,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import SinumConnectionError, SinumNotSupportedError
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, hub_prefixed_name
 from .sensor_bus import _SENTINEL_INT16, SinumSensorDescription
 
@@ -216,7 +216,7 @@ class SinumWeatherSensor(SensorEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_weather")},
             name="Sinum Weather",
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum EH-01 Weather",
         )
 
@@ -254,7 +254,7 @@ class SinumEnergySensor(SensorEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_energy")},
             name="Sinum Energy Center",
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum EH-01 Energy",
         )
 
@@ -332,7 +332,7 @@ class SinumThermostatOutputGroupSensor(CoordinatorEntity[SinumCoordinator], Sens
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
             name=hub_prefixed_name(coordinator, label),
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Virtual Device",
         )
 
@@ -381,7 +381,7 @@ class SinumAutomationStatusSensor(CoordinatorEntity[SinumCoordinator], SensorEnt
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_automations")},
             name="Sinum Automations",
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model="Sinum Automation API",
         )
 

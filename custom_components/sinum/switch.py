@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
+    MANUFACTURER,
     LTYPE_RELAY,
     STYPE_COMMON_VALVE,
     STYPE_RELAY,
@@ -159,7 +160,7 @@ def _device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_virtual_{device_id}")},
         name=name,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=model,
         suggested_area=device.get("_area") or None,
     )
@@ -276,7 +277,7 @@ class SinumBusRelaySwitch(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
             name=name,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or f"Sinum {bus.upper()} Relay",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),
@@ -345,7 +346,7 @@ class SinumCommonValveSwitch(
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_sbus_{device_id}")},
             name=name,
-            manufacturer="TECH Sterowniki",
+            manufacturer=MANUFACTURER,
             model=device.get("_parent_model") or "Sinum SBUS Common Valve",
             suggested_area=device.get("_area") or None,
             via_device=via_device_for(device, entry_id),

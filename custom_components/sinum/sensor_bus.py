@@ -16,7 +16,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 from .sensor_bus_descriptions import (  # noqa: F401  (re-export for callers)
     _SENTINEL_INT16,
@@ -117,7 +117,7 @@ def _sensor_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{source}_{device_id}")},
         name=label,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or _model_for_source(source),
         sw_version=device.get("software_version"),
         serial_number=device.get("eui"),
@@ -133,7 +133,7 @@ def _button_device_info(
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
         name=label,
-        manufacturer="TECH Sterowniki",
+        manufacturer=MANUFACTURER,
         model=device.get("_parent_model") or f"Sinum {bus.upper()} Button",
         suggested_area=device.get("_area") or None,
     )
