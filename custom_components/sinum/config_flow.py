@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
-from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, cast
-from urllib.parse import urlsplit
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -13,19 +9,45 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from ._config_flow_helpers import (  # noqa: F401
+    _PROBE_MISSING,
+    _PROBE_RETRIES,
+    _PROBE_RETRY_DELAY,
+    _REAUTH_COOLDOWN_SEC,
+    _REAUTH_MAX_FAILS,
+    STEP_AUTH_SCHEMA,
+    STEP_PASSWORD_SCHEMA,
+    STEP_TOKEN_SCHEMA,
+    _extract_host_from_scheme,
+    _extract_plain_host,
+    _mqtt_topic_prefix,
+    _normalize_host_input,
+    _reauth_cooldown_remaining,
+    _reauth_record_failure,
+    _reauth_reset,
+    _reauth_schema,
+    _reauth_store_key,
+    _reject_url_suffix,
+    _try_probe,
+    _validate_extracted_host,
+    _websocket_path,
+)
 from .api import SinumAuthError, SinumClient, SinumConnectionError
 from .const import (
     AUTH_MODE_PASSWORD,
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
+    CONF_HOST,
     CONF_MQTT_CLIENT_ID,
     CONF_MQTT_ENABLED,
     CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_PASSWORD,
+    CONF_USERNAME,
     CONF_WS_ENABLED,
     CONF_WS_PATH,
     DEFAULT_MQTT_CLIENT_ID,
@@ -38,126 +60,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-_PROBE_RETRIES = 2
-_PROBE_RETRY_DELAY = 0.5
-_REAUTH_MAX_FAILS = 5
-_REAUTH_COOLDOWN_SEC = 300  # 5 minutes after 5 bad attempts
 T = TypeVar("T")
-_PROBE_MISSING: object = object()
-
-
-async def _try_probe(
-    operation: Callable[[], Awaitable[Any]],
-    attempt: int,
-) -> Any:
-    """Run one probe attempt; return result on success, _PROBE_MISSING on retry."""
-    try:
-        return await operation()
-    except SinumAuthError:
-        raise
-    except SinumConnectionError:
-        if attempt < _PROBE_RETRIES:
-            await asyncio.sleep(_PROBE_RETRY_DELAY)
-            return _PROBE_MISSING
-        raise
-
-
-def _reauth_schema(auth_mode: str) -> vol.Schema:
-    return STEP_TOKEN_SCHEMA if auth_mode == AUTH_MODE_TOKEN else STEP_PASSWORD_SCHEMA
-
-
-def _reauth_store_key(entry_id: str) -> str:
-    return f"sinum_reauth_{entry_id}"
-
-
-def _reauth_cooldown_remaining(hass: Any, entry_id: str) -> float:
-    """Return seconds remaining in cooldown, 0 if not blocked."""
-    store: dict[str, Any] = hass.data.get(_reauth_store_key(entry_id), {})
-    return max(0.0, store.get("blocked_until", 0.0) - time.monotonic())
-
-
-def _reauth_record_failure(hass: Any, entry_id: str) -> None:
-    key = _reauth_store_key(entry_id)
-    store: dict[str, Any] = hass.data.get(key, {"fails": 0, "blocked_until": 0.0})
-    store["fails"] = store["fails"] + 1
-    if store["fails"] >= _REAUTH_MAX_FAILS:
-        store["blocked_until"] = time.monotonic() + _REAUTH_COOLDOWN_SEC
-        _LOGGER.warning(
-            "Sinum reauth blocked after %d failures for entry %s", store["fails"], entry_id
-        )
-    hass.data[key] = store
-
-
-def _reauth_reset(hass: Any, entry_id: str) -> None:
-    hass.data.pop(_reauth_store_key(entry_id), None)
-
-
-def _normalize_host_input(value: str) -> str:
-    """Normalize host input from GUI and reject malformed endpoint strings."""
-    raw = value.strip()
-    if not raw:
-        raise ValueError("empty host")
-    parsed = urlsplit(raw)
-    host = _extract_host_from_scheme(parsed, raw) if parsed.scheme else _extract_plain_host(raw)
-    return _validate_extracted_host(host)
-
-
-def _validate_extracted_host(host: str) -> str:
-    host = host.strip().strip("/")
-    if not host or " " in host:
-        raise ValueError("invalid host")
-    return host
-
-
-def _extract_host_from_scheme(parsed: Any, raw: str) -> str:
-    """Extract host from a URL string that already includes a scheme."""
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("unsupported scheme")
-    if not parsed.netloc:
-        raise ValueError("missing host")
-    _reject_url_suffix(parsed)
-    return parsed.netloc
-
-
-def _reject_url_suffix(parsed: Any) -> None:
-    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
-        raise ValueError("path/query/fragment not allowed")
-
-
-def _extract_plain_host(raw: str) -> str:
-    """Extract host from a bare hostname/IP with no scheme."""
-    if any(ch in raw for ch in "/?#"):
-        raise ValueError("path/query/fragment not allowed")
-    return raw
-
-
-STEP_AUTH_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_HOST): str,
-        vol.Required(CONF_AUTH_MODE, default=AUTH_MODE_TOKEN): vol.In(
-            [AUTH_MODE_TOKEN, AUTH_MODE_PASSWORD]
-        ),
-    }
-)
-
-STEP_TOKEN_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_API_TOKEN): str,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
-            int, vol.Range(min=10, max=300)
-        ),
-    }
-)
-
-STEP_PASSWORD_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
-            int, vol.Range(min=10, max=300)
-        ),
-    }
-)
 
 
 class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
@@ -269,7 +172,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         session = async_get_clientsession(self.hass, verify_ssl=False)
         return SinumClient(self._host, session, **kwargs)
 
-    async def _run_probe_with_retry(self, operation: Callable[[], Awaitable[T]]) -> T:
+    async def _run_probe_with_retry(self, operation: Any) -> Any:
         for attempt in range(1, _PROBE_RETRIES + 1):
             result = await _try_probe(operation, attempt)
             if result is not _PROBE_MISSING:
@@ -309,7 +212,6 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         try:
             hub_info = await self._run_probe_with_retry(client.get_hub_info)
         except SinumConnectionError:
-            # Fallback: login was accepted but /info may be temporarily busy.
             _LOGGER.warning(
                 "Hub info unavailable after successful login, using host as fallback title"
             )
@@ -370,8 +272,6 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     @staticmethod
     def async_get_options_flow(config_entry: Any) -> SinumOptionsFlow:
         return SinumOptionsFlow(config_entry)
-
-    # ----------------------------------------------------------------- reauth
 
     async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
@@ -472,23 +372,3 @@ class SinumOptionsFlow(OptionsFlow):
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
-
-
-def _mqtt_topic_prefix(value: str) -> str:
-    """Validate and normalize MQTT topic prefix for one Sinum hub."""
-    prefix = value.strip().strip("/")
-    if not prefix:
-        prefix = DEFAULT_MQTT_TOPIC_PREFIX
-    if "#" in prefix or "+" in prefix:
-        raise vol.Invalid("MQTT wildcards are not allowed in topic prefix")
-    return prefix
-
-
-def _websocket_path(value: str) -> str:
-    """Validate websocket endpoint path on the Sinum hub."""
-    path = value.strip()
-    if not path:
-        return DEFAULT_WS_PATH
-    if path.startswith(("ws://", "wss://", "http://", "https://")):
-        raise vol.Invalid("Provide only endpoint path, e.g. /api/v1/events")
-    return path if path.startswith("/") else f"/{path}"
