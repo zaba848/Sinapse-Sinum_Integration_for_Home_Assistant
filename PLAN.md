@@ -1,7 +1,7 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-02 (released: v0.7.7 pending push)
-> Current manifest version: v0.7.7
+> Last updated: 2026-07-03 (released: v0.7.8 pending push)
+> Current manifest version: v0.7.8
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -10,10 +10,11 @@
 
 ```text
 Tests:  1 890 passing, 5 skipped (~10 s)
-Coverage: 100% line coverage — all 30 modules
+Coverage: 100% line coverage — all 32 modules
 Ruff:   0 errors
 mypy:   0 errors (errors in HA library stubs only, not our code)
 CC:     <= 4, _LEGACY_ALLOWANCE = {}
+# type: ignore: 2 remaining (both HA-stub limitations, not our code)
 ```
 
 Commands verified locally on 2026-07-02:
@@ -91,6 +92,8 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 | v0.7.4 | Hub name prefix only in multi-hub setups | 1 689 |
 | v0.7.5 | Delete dead scene.py, 100% line coverage all 28 modules, LoRa smoke check verified | 1 743 |
 | v0.7.6 | FAN platform for fan_coil gear control, Energy Center flow/consumption/production sensors, climate/light refactor integration tests, real API field paths for EC sensors | 1 849 |
+| v0.7.7 | api.py mixin extraction (SceneMixin/EnergyMixin), sensor_bus DRY, switch base class, cover split, WebRTC extraction, __init__ lifecycle extraction | 1 890 |
+| v0.7.8 | sensor_virtual split (EC/hub/virtual), TYPE_CHECKING stubs, MANUFACTURER const, camera DOMAIN, binary_sensor cast | 1 890 |
 
 ---
 
@@ -223,10 +226,25 @@ Follows `_climate_helpers.py` pattern:
 
 ### Phase L — __init__.py lifecycle extraction ✅ Done (v0.7.7)
 
+### Phase M — sensor_virtual.py split + weak point sweep ✅ Done (v0.7.8)
+
 - `lifecycle.py` — bridge lifecycle (`start_mqtt_bridge`, `start_ws_bridge`, `start_realtime_bridge`, `stop_mqtt_bridge`, `stop_ws_bridge`) + stale entity cleanup (`_stale_uid_prefixes`, `_stale_identifiers`, `_is_stale_entity`, `_remove_stale_devices`, `cleanup_stale_entities`)
 - Module-level `_MQTT_BRIDGES` / `_WS_BRIDGES` dicts now live in `lifecycle.py`
 - `__init__.py` reduced from 502 → ~390 lines, imports 4 public functions from lifecycle
 - Tests updated: patch targets and `_MQTT_BRIDGES` / `_WS_BRIDGES` imports updated to lifecycle module
+
+### Phase M — sensor_virtual.py split + weak point sweep ✅ Done (v0.7.8)
+
+- Split `sensor_virtual.py` (808 lines) into three focused modules:
+  - `sensor_energy_center.py` (296 lines) — EC status/flow/data/storage sensors
+  - `sensor_hub.py` (117 lines) — hub uptime/Wi-Fi/firmware sensors
+  - `sensor_virtual.py` (416 lines) — weather/energy/thermostat/automation sensors
+- Added `TYPE_CHECKING` stub for `_request` in `SceneMixin` and `EnergyMixin`; removes all `# type: ignore[attr-defined]` from mixin call sites
+- Moved `_partition_energy_results` from `_api_helpers` into `_api_energy` (only consumer)
+- Added `MANUFACTURER = "TECH Sterowniki"` to `const.py`; replaced 37 literal occurrences in 21 files
+- Fixed `camera.py` hardcoded `"sinum"` → uses `DOMAIN` const
+- Fixed `binary_sensor.py` `# type: ignore[arg-type]` → `typing.cast` (no CC cost)
+- All 1890 tests passing, CC ≤ 4, 2 `type: ignore` remain (both HA-stub limitations)
 
 ---
 
