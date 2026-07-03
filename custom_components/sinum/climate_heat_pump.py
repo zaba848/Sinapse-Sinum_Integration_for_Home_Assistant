@@ -143,50 +143,28 @@ class SinumHeatPumpManagerClimate(
             return {"target_temperature": {"current": raw}}
         return {"target_temperature": raw}
 
-    async def _patch_virtual_temperature(self, payload: dict[str, Any]) -> None:
+    async def _patch_and_apply(self, payload: dict[str, Any], err_msg: str) -> None:
         try:
             updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
         except Exception as err:
-            raise HomeAssistantError(f"Cannot set temperature: {err}") from err
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
         if updated:
             self.coordinator.virtual_devices[self._device_id].update(updated)
         self.async_write_ha_state()
+
+    async def _patch_virtual_temperature(self, payload: dict[str, Any]) -> None:
+        await self._patch_and_apply(payload, "Cannot set temperature")
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        try:
-            if hvac_mode == HVACMode.OFF:
-                updated = await self.coordinator.client.patch_virtual_device(
-                    self._device_id, {"enabled": False}
-                )
-            else:
-                sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "heating")
-                updated = await self.coordinator.client.patch_virtual_device(
-                    self._device_id, {"enabled": True, "work_mode": sinum_mode}
-                )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot set HVAC mode: {err}") from err
-        if updated:
-            self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        if hvac_mode == HVACMode.OFF:
+            payload: dict[str, Any] = {"enabled": False}
+        else:
+            sinum_mode = _HVAC_TO_MODE.get(hvac_mode, "heating")
+            payload = {"enabled": True, "work_mode": sinum_mode}
+        await self._patch_and_apply(payload, "Cannot set HVAC mode")
 
     async def async_turn_on(self) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"enabled": True}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn on: {err}") from err
-        if updated:
-            self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_and_apply({"enabled": True}, "Cannot turn on")
 
     async def async_turn_off(self) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(
-                self._device_id, {"enabled": False}
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Cannot turn off: {err}") from err
-        if updated:
-            self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await self._patch_and_apply({"enabled": False}, "Cannot turn off")
