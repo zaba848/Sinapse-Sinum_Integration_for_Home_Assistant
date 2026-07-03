@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
+from custom_components.sinum._api_helpers import _list_result
 from custom_components.sinum.api import (
     SinumAuthError,
     SinumClient,
     SinumConnectionError,
     SinumNotSupportedError,
-    _list_result,
 )
 
 

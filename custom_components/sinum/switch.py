@@ -12,8 +12,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
-    MANUFACTURER,
     LTYPE_RELAY,
+    MANUFACTURER,
     STYPE_COMMON_VALVE,
     STYPE_RELAY,
     VTYPE_HEAT_PUMP_MANAGER,

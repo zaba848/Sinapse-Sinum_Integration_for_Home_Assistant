@@ -17,11 +17,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SinumConfigEntry
 from .const import (
     DOMAIN,
-    MANUFACTURER,
     LTYPE_FLOOD_SENSOR,
     LTYPE_OPENING_SENSOR,
     LTYPE_SMOKE_SENSOR,
     LTYPE_TWO_STATE_INPUT_SENSOR,
+    MANUFACTURER,
     STYPE_MOTION_SENSOR,
     STYPE_VALVE_PUMP,
     WTYPE_FAN_COIL,
@@ -302,11 +302,11 @@ class SinumBinarySensor(
         )
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
-        if self._source == "sbus":
-            return coordinator.sbus_devices.get(self._device_id, {})
-        if self._source == "lora":
-            return coordinator.lora_devices.get(self._device_id, {})
-        return coordinator.wtp_devices.get(self._device_id, {})
+        store = {
+            "sbus": coordinator.sbus_devices,
+            "lora": coordinator.lora_devices,
+        }.get(self._source, coordinator.wtp_devices)
+        return store.get(self._device_id, {})
 
     @property
     def _device(self) -> dict[str, Any]:

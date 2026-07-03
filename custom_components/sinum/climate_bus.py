@@ -23,7 +23,15 @@ from ._climate_helpers import (
     _state_action_from_text,
     _target_temperature_mode_value,
 )
-from .const import DOMAIN, MANUFACTURER, STYPE_FAN_COIL, TEMP_MAX, TEMP_MIN, WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2
+from .const import (
+    DOMAIN,
+    MANUFACTURER,
+    STYPE_FAN_COIL,
+    TEMP_MAX,
+    TEMP_MIN,
+    WTYPE_FAN_COIL,
+    WTYPE_FAN_COIL_V2,
+)
 from .coordinator import SinumCoordinator, via_device_for
 
 _LOGGER = logging.getLogger(__name__)

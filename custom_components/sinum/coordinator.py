@@ -30,10 +30,15 @@ _LOGGER = logging.getLogger(__name__)
 
 # Re-export helpers so existing importers (tests, other modules) continue to work
 from ._coordinator_helpers import (  # noqa: F401, E402
+    _CLASS_BUCKET_INDEX,
+    _KNOWN_CLASSES,
+    _LORA_CLASSES,
+    _SBUS_CLASSES,
+    _VIRTUAL_CLASSES,
+    _WTP_CLASSES,
     _accumulate_parent_entry,
     _add_device_to_bucket,
     _apply_room_keys,
-    _CLASS_BUCKET_INDEX,
     _device_class,
     _device_matches,
     _device_name_in_room,
@@ -47,16 +52,11 @@ from ._coordinator_helpers import (  # noqa: F401, E402
     _inject_room_from_lookup,
     _iter_room_device_pairs,
     _iter_room_devices,
-    _KNOWN_CLASSES,
-    _LORA_CLASSES,
     _map_for_bus,
     _maybe_index_list,
     _parent_id,
     _room_devices,
     _room_name_for_device,
-    _SBUS_CLASSES,
-    _VIRTUAL_CLASSES,
-    _WTP_CLASSES,
 )
 
 
