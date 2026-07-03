@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from .climate_bus import _fan_coil_device_info
+from .climate_fan_coil import _fan_coil_device_info
 from .const import (
     STYPE_FAN_COIL,
     WTYPE_FAN_COIL,
