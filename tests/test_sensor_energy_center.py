@@ -8,7 +8,7 @@ import pytest
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.api import SinumConnectionError, SinumNotSupportedError
-from custom_components.sinum.sensor_virtual import (
+from custom_components.sinum.sensor_energy_center import (
     SinumEnergyCenterDataSensor,
     SinumEnergyCenterFlowSensor,
     _ec_first_numeric,

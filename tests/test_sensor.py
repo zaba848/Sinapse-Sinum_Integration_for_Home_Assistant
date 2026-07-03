@@ -326,7 +326,7 @@ class TestEnergyCenterStatusSensor:
     def _make(self, data=None):
         from unittest.mock import AsyncMock, MagicMock
 
-        from custom_components.sinum.sensor_virtual import SinumEnergyCenterStatusSensor
+        from custom_components.sinum.sensor_energy_center import SinumEnergyCenterStatusSensor
 
         client = MagicMock()
         client.get_energy_center_summary = AsyncMock(

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.sinum.api import SinumConnectionError, SinumNotSupportedError
-from custom_components.sinum.sensor_virtual import (
+from custom_components.sinum.sensor_energy_center import (
     STORAGE_SENSORS,
     SinumEnergyStorageSensor,
     SinumEnergyStorageStatusSensor,

@@ -296,21 +296,21 @@ class TestAsyncSetupEntry:
         entry = _make_entry(coordinator)
         added = []
         await async_setup_entry(MagicMock(), entry, lambda e, **kw: added.extend(e))
-        from custom_components.sinum.sensor_virtual import SinumHubFirmwareSensor
+        from custom_components.sinum.sensor_hub import SinumHubFirmwareSensor
         fw = [e for e in added if isinstance(e, SinumHubFirmwareSensor)]
         assert len(fw) == 1
         assert fw[0].native_value == "1.24.0-alpha.4"
 
     @pytest.mark.asyncio
     async def test_hub_firmware_sensor_value_is_none_when_no_version(self):
-        from custom_components.sinum.sensor_virtual import SinumHubFirmwareSensor
+        from custom_components.sinum.sensor_hub import SinumHubFirmwareSensor
         coordinator = _make_coordinator(hub_info={"uptime": 100})
         s = SinumHubFirmwareSensor(coordinator, "entry")
         assert s.native_value is None
 
     @pytest.mark.asyncio
     async def test_hub_firmware_sensor_extra_attrs(self):
-        from custom_components.sinum.sensor_virtual import SinumHubFirmwareSensor
+        from custom_components.sinum.sensor_hub import SinumHubFirmwareSensor
         coordinator = _make_coordinator(
             hub_info={"uptime": 100, "version": "1.24.0", "device_type": "sinum_plus", "api": "1.4"}
         )

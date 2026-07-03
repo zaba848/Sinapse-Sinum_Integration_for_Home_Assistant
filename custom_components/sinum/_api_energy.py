@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ._api_helpers import _list_result, _partition_energy_results
+from ._api_helpers import _list_result
 from .const import (
     API_ENERGY,
     API_ENERGY_CENTER_ASSOCIATIONS,
@@ -21,52 +21,65 @@ from .const import (
 )
 
 
-class EnergyMixin:
-    """Mixin providing energy center and weather API methods.
+def _partition_energy_results(
+    keys: tuple[str, ...], results: list[Any]
+) -> tuple[dict[str, Any], list[str]]:
+    available: dict[str, Any] = {}
+    missing: list[str] = []
+    for key, result in zip(keys, results):
+        if result is not None:
+            available[key] = result
+        else:
+            missing.append(key)
+    return available, missing
 
-    Requires self._request() from the base SinumClient transport.
-    """
+
+class EnergyMixin:
+    """Mixin providing energy center and weather API methods."""
+
+    if TYPE_CHECKING:
+        async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...
 
     # --------------------------------------------------------------- weather
 
     async def get_weather(self) -> dict[str, Any]:
-        return await self._request("GET", API_WEATHER)  # type: ignore[attr-defined]
+        return await self._request("GET", API_WEATHER)
 
     # --------------------------------------------------------------- energy
 
     async def get_energy(self) -> dict[str, Any]:
-        return await self._request("GET", API_ENERGY)  # type: ignore[attr-defined]
+        return await self._request("GET", API_ENERGY)
 
     async def get_energy_center_associations(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_ASSOCIATIONS)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_ASSOCIATIONS)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_flow_monitor(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_FLOW_MONITOR)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_FLOW_MONITOR)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_prices(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_prices_settings(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SETTINGS)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SETTINGS)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_prices_sources(self) -> list[dict[str, Any]]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SOURCES)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_PRICES_SOURCES)
         return _list_result(result, "sources")
 
     async def get_energy_center_storage(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_STORAGE)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_STORAGE)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_consumption(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_CONSUMPTION)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_CONSUMPTION)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_production(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_PRODUCTION)  # type: ignore[attr-defined]
+        result = await self._request("GET", API_ENERGY_CENTER_PRODUCTION)
         return result if isinstance(result, dict) else {}
 
     @staticmethod
@@ -84,14 +97,14 @@ class EnergyMixin:
 
     def _energy_center_getters(self) -> tuple[Any, ...]:
         return (
-            self.get_energy_center_associations,  # type: ignore[attr-defined]
-            self.get_energy_center_flow_monitor,  # type: ignore[attr-defined]
-            self.get_energy_center_prices,  # type: ignore[attr-defined]
-            self.get_energy_center_prices_settings,  # type: ignore[attr-defined]
-            self.get_energy_center_prices_sources,  # type: ignore[attr-defined]
-            self.get_energy_center_storage,  # type: ignore[attr-defined]
-            self.get_energy_center_consumption,  # type: ignore[attr-defined]
-            self.get_energy_center_production,  # type: ignore[attr-defined]
+            self.get_energy_center_associations,
+            self.get_energy_center_flow_monitor,
+            self.get_energy_center_prices,
+            self.get_energy_center_prices_settings,
+            self.get_energy_center_prices_sources,
+            self.get_energy_center_storage,
+            self.get_energy_center_consumption,
+            self.get_energy_center_production,
         )
 
     async def _safe_get_energy_center_value(self, getter: Any) -> Any:
@@ -124,4 +137,4 @@ class EnergyMixin:
     # ----------------------------------------- Lua HTTP server (optional)
 
     async def get_lua_hub_info(self) -> dict[str, Any]:
-        return await self._request("GET", API_LUA_INFO)  # type: ignore[attr-defined]
+        return await self._request("GET", API_LUA_INFO)

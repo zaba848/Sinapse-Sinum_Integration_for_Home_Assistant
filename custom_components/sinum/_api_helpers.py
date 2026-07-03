@@ -54,19 +54,6 @@ def _list_result_from_dict(
     return _flatten_values(result)
 
 
-def _partition_energy_results(
-    keys: tuple[str, ...], results: list[Any]
-) -> tuple[dict[str, Any], list[str]]:
-    available: dict[str, Any] = {}
-    missing: list[str] = []
-    for key, result in zip(keys, results):
-        if result is not None:
-            available[key] = result
-        else:
-            missing.append(key)
-    return available, missing
-
-
 def _list_result(result: Any, *preferred_keys: str) -> list[dict[str, Any]]:
     """Normalize Sinum list responses across firmware variants.
 

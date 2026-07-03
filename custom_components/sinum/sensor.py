@@ -21,6 +21,15 @@ from .sensor_bus import (
     SinumSensorDescription,
     SinumTemperatureRegulatorSensor,
 )
+from .sensor_energy_center import (
+    STORAGE_SENSORS,
+    SinumEnergyCenterDataSensor,
+    SinumEnergyCenterFlowSensor,
+    SinumEnergyCenterStatusSensor,
+    SinumEnergyStorageSensor,
+    SinumEnergyStorageStatusSensor,
+)
+from .sensor_hub import SinumHubFirmwareSensor, SinumHubUptimeSensor, SinumHubWifiSensor
 from .sensor_modbus import build_modbus_sensor_entities, build_slink_sensor_entities
 from .sensor_schedule import (
     SinumScheduleActivePeriodSensor,
@@ -31,19 +40,10 @@ from .sensor_schedule import (
 )
 from .sensor_virtual import (
     ENERGY_SENSORS,
-    STORAGE_SENSORS,
     VIRTUAL_SENSORS,
     WEATHER_SENSORS,
     SinumAutomationStatusSensor,
-    SinumEnergyCenterDataSensor,
-    SinumEnergyCenterFlowSensor,
-    SinumEnergyCenterStatusSensor,
     SinumEnergySensor,
-    SinumEnergyStorageSensor,
-    SinumEnergyStorageStatusSensor,
-    SinumHubFirmwareSensor,
-    SinumHubUptimeSensor,
-    SinumHubWifiSensor,
     SinumThermostatOutputGroupSensor,
     SinumWeatherSensor,
 )
