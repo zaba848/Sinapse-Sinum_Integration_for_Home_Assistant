@@ -1,22 +1,22 @@
 # CI Quality Dashboard
 
-Generated: 2026-06-29 13:04:45Z
+Generated: 2026-07-06 12:43:17Z
 
 ## Main Metrics (CI on main)
-- Total completed runs analyzed: 14
-- Pass rate: 85.7%
-- Average duration: 1.76 min
-- P95 duration: 1.76 min
+- Total completed runs analyzed: 12
+- Pass rate: 83.3%
+- Average duration: 1.79 min
+- P95 duration: 1.79 min
 - Flaky proxy (rerun attempts > 1): 0
 
 ## Recent CI Runs
-- completed/success | #160 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28373456098
-- completed/success | #159 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28369691350
-- completed/success | #158 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28355757696
-- completed/success | #157 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28354976560
-- completed/success | #156 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28352505337
-- completed/cancelled | #155 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28352447836
-- completed/success | #154 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28352268682
-- completed/cancelled | #153 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28352214139
-- completed/success | #152 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28352090663
-- completed/success | #151 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28351671260
+- completed/success | #188 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28642237758
+- completed/success | #187 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28639967677
+- completed/success | #186 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28586519000
+- completed/cancelled | #185 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28586469588
+- completed/success | #184 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28585856623
+- completed/success | #183 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28567414545
+- completed/success | #182 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28566746063
+- completed/cancelled | #181 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28566724650
+- completed/success | #180 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28565155783
+- completed/success | #179 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/28520372203
