@@ -25,6 +25,7 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ### Changed
 - **Modbus sensor split** — device-type descriptions moved into `sensor_modbus_descriptions.py`; `sensor_modbus.py` now contains entity classes and builders only.
+- **`deploy_rpi.sh`** — single tar-over-SSH session (fixes intermittent auth failures); accepts `504` as valid restart response.
 
 ## [0.8.0] — 2026-07-07
 

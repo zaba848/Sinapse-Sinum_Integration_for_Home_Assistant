@@ -2,17 +2,19 @@
 # Deploy Sinum integration to Home Assistant on Raspberry Pi.
 # Usage:
 #   export SINUM_SSH_PASS="<password>"
+#   export HA_HOST="10.0.63.53"   # optional; default homeassistant.local
+#   export HA_TOKEN="<long-lived-token>"  # optional; triggers restart
 #   bash scripts/deploy_rpi.sh
-# Or pass password as first argument (avoid if in shared shell history):
-#   SINUM_SSH_PASS=... bash scripts/deploy_rpi.sh
 
 set -euo pipefail
 
 HA_HOST="${HA_HOST:-homeassistant.local}"
 HA_USER="${HA_USER:-tomasz}"
 HA_TOKEN="${HA_TOKEN:-}"
-REMOTE_DIR="/config/custom_components/sinum"
-SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)/custom_components/sinum"
+REMOTE_PARENT="/config/custom_components"
+REMOTE_DIR="${REMOTE_PARENT}/sinum"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_PARENT="${REPO_ROOT}/custom_components"
 
 if [ -z "${SINUM_SSH_PASS:-}" ]; then
   echo "ERROR: SINUM_SSH_PASS environment variable not set." >&2
@@ -20,35 +22,31 @@ if [ -z "${SINUM_SSH_PASS:-}" ]; then
 fi
 
 export SSHPASS="$SINUM_SSH_PASS"
-SSH="sshpass -e ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no ${HA_USER}@${HA_HOST}"
-SCP="sshpass -e scp -o StrictHostKeyChecking=no -o PubkeyAuthentication=no"
+SSH=(
+  sshpass -e ssh
+  -o StrictHostKeyChecking=no
+  -o PubkeyAuthentication=no
+  "${HA_USER}@${HA_HOST}"
+)
 
-echo "==> Creating remote directory structure..."
-$SSH "mkdir -p ${REMOTE_DIR}/translations"
+echo "==> Deploying custom_components/sinum to ${HA_USER}@${HA_HOST} (single tar session)..."
+tar czf - -C "${SRC_PARENT}" sinum | "${SSH[@]}" "mkdir -p ${REMOTE_PARENT} && tar xzf - -C ${REMOTE_PARENT}"
 
-echo "==> Uploading Python modules and config files..."
-for f in "$SRC_DIR"/*.py "$SRC_DIR/manifest.json" "$SRC_DIR/strings.json" "$SRC_DIR/services.yaml"; do
-  [ -f "$f" ] || continue
-  fname=$(basename "$f")
-  cat "$f" | $SSH "cat > ${REMOTE_DIR}/${fname}"
-  echo "  uploaded: $fname"
-done
-
-echo "==> Uploading translations..."
-for f in "$SRC_DIR/translations"/*.json; do
-  [ -f "$f" ] || continue
-  fname=$(basename "$f")
-  cat "$f" | $SSH "cat > ${REMOTE_DIR}/translations/${fname}"
-  echo "  uploaded: translations/$fname"
-done
+echo "==> Remote manifest version:"
+"${SSH[@]}" "python3 -c \"import json; print(json.load(open('${REMOTE_DIR}/manifest.json'))['version'])\""
 
 echo "==> Restarting Home Assistant..."
 if [ -n "$HA_TOKEN" ]; then
-  curl -s -o /dev/null -w "%{http_code}" \
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
     -X POST "http://${HA_HOST}:8123/api/services/homeassistant/restart" \
     -H "Authorization: Bearer ${HA_TOKEN}" \
     -H "Content-Type: application/json" \
-    -d "{}" | grep -q "200" && echo "  HA restart triggered." || echo "  HA restart returned non-200."
+    -d "{}")
+  if [ "$http_code" = "200" ] || [ "$http_code" = "504" ]; then
+    echo "  HA restart triggered (HTTP ${http_code})."
+  else
+    echo "  HA restart returned HTTP ${http_code} — restart manually if needed."
+  fi
 else
   echo "  HA_TOKEN not set — restart HA manually."
 fi

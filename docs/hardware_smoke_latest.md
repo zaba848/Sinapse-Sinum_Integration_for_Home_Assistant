@@ -1,6 +1,6 @@
 # Hardware Smoke Test (Latest)
 
-Generated: 2026-07-07 10:59:42Z
+Generated: 2026-07-07 12:30:48Z
 
 | Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual | /devices/lora | /devices/slink | /devices/modbus |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -19,21 +19,21 @@ Generated: 2026-07-07 10:59:42Z
 
 ## Result
 
-FAIL — VIDEO and SBUS2 hubs unreachable from test network; WTP, SBUS, KLIMAK and LORA passed all endpoints.
+FAIL — VIDEO and SBUS2 hubs unreachable; WTP, SBUS, KLIMAK and LORA passed all endpoints.
 
 ## HIL Summary
 
-Generated: 2026-07-07
+Generated: 2026-07-07 (post-HA-online)
 
-| Hub | Smoke | Notes |
+| Hub | Smoke | HA config entry |
 |---|---|---|
-| WTP | PASS | All 8 endpoints HTTP 200 |
-| SBUS | PASS | All 8 endpoints HTTP 200 |
-| KLIMAK | PASS | All 8 endpoints HTTP 200 |
-| LORA | PASS | All 8 endpoints HTTP 200; 2 LoRa devices (ACW THO temp + humidity) |
-| VIDEO | NOT RUN | Lab and internal addresses unreachable (network) |
-| SBUS2 | NOT RUN | Lab address unreachable (network) |
+| WTP | PASS | `tablica-wtp` loaded |
+| SBUS | PASS | `sinum-tablica-sbus-1` loaded |
+| KLIMAK | PASS | `ehome-wojtek` loaded |
+| LORA | PASS | `sinum-lora` loaded |
+| VIDEO | NOT RUN | `tablica-video-nowa` setup_retry |
+| SBUS2 | NOT RUN | `sinum-tablica-sbus2` setup_retry |
 
 ## Overall
 
-Hardware validation is **PASS for 4/6 hubs** reachable from the current network. VIDEO and SBUS2 failures are network availability issues, not integration regressions. Re-test when on lab LAN or via self-hosted CI runner (`sinum-lan`).
+Hardware validation **PASS for 4/6 hubs**. HA RPi online with v0.8.0 deployed (3937 entities). VIDEO and SBUS2 require lab-network reachability fix.

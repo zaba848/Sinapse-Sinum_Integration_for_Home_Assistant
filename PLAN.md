@@ -1,6 +1,6 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-07 (released: v0.8.0)
+> Last updated: 2026-07-07 (released: v0.8.0, deploy: HA RPi online)
 > Current manifest version: v0.8.0
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
@@ -143,19 +143,22 @@ Assessed 2026-07-02 via radon MI, CC, dependency mapping.
 | WS log redaction + sanitization gates | ✅ Done |
 | Full platform setup harness | ✅ Done |
 | Version bump 0.8.0 + docs sync | ✅ Done |
-| Deploy v0.8.0 to RPi | ⏳ Pending (`SINUM_SSH_PASS=… bash scripts/deploy_rpi.sh`) |
-| GitHub release v0.8.0 | ⏳ Pending |
-| Hardware smoke 6/6 hubs | ✅ 4/6 (network limits VIDEO, SBUS2) |
+| Deploy v0.8.0 to RPi | ✅ Done (manifest 0.8.0, tar deploy via `HA_HOST=<HA_IP>`) |
+| GitHub release v0.8.0 | ⏳ Pending (gh auth / manual UI) |
+| Hardware smoke 6/6 hubs | ✅ 4/6 PASS (VIDEO, SBUS2 unreachable) |
 
 ### Phase B — Hardware validation (now)
 
 | Item | Hub | Status |
 |---|---|---|
-| Read-only smoke (6 hubs) | all | ✅ 4/6 PASS (WTP, SBUS, KLIMAK, LORA); VIDEO+SBUS2 unreachable (network) |
-| HIL API coverage + WebSocket | SBUS, VIDEO | ⏳ SBUS ready; VIDEO blocked by network |
+| HA RPi online + Energy dashboard | HA | ✅ Online (`/energy/electricity`), 3937 entities |
+| Deploy v0.8.0 integration | RPi | ✅ manifest 0.8.0 deployed |
+| Sinum config entries in HA | all | ✅ 6 entries (incl. sinum-lora); 4 loaded, 2 setup_retry (VIDEO, SBUS2) |
+| Read-only smoke (6 hubs) | all | ✅ 4/6 PASS (WTP, SBUS, KLIMAK, LORA); VIDEO+SBUS2 ERR |
+| HIL API coverage + WebSocket | SBUS, VIDEO | ⏳ SBUS ready; VIDEO hub offline |
 | Safe write validation | KLIMAK, SBUS | ⏳ |
-| LoRa hub → HA config entry | LORA | ⏳ |
-| VIDEO hub network diagnosis | VIDEO | ⏳ unreachable from current network (lab + internal) |
+| LoRa hub → HA config entry | LORA | ✅ Done (`sinum-lora` loaded) |
+| VIDEO hub network diagnosis | VIDEO | ⏳ smoke ERR; HA entry `setup_retry` |
 
 ### Phase C — Climate refactor ✅ Done (v0.7.6)
 
@@ -267,10 +270,11 @@ Before every merge to `main`:
 - [ ] `python3 -m pytest -q tests/test_code_quality.py` — CC ≤ 4
 
 Deploy checklist:
-- [ ] `bash scripts/deploy_rpi.sh` with `SINUM_SSH_PASS` and `HA_TOKEN` set
-- [ ] HA restart confirmed (HTTP 200 from restart service)
-- [ ] Entity count verified via HA REST API
-- [ ] LoRa sensors reading live values
+- [x] Deploy via `scripts/deploy_rpi.sh` with `HA_HOST` set to the RPi address
+- [x] HA restart confirmed (manifest 0.8.0 on RPi)
+- [x] 6 Sinum config entries present (incl. sinum-lora)
+- [ ] VIDEO + SBUS2 entries reach `loaded` state
+- [ ] LoRa sensors reading live values in HA UI
 
 ---
 
