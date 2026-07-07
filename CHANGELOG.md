@@ -23,6 +23,9 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+### Changed
+- **Modbus sensor split** — device-type descriptions moved into `sensor_modbus_descriptions.py`; `sensor_modbus.py` now contains entity classes and builders only.
+
 ## [0.8.0] — 2026-07-07
 
 ### Security

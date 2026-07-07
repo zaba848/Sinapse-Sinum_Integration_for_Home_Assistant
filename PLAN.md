@@ -235,7 +235,7 @@ Follows `_climate_helpers.py` pattern:
 
 | Item | Priority | Notes |
 |---|---|---|
-| `sensor_modbus.py` split (640 lines) | HIGH | Largest remaining module |
+| `sensor_modbus.py` split (640 lines) | HIGH | ✅ Done (v0.8.1) — `sensor_modbus_descriptions.py` + 143-line entity module |
 | Energy Center PV/grid/battery/daily sensors | MEDIUM | Needs hub with PV hardware |
 | LoRa relay PATCH hardware validation | MEDIUM | Code exists, write untested |
 | Bus registry pattern (reduce 15-file edits) | MEDIUM | Architectural |
