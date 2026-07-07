@@ -12,6 +12,7 @@ import contextlib
 import json
 import logging
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 
@@ -38,6 +39,21 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _RECONNECT_DELAY_MIN = 5
 _RECONNECT_DELAY_MAX = 60
+_SECRET_QUERY_KEYS = frozenset({"access_token"})
+
+
+def _redact_ws_url(url: str) -> str:
+    """Redact query-string secrets before writing websocket URLs to logs."""
+    parsed = urlsplit(url)
+    if not parsed.query:
+        return url
+    query = [
+        (key, "<redacted>" if key in _SECRET_QUERY_KEYS else value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+    ]
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, urlencode(query, safe="<>"), parsed.fragment)
+    )
 
 
 class SinumWebSocketBridge(_WebSocketVideoMixin):
@@ -107,7 +123,7 @@ class SinumWebSocketBridge(_WebSocketVideoMixin):
         await self._client.ensure_push_auth()
         ws_url = self._client.websocket_url_with_access_token(self._ws_path)
         async with self._client.session.ws_connect(ws_url, heartbeat=30, ssl=False) as ws:
-            _LOGGER.info("Sinapse WebSocket bridge connected to %s", ws_url)
+            _LOGGER.info("Sinapse WebSocket bridge connected to %s", _redact_ws_url(ws_url))
             await self._receive_messages(ws)
 
     async def _receive_messages(self, ws: aiohttp.ClientWebSocketResponse) -> None:

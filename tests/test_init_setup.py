@@ -112,6 +112,72 @@ class TestAsyncSetupEntry:
         assert result is True
 
     @pytest.mark.asyncio
+    async def test_setup_entry_registers_ha_runtime_contract(self, hass):
+        """async_setup_entry wires Home Assistant runtime state after first refresh."""
+        from custom_components.sinum import (
+            DATA_COORDINATORS,
+            DATA_NOTIFICATION_CLIENTS,
+            PLATFORMS,
+            async_setup_entry,
+        )
+
+        entry = MagicMock()
+        entry.entry_id = "runtime_entry"
+        entry.title = "Sinum"
+        entry.data = {
+            "host": "sinum-hub.local",
+            CONF_AUTH_MODE: AUTH_MODE_TOKEN,
+            CONF_API_TOKEN: "tok",
+            "scan_interval": DEFAULT_SCAN_INTERVAL,
+        }
+        entry.options = {}
+        entry.add_update_listener = MagicMock(return_value="update-listener")
+        entry.async_on_unload = MagicMock()
+
+        with (
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.sinum.SinumClient") as MockClient,
+            patch("custom_components.sinum.SinumCoordinator") as MockCoordinator,
+            patch(
+                "custom_components.sinum._start_realtime_bridge", new_callable=AsyncMock
+            ) as mock_start_bridge,
+            patch.object(
+                hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock
+            ) as mock_forward,
+        ):
+            client = MagicMock()
+            client.login = AsyncMock()
+            MockClient.return_value = client
+
+            coordinator = MagicMock()
+            coordinator.async_config_entry_first_refresh = AsyncMock()
+            coordinator.async_add_listener = MagicMock(return_value="stale-cleanup-listener")
+            coordinator.hub_info = {}
+            coordinator.removed_ids = {}
+            coordinator.mqtt_bridge = None
+            MockCoordinator.return_value = coordinator
+
+            result = await async_setup_entry(hass, entry)
+
+        assert result is True
+        assert entry.runtime_data is coordinator
+        mock_forward.assert_awaited_once_with(entry, PLATFORMS)
+        mock_start_bridge.assert_awaited_once_with(
+            hass,
+            entry,
+            coordinator,
+            {**entry.data, **entry.options},
+        )
+        assert hass.data[DOMAIN][DATA_COORDINATORS]["runtime_entry"] is coordinator
+        assert hass.data[DOMAIN][DATA_NOTIFICATION_CLIENTS]["runtime_entry"] is client
+        assert hass.services.has_service(DOMAIN, SERVICE_SEND_NOTIFICATION)
+        assert hass.services.has_service(DOMAIN, SERVICE_UPDATE_SCHEDULE)
+        assert hass.services.has_service(DOMAIN, SERVICE_UPLOAD_MQTT_BRIDGE)
+        assert hass.services.has_service(DOMAIN, SERVICE_RUN_SCENE)
+        entry.async_on_unload.assert_any_call("update-listener")
+        entry.async_on_unload.assert_any_call("stale-cleanup-listener")
+
+    @pytest.mark.asyncio
     async def test_setup_entry_updates_title_from_hub_name(self, hass):
         """async_setup_entry syncs stale config entry title with hub name."""
         from custom_components.sinum import async_setup_entry
@@ -663,7 +729,7 @@ class TestUpdateScheduleService:
         assert coordinator_b.schedules[0]["name"] == "Evening"
 
 
-class TestRunSceneService:
+class TestRunSceneServiceRouting:
     """Tests for handle_run_scene service handler."""
 
     def _setup_entry(self) -> tuple:
@@ -1017,7 +1083,9 @@ class TestStaleEntityCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_noop_when_no_removed(self, hass):
-        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import (
+            cleanup_stale_entities as _cleanup_stale_entities,
+        )
 
         with patch("custom_components.sinum.lifecycle.er") as mock_er:
             await _cleanup_stale_entities(hass, "entry1", {"wtp": frozenset(), "sbus": frozenset()})
@@ -1025,7 +1093,9 @@ class TestStaleEntityCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_removes_matching_entities(self, hass):
-        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import (
+            cleanup_stale_entities as _cleanup_stale_entities,
+        )
 
         stale_entity = MagicMock()
         stale_entity.unique_id = "e1_wtp_42_temperature"
@@ -1046,7 +1116,9 @@ class TestStaleEntityCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_entities_removes_exact_uid_match(self, hass):
-        from custom_components.sinum.lifecycle import cleanup_stale_entities as _cleanup_stale_entities
+        from custom_components.sinum.lifecycle import (
+            cleanup_stale_entities as _cleanup_stale_entities,
+        )
 
         entity = MagicMock()
         entity.unique_id = "e1_sbus_7"
@@ -1055,10 +1127,14 @@ class TestStaleEntityCleanup:
         mock_reg = MagicMock()
         mock_reg.entities.get_entries_for_config_entry_id.return_value = [entity]
 
-        with patch("custom_components.sinum.lifecycle.er") as mock_er, \
-             patch("custom_components.sinum.lifecycle.dr") as mock_dr:
+        with (
+            patch("custom_components.sinum.lifecycle.er") as mock_er,
+            patch("custom_components.sinum.lifecycle.dr") as mock_dr,
+        ):
             mock_er.async_get.return_value = mock_reg
-            mock_dr.async_get.return_value = MagicMock(async_get_device=MagicMock(return_value=None))
+            mock_dr.async_get.return_value = MagicMock(
+                async_get_device=MagicMock(return_value=None)
+            )
             await _cleanup_stale_entities(hass, "e1", {"sbus": frozenset({7})})
 
         mock_reg.async_remove.assert_called_once_with("switch.stale")

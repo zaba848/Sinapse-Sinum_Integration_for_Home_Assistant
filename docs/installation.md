@@ -67,7 +67,7 @@ Restart Home Assistant, then continue with [Step 1](#step-1--create-an-api-token
 
 The integration prefers a **static API token** over username + password. A token is scoped, doesn't expire, and can be revoked independently of your admin password.
 
-Open the Sinum web UI on the same local network as Home Assistant. The address is the hub's IP or hostname — for example `http://sinum.local` or `http://10.0.62.167` (use your own hub address, not this example).
+Open the Sinum web UI on the same local network as Home Assistant. The address is the hub's IP or hostname — for example `http://sinum.local` or `http://sinum-hub.local` (use your own hub address, not this example).
 
 ![Sinum local sign-in](images/setup/sinum-01-sign-in.png)
 
@@ -109,7 +109,7 @@ The setup wizard has two screens.
 
 | Field | What to enter |
 |---|---|
-| **Host** | IP address or hostname of your hub — e.g. `10.0.62.167`. No `http://`. |
+| **Host** | IP address or hostname of your hub — e.g. `sinum-hub.local`. No `http://`. |
 | **Auth method** | `api_token` (recommended) or `username_password` |
 
 > If you don't know the hub IP, try `sinum.local`. If that doesn't resolve, check the DHCP lease list in your router.

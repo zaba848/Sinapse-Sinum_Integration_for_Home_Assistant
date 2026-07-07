@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Przykładowe odpowiedzi API centrali używane w testach
   ├── test_code_quality.py     Bramka CC — wszystkie funkcje muszą mieć CC ≤ 4
   ├── hardware_in_loop/        Skrypty HIL do smoke testów na żywej centrali
-  └── test_*.py                1743 przechodzących testów dla wszystkich platform i typów urządzeń
+  └── test_*.py                1912+ przechodzących testów dla wszystkich platform i typów urządzeń
 ```
 
 ---
@@ -102,7 +102,7 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Statystyki testów: **1743 przechodzących testów, 5 pominiętych testów live-write, 46 plików testów**, czas wykonania ~10 s. Wszystkie testy niesprzętowe muszą przejść przed mergem.
+Statystyki testów: **1912+ przechodzących testów, 5 pominiętych testów live-write, 50+ plików testów**, czas wykonania ~12 s. Wszystkie testy niesprzętowe muszą przejść przed mergem.
 
 Markery pomijania:
 - testy live-write w `tests/test_api_endpoint_write.py` są pomijane bez `SINUM_WRITE_TESTS=1` i danych dostępowych do live huba
@@ -120,13 +120,13 @@ Wszystkie pull requesty muszą przejść:
 | Format | `ruff format` | Brak różnic |
 | Typy | `mypy` | Zero błędów |
 | Złożoność cyklomatyczna | `radon` przez `tests/test_code_quality.py` | Wszystkie funkcje CC ≤ 4 |
-| Testy | `pytest` | Wszystkie 1743 testów niesprzętowych przechodzą |
+| Testy | `pytest` | Wszystkie 1912+ testów niesprzętowych przechodzą |
 | HACS | hacs-action | Poprawne `hacs.json` i manifest |
 
 ```bash
 ruff check custom_components/        # lint
 ruff format custom_components/       # auto-formatowanie
-mypy custom_components/sinum/        # sprawdzanie typów
+mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages
 pytest tests/test_code_quality.py    # bramka CC
 ```
 
@@ -178,8 +178,8 @@ Klasa danych rozszerzająca `SensorEntityDescription`. Dodatkowe pola:
 | `source` | `str` | Magistrala: `"wtp"`, `"sbus"`, `"lora"` |
 | `api_key` | `str` | Klucz w surowym słowniku urządzenia |
 | `scale` | `float` | Mnożnik surowej wartości (np. `0.1` dla °C×10) |
+| `is_text` | `bool` | Zwróć surową wartość jako tekst zamiast skalowania liczbowego |
 | `zero_is_unavailable` | `bool` | Zwróć `None` zamiast `0.0` gdy surowa wartość wynosi zero |
-| `wtp_type` / `sbus_type` / `lora_type` | `str` | Typ urządzenia dostarczający to pole |
 
 ### Dostępność encji
 
@@ -207,7 +207,6 @@ SinumSensorDescription(
     key="pm2_5",                           # unikalny klucz w tym typie urządzenia
     api_key="pm2_5",                       # nazwa pola w surowym JSON centrali
     source="wtp",
-    wtp_type="air_quality_sensor",         # typ urządzenia centrali z tym polem
     device_class=SensorDeviceClass.PM25,
     state_class=SensorStateClass.MEASUREMENT,
     native_unit_of_measurement="µg/m³",
@@ -227,7 +226,7 @@ Jeśli typ urządzenia jest nowy (jeszcze nieobsługiwany przez żaden opis czuj
 WTYPE_AIR_QUALITY = "air_quality_sensor"
 ```
 
-Następnie dodaj wpisy `SinumSensorDescription` jak powyżej, odwołując się do nowego typu w `wtp_type`.
+Następnie dodaj wpisy `SinumSensorDescription` jak powyżej. `sensor.py` utworzy encję, gdy pole będzie obecne w payloadzie urządzenia.
 
 ---
 
@@ -371,7 +370,7 @@ logger:
 Następnie użyj read-only smoke runnera (sekrety przez env, nigdy w repo):
 
 ```bash
-export SINUM_SMOKE_HUBS="SBUS=http://10.0.62.167"
+export SINUM_SMOKE_HUBS="SBUS=http://sinum-sbus.local"
 export SINUM_PASSWORD=twoje_haslo
 python3 scripts/hardware_smoke_check.py
 ```
@@ -379,9 +378,9 @@ python3 scripts/hardware_smoke_check.py
 Do głębszych probe uruchom samodzielne skrypty HIL z tokenem:
 
 ```bash
-python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
-python3 tests/hardware_in_loop/hil_api_coverage.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
-python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_smoke.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_api_coverage.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_websocket.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
 ```
 
 ---
@@ -394,8 +393,8 @@ Szybka lista kontrolna przed zgłoszeniem PR:
 
 - [ ] `ruff check custom_components/` przechodzi
 - [ ] `ruff format custom_components/` nie daje różnic
-- [ ] `mypy custom_components/sinum/` przechodzi
-- [ ] `pytest tests/` — wszystkie 1743 testów niesprzętowych przechodzą
+- [ ] `mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages` przechodzi
+- [ ] `pytest tests/` — wszystkie 1912+ testów niesprzętowych przechodzą
 - [ ] `pytest tests/test_code_quality.py` — bramka CC czysta (bez nowych wpisów `_LEGACY_ALLOWANCE`)
 - [ ] Nowe typy urządzeń mają stałe w `const.py`
 - [ ] Nowa funkcjonalność ma co najmniej 3 testy

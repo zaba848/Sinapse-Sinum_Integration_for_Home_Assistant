@@ -7,11 +7,12 @@ import sys
 import types
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, create_autospec
 
 import pytest
 
-from custom_components.sinum.const import DOMAIN, CONF_API_TOKEN
+from custom_components.sinum.api import SinumClient
+from custom_components.sinum.const import CONF_API_TOKEN, DOMAIN
 
 # turbojpeg is an optional C extension used by the HA camera platform for JPEG
 # re-encoding. It is not available in the CI/test environment; provide a stub so
@@ -36,7 +37,11 @@ def fixture_data() -> dict[str, Any]:
 
 @pytest.fixture(name="mock_client")
 def fixture_mock_client(fixtures: dict[str, Any]) -> MagicMock:
-    client = MagicMock()
+    # Autospec'd against SinumClient so every real method (including ones no
+    # single test configures explicitly) is a proper AsyncMock/MagicMock
+    # matching its real signature, rather than silently returning a bare
+    # MagicMock that blows up with "object can't be awaited".
+    client = create_autospec(SinumClient, instance=True)
     client.get_rooms = AsyncMock(return_value=fixtures["rooms"])
     client.get_hub_info = AsyncMock(return_value={"version": "1.24.0-alpha.1", "uptime": 123})
     client.get_lua_hub_info = AsyncMock(return_value={})
@@ -74,6 +79,18 @@ def fixture_mock_client(fixtures: dict[str, Any]) -> MagicMock:
     client.get_alarm_devices = AsyncMock(return_value=fixtures["alarm_devices"])
     client.login = AsyncMock(return_value=None)
     client.test_connection = AsyncMock(return_value=None)
+    # Explicit return_value (rather than relying on the autospec default) for
+    # every async method the sensor platform's optional-sensor factories
+    # await during setup — under this environment's asyncio eager-task
+    # scheduling, an unconfigured autospec'd AsyncMock can resolve to a
+    # still-pending coroutine instead of its return value, and these call
+    # sites only catch SinumConnectionError/SinumNotSupportedError, so
+    # anything else crashes the whole sensor platform setup.
+    client.get_energy_center_summary = AsyncMock(return_value={})
+    client.get_energy_center_flow_monitor = AsyncMock(return_value={})
+    client.get_energy_center_consumption = AsyncMock(return_value={})
+    client.get_energy_center_production = AsyncMock(return_value={})
+    client.get_energy_center_storage = AsyncMock(return_value={})
     client.decode_temperature = lambda raw: raw / 10
     client.encode_temperature = lambda c: round(c * 10)
     return client

@@ -28,7 +28,7 @@ class SinumScheduleSensor(CoordinatorEntity[SinumCoordinator], SensorEntity):
         self._schedule_id = schedule.get("id")
         self._attr_unique_id = f"{entry_id}_schedule_{self._schedule_id}_{unique_suffix}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"schedule_{self._schedule_id}_{entry_id}")},
+            identifiers={(DOMAIN, f"{entry_id}_schedule_{self._schedule_id}")},
             name=hub_prefixed_name(
                 coordinator, f"Schedule {schedule.get('name', self._schedule_id)}"
             ),

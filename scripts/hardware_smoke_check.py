@@ -5,11 +5,10 @@ Configuration comes from environment variables or CLI arguments; credentials
 must not be stored in this repository.
 
 Examples:
-    SINUM_PASSWORD=... python3 scripts/hardware_smoke_check.py
-    SINUM_SMOKE_HUBS="WTP=http://10.0.61.132,SBUS=http://10.0.62.167" \
+    SINUM_SMOKE_HUBS="WTP=http://sinum-wtp.local,SBUS=http://sinum-sbus.local" \
       SINUM_PASSWORD=... python3 scripts/hardware_smoke_check.py
-    SINUM_SBUS_TOKEN=... python3 scripts/hardware_smoke_check.py --hub SBUS=10.0.62.167
-    SINUM_LORA_TOKEN=... python3 scripts/hardware_smoke_check.py --hub LORA=10.0.x.y
+    SINUM_SBUS_TOKEN=... python3 scripts/hardware_smoke_check.py --hub SBUS=sinum-sbus.local
+    SINUM_LORA_TOKEN=... python3 scripts/hardware_smoke_check.py --hub LORA=sinum-lora.local
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_HUBS = "WTP=http://10.0.61.132,SBUS=http://10.0.62.167"
+DEFAULT_HUBS = ""
 DEFAULT_USERNAME = "admin"
 
 # These must return 200 on every hub — failure makes the hub FAIL.
@@ -89,7 +88,10 @@ def _hub_specs_from_cli_or_env(cli_hubs: list[str] | None) -> list[str]:
 
 
 def _load_hubs(cli_hubs: list[str] | None) -> list[Hub]:
-    return [_parse_hub_spec(spec) for spec in _hub_specs_from_cli_or_env(cli_hubs)]
+    specs = _hub_specs_from_cli_or_env(cli_hubs)
+    if not specs:
+        raise ValueError("Provide at least one hub via --hub or SINUM_SMOKE_HUBS")
+    return [_parse_hub_spec(spec) for spec in specs]
 
 
 def _request_json(
@@ -203,9 +205,7 @@ def check_hub(hub: Hub) -> HubResult:
     lora_devices: list[dict] = []
     lora_code = endpoint_codes.get("/api/v1/devices/lora", "N/A")
     if lora_code == "200":
-        _, lora_body = _request_json(
-            f"{hub.url}/api/v1/devices/lora", headers=headers
-        )
+        _, lora_body = _request_json(f"{hub.url}/api/v1/devices/lora", headers=headers)
         lora_devices = _parse_lora_devices(lora_body)
 
     result = HubResult(
@@ -241,7 +241,7 @@ def _report_lines(results: list[HubResult]) -> list[str]:
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for result in results:
-        label = f"{result.hub.label} ({result.hub.url})"
+        label = result.hub.label
         lines.append(
             f"| {label} | {result.login}"
             f" | {_endpoint_code(result.endpoint_codes, '/api/v1/info')}"
@@ -280,7 +280,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    hubs = _load_hubs(args.hub)
+    try:
+        hubs = _load_hubs(args.hub)
+    except ValueError as err:
+        parser.error(str(err))
     results = [check_hub(hub) for hub in hubs]
     lines = _report_lines(results)
 

@@ -53,7 +53,7 @@ export SINUM_ALARM_TEST_PIN="<alarm-pin>"  # Optional, only if testing alarms
 ```bash
 # tablicaKlimak: 13 virtual, 41 WTP, 25 SBUS, 5 Modbus — safe for dimmer/schedule writes
 python3 scripts/validate_api_writes.py \
-  --hub-url http://10.0.61.114 \
+  --host sinum-klimak.local \
   --username $SINUM_USERNAME \
   --password $SINUM_PASSWORD
 ```
@@ -64,7 +64,7 @@ python3 scripts/validate_api_writes.py \
 ```bash
 # sinum-tablica-sbus-1: 171 virtual, 35 WTP, 436 SBUS, 3 alarms — includes alarms
 python3 scripts/validate_api_writes.py \
-  --hub-url http://10.0.62.167 \
+  --host sinum-sbus.local \
   --username $SINUM_USERNAME \
   --password $SINUM_PASSWORD
 ```

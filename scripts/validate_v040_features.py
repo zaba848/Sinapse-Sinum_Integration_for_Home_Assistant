@@ -8,8 +8,8 @@ Tests:
   D - modbus energy meter: verifies sensors return non-None values
 
 Usage:
-  python scripts/validate_v040_features.py --host 10.0.62.167 --password <pass>
-  python scripts/validate_v040_features.py --host 10.0.61.132 --token <api_token>
+  python scripts/validate_v040_features.py --host sinum-sbus.local --password <pass>
+  python scripts/validate_v040_features.py --host sinum-wtp.local --token <api_token>
 """
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import aiohttp
 
 
-async def _make_client(session: aiohttp.ClientSession, host: str, token: str | None, password: str | None):
+async def _make_client(
+    session: aiohttp.ClientSession, host: str, token: str | None, password: str | None
+):
     from custom_components.sinum.api import SinumClient
 
     if token:
@@ -38,6 +40,7 @@ async def _make_client(session: aiohttp.ClientSession, host: str, token: str | N
 
 # ── A: target_temperature=0 ────────────────────────────────────────────────────
 
+
 async def test_a_zero_target_temp(client) -> tuple[str, str]:
     """Find thermostats where target_temperature==0 and report them (expected → None in HA)."""
     try:
@@ -45,14 +48,20 @@ async def test_a_zero_target_temp(client) -> tuple[str, str]:
     except Exception as e:
         return "SKIP", f"Cannot fetch virtual devices: {e}"
 
-    zero_devs = [d for d in devices if d.get("target_temperature") == 0 and d.get("type") == "thermostat"]
-    no_sensor_devs = [d for d in zero_devs if not d.get("temperature_sensor_id") and d.get("temperature", 1) == 0]
+    zero_devs = [
+        d for d in devices if d.get("target_temperature") == 0 and d.get("type") == "thermostat"
+    ]
+    no_sensor_devs = [
+        d for d in zero_devs if not d.get("temperature_sensor_id") and d.get("temperature", 1) == 0
+    ]
 
     lines = []
     for d in zero_devs[:5]:
         tid = d.get("temperature_sensor_id")
         temp = d.get("temperature")
-        lines.append(f"  id={d['id']} name={d.get('name')} target_temp=0 sensor_id={tid} current_temp={temp}")
+        lines.append(
+            f"  id={d['id']} name={d.get('name')} target_temp=0 sensor_id={tid} current_temp={temp}"
+        )
 
     if not zero_devs:
         return "SKIP", "No thermostats with target_temperature=0 found on this hub"
@@ -65,6 +74,7 @@ async def test_a_zero_target_temp(client) -> tuple[str, str]:
 
 
 # ── B: SBUS RGB Lua colour ─────────────────────────────────────────────────────
+
 
 async def test_b_sbus_rgb_lua_color(client) -> tuple[str, str]:
     """Find an SBUS rgb_controller and send a colour via Lua scene; verify hub reflects it."""
@@ -123,6 +133,7 @@ async def test_b_sbus_rgb_lua_color(client) -> tuple[str, str]:
 
 # ── C: virtual gate field survey ───────────────────────────────────────────────
 
+
 async def test_c_gate_field_survey(client) -> tuple[str, str]:
     """Read virtual gate devices and log all their fields to identify close_status_sensor."""
     try:
@@ -159,6 +170,7 @@ async def test_c_gate_field_survey(client) -> tuple[str, str]:
 
 # ── D: modbus energy meter ─────────────────────────────────────────────────────
 
+
 async def test_d_modbus_energy(client) -> tuple[str, str]:
     """Verify modbus energy meter returns non-None values for key sensors."""
     try:
@@ -193,6 +205,7 @@ async def test_d_modbus_energy(client) -> tuple[str, str]:
 
 
 # ── Runner ─────────────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Validate v0.4.1 features on live hub")

@@ -12,13 +12,13 @@ jobs:
   test_stability:
     name: Measure Test Stability
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -29,23 +29,28 @@ jobs:
 
       - name: Run tests with stability tracking
         id: stability
-        continue-on-error: true
+        shell: bash
         run: |
+          set +e
           python -m pytest tests/ \
             -v \
             --tb=short \
             --durations=10 \
             2>&1 | tee test_output.log
-          
+          TEST_EXIT=${PIPESTATUS[0]}
+          set -e
+
           # Extract summary
           TOTAL=$(grep -c "PASSED\|FAILED" test_output.log || echo "0")
           FAILED=$(grep -c "FAILED" test_output.log || echo "0")
-          PASS_RATE=$(python -c "print(f'{100 * (${TOTAL} - ${FAILED}) / max(${TOTAL}, 1):.1f}%')")
+          PASS_RATE=$(python -c "total=int('${TOTAL}'); failed=int('${FAILED}'); print(f'{100 * (total - failed) / max(total, 1):.1f}%')")
           echo "pass_rate=${PASS_RATE}" >> $GITHUB_OUTPUT
           echo "total_tests=${TOTAL}" >> $GITHUB_OUTPUT
           echo "failed_tests=${FAILED}" >> $GITHUB_OUTPUT
+          echo "test_exit=${TEST_EXIT}" >> $GITHUB_OUTPUT
 
       - name: Report to GitHub
+        if: always()
         run: |
           echo "## Test Stability Report" >> $GITHUB_STEP_SUMMARY
           echo "- Total tests: ${{ steps.stability.outputs.total_tests }}" >> $GITHUB_STEP_SUMMARY
@@ -57,8 +62,8 @@ jobs:
           tail -20 test_output.log | head -15 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Fail if pass rate too low
-        if: failure()
+      - name: Fail if tests failed
+        if: steps.stability.outputs.test_exit != '0'
         run: |
-          echo "⚠ Test pass rate below threshold. Review test output above."
+          echo "Tests failed. Review test output above."
           exit 1

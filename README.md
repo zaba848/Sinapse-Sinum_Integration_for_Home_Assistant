@@ -6,9 +6,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1743%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1912%2B%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/version-0.7.5-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---
@@ -19,7 +19,7 @@
 - **12 entity platforms**: climate, sensor, binary\_sensor, switch, cover, light, event, button, number, update, alarm\_control\_panel, camera
 - **7 local surfaces**: Virtual, WTP, SBUS, LoRa, SLINK, Modbus, Video — polled in parallel every 30 s
 - **Real-time push** via WebSocket (\< 1 s latency), MQTT bridge as fallback
-- **1 715 passing tests** across 46 test files, CC ≤ 4 on every function, ruff and mypy clean
+- **1 912+ passing tests** across 50+ test files, 100% line coverage, CC ≤ 4 on every function, ruff and mypy clean
 
 ---
 
@@ -251,8 +251,8 @@ python3 scripts/hardware_in_loop/websocket_listener.py \
 
 | Metric | Value | Target |
 |---|---|---|
-| Test files | 46 | ≥40 |
-| Test cases | 1743 | ≥1600 |
+| Test files | 46+ | ≥40 |
+| Test cases | 1912+ | ≥1600 |
 | Ruff violations | 0 | 0 |
 | MyPy errors | 0 | 0 |
 | CC > 4 functions | 0 | 0 |

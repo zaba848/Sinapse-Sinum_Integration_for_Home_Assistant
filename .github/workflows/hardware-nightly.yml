@@ -8,7 +8,7 @@ on:
       hubs:
         description: "Comma-separated LABEL=URL list"
         required: false
-        default: "WTP=http://10.0.61.132,SBUS=http://10.0.62.167"
+        default: ""
 
 jobs:
   hardware_smoke_test:
@@ -27,7 +27,7 @@ jobs:
 
       - name: Run read-only hardware smoke
         env:
-          SINUM_SMOKE_HUBS: ${{ github.event.inputs.hubs || vars.SINUM_SMOKE_HUBS || 'WTP=http://10.0.61.132,SBUS=http://10.0.62.167' }}
+          SINUM_SMOKE_HUBS: ${{ github.event.inputs.hubs || vars.SINUM_SMOKE_HUBS }}
           SINUM_USERNAME: ${{ secrets.SINUM_USERNAME || 'admin' }}
           SINUM_PASSWORD: ${{ secrets.SINUM_PASSWORD }}
           SINUM_API_TOKEN: ${{ secrets.SINUM_API_TOKEN }}

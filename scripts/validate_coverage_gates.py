@@ -16,22 +16,34 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-# Define per-module coverage thresholds (%)
-# Set based on current stable levels to avoid breaking PRs
-# Format: module_path: min_threshold (current_level + safety_margin)
+# Define hard per-module coverage thresholds (%).
+# Format: module_path: min_threshold
 MODULE_THRESHOLDS = {
-    "custom_components/sinum/api.py": 84,  # Currently 85%
-    "custom_components/sinum/light.py": 84,  # Currently 85%
-    "custom_components/sinum/cover.py": 85,  # Currently 86%
-    "custom_components/sinum/sensor_virtual.py": 86,  # Currently 87%
-    "custom_components/sinum/coordinator.py": 93,  # Currently 94%
-    "custom_components/sinum/__init__.py": 99,  # Currently 100%
-    "custom_components/sinum/config_flow.py": 99,  # Currently 100%
-    "custom_components/sinum/climate.py": 99,  # Currently 100%
-    "custom_components/sinum/switch.py": 97,  # Currently 98%
+    "custom_components/sinum/api.py": 100,
+    "custom_components/sinum/light.py": 100,
+    "custom_components/sinum/cover.py": 100,
+    "custom_components/sinum/sensor_virtual.py": 100,
+    "custom_components/sinum/coordinator.py": 100,
+    "custom_components/sinum/__init__.py": 100,
+    "custom_components/sinum/config_flow.py": 100,
+    "custom_components/sinum/climate.py": 100,
+    "custom_components/sinum/switch.py": 100,
 }
 
-GLOBAL_THRESHOLD = 80
+GLOBAL_THRESHOLD = 100
+
+
+def _normalize_filename(filename: str) -> str:
+    """Normalize coverage filenames to repository-relative POSIX paths."""
+    normalized = filename.replace("\\", "/")
+    marker = "custom_components/sinum/"
+    if marker in normalized:
+        return normalized[normalized.index(marker) :]
+    if normalized.startswith("sinum/"):
+        return f"custom_components/{normalized}"
+    if "/" not in normalized and normalized.endswith(".py"):
+        return f"{marker}{normalized}"
+    return normalized
 
 
 def parse_coverage_xml(xml_path: Path) -> dict[str, float]:
@@ -51,7 +63,7 @@ def parse_coverage_xml(xml_path: Path) -> dict[str, float]:
             line_rate = float(cls.get("line-rate", 0)) * 100
 
             if filename:
-                coverage_by_file[filename] = line_rate
+                coverage_by_file[_normalize_filename(filename)] = line_rate
 
     return coverage_by_file
 
@@ -59,6 +71,7 @@ def parse_coverage_xml(xml_path: Path) -> dict[str, float]:
 def validate_gates(coverage_by_file: dict[str, float]) -> bool:
     """Validate that all modules meet their thresholds."""
     failed_modules = []
+    global_failed = False
 
     print("\n📊 Per-Module Coverage Validation\n")
     print(f"{'Module':<50} {'Coverage':<12} {'Threshold':<12} {'Status'}")
@@ -79,19 +92,21 @@ def validate_gates(coverage_by_file: dict[str, float]) -> bool:
         status = "✅" if global_coverage >= GLOBAL_THRESHOLD else "❌"
         print("─" * 90)
         print(f"{'GLOBAL':<50} {global_coverage:>10.1f}% {GLOBAL_THRESHOLD:>10}% {status}")
+        global_failed = global_coverage < GLOBAL_THRESHOLD
 
     print()
 
     if failed_modules:
-        print("⚠️  Modules below monitoring threshold (informational only):\n")
+        print("❌ Modules below hard coverage threshold:\n")
         for module, actual, threshold in failed_modules:
             gap = threshold - actual
             print(f"   {module}: {actual:.1f}% (threshold {threshold}%, gap {gap:.1f}%)")
         print()
-        print("💡 Tip: These are monitoring thresholds, not hard gates.")
-        print("   Focus on maintaining coverage, regressions will be caught.\n")
 
-    return True  # Always pass (informational only)
+    if global_failed:
+        print(f"❌ Global average coverage is below {GLOBAL_THRESHOLD}%.\n")
+
+    return not failed_modules and not global_failed
 
 
 def main():
@@ -100,12 +115,14 @@ def main():
     coverage_xml = workspace_root / "coverage.xml"
 
     coverage_by_file = parse_coverage_xml(coverage_xml)
-    validate_gates(coverage_by_file)
+    passed = validate_gates(coverage_by_file)
 
-    # Always exit with success (informational reporting only)
-    # Regressions caught by global coverage gate (--cov-fail-under=80)
-    print("✅ Coverage report generated and analyzed.\n")
-    sys.exit(0)
+    if passed:
+        print("✅ Coverage gates passed.\n")
+        sys.exit(0)
+
+    print("❌ Coverage gates failed.\n")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ jobs:
             --cov=custom_components/sinum \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
-            --cov-fail-under=80 \
+            --cov-fail-under=100 \
             -q
 
       - name: Validate per-module quality gates

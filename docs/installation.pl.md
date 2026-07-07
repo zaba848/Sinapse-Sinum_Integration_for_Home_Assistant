@@ -67,7 +67,7 @@ Uruchom ponownie Home Assistant, a następnie przejdź do [Kroku 1](#krok-1--two
 
 Integracja preferuje **statyczny token API** zamiast loginu i hasła. Token jest ograniczony zakresem, nie wygasa i można go odwołać niezależnie od hasła administratora.
 
-Otwórz interfejs webowy Sinum w tej samej sieci lokalnej co Home Assistant. Adres to IP lub nazwa hosta centrali — np. `http://sinum.local` lub `http://10.0.62.167` (użyj adresu swojej centrali, nie tego przykładu).
+Otwórz interfejs webowy Sinum w tej samej sieci lokalnej co Home Assistant. Adres to IP lub nazwa hosta centrali — np. `http://sinum.local` lub `http://sinum-hub.local` (użyj adresu swojej centrali, nie tego przykładu).
 
 ![Logowanie do Sinum](images/setup/sinum-01-sign-in.png)
 
@@ -109,7 +109,7 @@ Kreator konfiguracji ma dwa ekrany.
 
 | Pole | Co wpisać |
 |---|---|
-| **Host** | Adres IP lub nazwa hosta centrali — np. `10.0.62.167`. Bez `http://`. |
+| **Host** | Adres IP lub nazwa hosta centrali — np. `sinum-hub.local`. Bez `http://`. |
 | **Metoda uwierzytelniania** | `api_token` (zalecana) lub `username_password` |
 
 > Jeśli nie znasz IP centrali, spróbuj `sinum.local`. Jeśli nie działa, sprawdź listę dzierżaw DHCP w routerze.

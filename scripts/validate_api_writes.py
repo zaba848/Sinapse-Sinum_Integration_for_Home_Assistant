@@ -8,7 +8,7 @@ Test E (alarm arm/disarm) is skipped when all zones are armed — unsafe to modi
 a live alarm installation without owner confirmation.
 
 Usage:
-    python3 scripts/validate_api_writes.py --host 10.0.62.167 --password <hub-password>
+    python3 scripts/validate_api_writes.py --host sinum-sbus.local --password <hub-password>
 
 Environment:
     SINUM_HOST: Hub IP address or hostname

@@ -154,20 +154,20 @@ Live WTP sensor payloads for `iaq_sensor`, `aq_sensor`, and `air_quality_sensor`
 ```bash
 # If you have WTP hub credentials:
 python3 scripts/probe_wtp_iaq_payloads.py \
-  --hub-url http://10.0.61.132 \
+  --hub-url http://sinum-wtp.local \
   --api-token <SINUM_WTP_TOKEN>
 
 # Or set environment variable:
 export SINUM_WTP_TOKEN=<token>
 python3 scripts/probe_wtp_iaq_payloads.py \
-  --hub-url http://10.0.61.132
+  --hub-url http://sinum-wtp.local
 ```
 
 **Expected Output**:
 ```
 ============================================================
 Probe Results: 2026-07-01T...
-Hub: http://10.0.61.132
+Hub: http://sinum-wtp.local
 ============================================================
 
 Found 3 IAQ/AQ sensors:

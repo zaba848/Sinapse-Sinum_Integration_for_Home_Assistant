@@ -67,7 +67,7 @@ tests/
   │   └── sinum_devices.json   Sample hub API payloads used across tests
   ├── test_code_quality.py     CC gate — all functions must have CC ≤ 4
   ├── hardware_in_loop/        HIL scripts for live hub smoke testing
-  └── test_*.py                1743 passing tests across all platforms and device types
+  └── test_*.py                1912+ passing tests across all platforms and device types
 ```
 
 ---
@@ -102,7 +102,7 @@ pytest --cov=custom_components/sinum tests/
 pytest tests/test_code_quality.py -v
 ```
 
-Test statistics: **1743 passing tests, 5 skipped live-write tests, 46 test files**, ~10 s runtime. All non-hardware tests must pass before merging.
+Test statistics: **1912+ passing tests, 5 skipped live-write tests, 50+ test files**, ~12 s runtime. All non-hardware tests must pass before merging.
 
 Skip markers:
 - live-write tests in `tests/test_api_endpoint_write.py` are skipped unless `SINUM_WRITE_TESTS=1` and live credentials are provided
@@ -120,13 +120,13 @@ All pull requests must pass:
 | Format | `ruff format` | No diffs |
 | Types | `mypy` | Zero errors |
 | Cyclomatic complexity | `radon` via `tests/test_code_quality.py` | All functions CC ≤ 4 |
-| Tests | `pytest` | All 1743 non-hardware tests pass |
+| Tests | `pytest` | All 1912+ non-hardware tests pass |
 | HACS | hacs-action | Valid `hacs.json` and manifest |
 
 ```bash
 ruff check custom_components/        # lint
 ruff format custom_components/       # auto-format
-mypy custom_components/sinum/        # type check
+mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages
 pytest tests/test_code_quality.py    # CC gate
 ```
 
@@ -178,8 +178,8 @@ Dataclass extending `SensorEntityDescription`. Extra fields:
 | `source` | `str` | Bus: `"wtp"`, `"sbus"`, `"lora"` |
 | `api_key` | `str` | Key in the raw device dict |
 | `scale` | `float` | Raw value multiplier (e.g. `0.1` for °C×10) |
+| `is_text` | `bool` | Return the raw value as text instead of numeric scaling |
 | `zero_is_unavailable` | `bool` | Return `None` instead of `0.0` when raw value is zero |
-| `wtp_type` / `sbus_type` / `lora_type` | `str` | Device type that provides this field |
 
 ### Entity availability
 
@@ -207,7 +207,6 @@ SinumSensorDescription(
     key="pm2_5",                           # unique key within this device type
     api_key="pm2_5",                       # field name in raw hub JSON
     source="wtp",
-    wtp_type="air_quality_sensor",         # hub device type that has this field
     device_class=SensorDeviceClass.PM25,
     state_class=SensorStateClass.MEASUREMENT,
     native_unit_of_measurement="µg/m³",
@@ -227,7 +226,7 @@ If the device type is new (not yet handled by any sensor description), add the t
 WTYPE_AIR_QUALITY = "air_quality_sensor"
 ```
 
-Then add `SinumSensorDescription` entries as above, referencing the new type in `wtp_type`.
+Then add `SinumSensorDescription` entries as above. `sensor.py` will create an entity when the field is present in the device payload.
 
 ---
 
@@ -493,7 +492,7 @@ logger:
 Then use the read-only smoke runner (credentials via env, never committed):
 
 ```bash
-export SINUM_SMOKE_HUBS="SBUS=http://10.0.62.167"
+export SINUM_SMOKE_HUBS="SBUS=http://sinum-sbus.local"
 export SINUM_PASSWORD=your_password
 python3 scripts/hardware_smoke_check.py
 ```
@@ -501,9 +500,9 @@ python3 scripts/hardware_smoke_check.py
 For deeper probes, run the standalone HIL scripts with a token:
 
 ```bash
-python3 tests/hardware_in_loop/hil_smoke.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
-python3 tests/hardware_in_loop/hil_api_coverage.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
-python3 tests/hardware_in_loop/hil_websocket.py --host 10.0.62.167 --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_smoke.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_api_coverage.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
+python3 tests/hardware_in_loop/hil_websocket.py --host sinum-sbus.local --token "$SINUM_API_TOKEN"
 ```
 
 Or use the diagnostic script to survey device fields on your hub:
@@ -522,8 +521,8 @@ Quick checklist before submitting a PR:
 
 - [ ] `ruff check custom_components/` passes
 - [ ] `ruff format custom_components/` produces no diffs
-- [ ] `mypy custom_components/sinum/` passes
-- [ ] `pytest tests/` — all 1743 non-hardware tests pass
+- [ ] `mypy custom_components/sinum/ --ignore-missing-imports --no-site-packages` passes
+- [ ] `pytest tests/` — all 1912+ non-hardware tests pass
 - [ ] `pytest tests/test_code_quality.py` — CC gate clean (no `_LEGACY_ALLOWANCE` entries added)
 - [ ] New device types have constants in `const.py`
 - [ ] New functionality has at least 3 tests

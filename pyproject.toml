@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sinapse-homeassistant-sinum"
-version = "0.7.5"
+version = "0.8.0"
 description = "Sinapse - Sinum Integration for Home Assistant"
 readme = "README.md"
 license = {text = "Proprietary"}
@@ -41,7 +41,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 8  # all current code passes; prevents regression above CC=8
+# Ruff/McCabe counts nested service handlers differently than the Radon quality gate.
+# tests/test_code_quality.py remains the source of truth for the project CC <= 4 rule.
+max-complexity = 8
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]

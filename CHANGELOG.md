@@ -23,6 +23,82 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-07
+
+### Security
+- **WebSocket log redaction** — connection logs now redact `access_token` query values before writing URLs to Home Assistant logs.
+
+### Added
+- **Full platform setup harness** — `test_full_platform_setup.py` boots the real HA config-entry pipeline and inspects entity/device registries for cross-platform wiring bugs.
+- **Public artifact sanitization gate** — `test_public_artifact_sanitization.py` blocks private lab IPs from docs, scripts and CI workflows.
+- **Release metadata gate** — `test_release_metadata.py` keeps manifest, pyproject, README badges and CHANGELOG in sync.
+- **Coverage gate tests** — `test_coverage_gates.py` validates per-module coverage thresholds.
+
+### Changed
+- Release metadata and public documentation resynchronized with the `0.8.0` release line.
+- Hardware validation scripts and CI workflows updated for token-per-hub auth and sanitized public reports.
+
+### Quality
+- 1912 tests passing, 5 skipped.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
+## [0.7.9] — 2026-07-03
+
+### Changed
+- **Maintainability pass** — API transport/response handling, RGB light helpers and config-flow helpers were further split into focused modules.
+- **MI quality target reached** — all runtime modules report Maintainability Index grade A while keeping the existing CC ≤ 4 rule.
+
+### Quality
+- 1890 tests passing, 5 skipped.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
+## [0.7.8] — 2026-07-03
+
+### Changed
+- **Device API mixin extraction** — moved bus CRUD endpoints into `_api_devices.py`, keeping `api.py` focused on transport/auth.
+- **Switch platform split** — virtual and bus switch implementations moved into `switch_virtual.py` and `switch_bus.py`.
+- **Climate platform split continued** — fan coil, heat pump manager and bus-climate mixin code moved into focused modules.
+- **Parent and optional sensor cleanup** — parent binary sensors and optional sensor setup moved out of the main platform files.
+
+### Quality
+- 1890 tests passing, 5 skipped.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
+## [0.7.7] — 2026-07-02
+
+### Added
+- **Fan-coil mode select** — fan coil work mode is exposed through the `select` platform.
+- **Energy Storage sensors** — Energy Center storage status/details are exposed when supported by hub firmware.
+
+### Changed
+- **API mixins** — scene/automation/schedule and energy/weather/Lua hub-info methods moved into dedicated mixins.
+- **Cover split** — WTP and SBUS blind covers moved into bus-specific modules with shared cover helpers.
+- **WebRTC session manager** — WebRTC session state moved out of `coordinator.py`.
+- **Lifecycle extraction** — realtime bridge startup/shutdown and stale entity cleanup moved into `lifecycle.py`.
+- **Sensor descriptions DRY pass** — shared WTP/SBUS sensor descriptions are generated from common kwargs.
+
+### Quality
+- 1890 tests passing, 5 skipped.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
+## [0.7.6] — 2026-07-02
+
+### Added
+- **FAN platform** — fan coil gear control is exposed as native Home Assistant fan entities.
+- **Energy Center sensors** — flow monitor, total consumption and total production sensors are exposed when `/api/v1/energy-center/*` is available.
+- **Integration-style tests** — coordinator data flow to entity values is covered for representative sensors, climate and fan entities.
+
+### Changed
+- **Climate split** — the former large `climate.py` was split into virtual, bus, fan-coil and heat-pump focused modules.
+- **Light split** — the former large `light.py` was split into RGB, dimmer, bus dimmer and button-light focused modules.
+
+### Fixed
+- Energy Center sensors now use live-validated API field paths for current flow, consumption and production.
+
+### Quality
+- 1849+ tests passing during the release series, increasing to 1890 after the following refactor passes.
+- ruff ✅ | mypy ✅ | CC ≤ 4 everywhere ✅
+
 ## [0.7.5] — 2026-07-02
 
 ### Removed

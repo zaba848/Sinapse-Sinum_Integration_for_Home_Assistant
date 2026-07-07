@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -17,10 +18,12 @@ from custom_components.sinum.websocket import (
     _iter_events,
     _normalize_ws_path,
     _patch_device,
+    _redact_ws_url,
     _ws_should_continue,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 def _coordinator() -> MagicMock:
     coordinator = MagicMock()
@@ -52,13 +55,24 @@ def _bridge() -> tuple[SinumWebSocketBridge, MagicMock, MagicMock]:
 
 # ── Core payload handling ─────────────────────────────────────────────────────
 
+
 def test_ws_event_array_updates_only_details_field():
     bridge, hass, coordinator = _bridge()
     payload = [
-        {"data": {"type": "device_state_changed", "details": "humidity",
-                  "payload": {"class": "sbus", "id": 12, "humidity": 445}}},
-        {"data": {"type": "device_state_changed", "details": "humidity",
-                  "payload": {"class": "sbus", "id": 62, "humidity": 409}}},
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"class": "sbus", "id": 12, "humidity": 445},
+            }
+        },
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"class": "sbus", "id": 62, "humidity": 409},
+            }
+        },
     ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.sbus_devices[12]["humidity"] == 445
@@ -77,8 +91,14 @@ def test_ws_ignores_non_device_state_changed_events():
 
 def test_ws_without_details_merges_full_payload():
     bridge, _hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed",
-                          "payload": {"class": "wtp", "id": 8, "state": True, "temperature": 220}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "payload": {"class": "wtp", "id": 8, "state": True, "temperature": 220},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.wtp_devices[8]["state"] is True
     assert coordinator.wtp_devices[8]["temperature"] == 220
@@ -87,8 +107,15 @@ def test_ws_without_details_merges_full_payload():
 
 def test_ws_virtual_device_update():
     bridge, _hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "temperature",
-                          "payload": {"class": "virtual", "id": 31, "temperature": 354}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "temperature",
+                "payload": {"class": "virtual", "id": 31, "temperature": 354},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.virtual_devices[31]["temperature"] == 354
 
@@ -102,24 +129,45 @@ def test_ws_invalid_json_ignored():
 
 def test_ws_missing_id_in_payload_ignored():
     bridge, hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "val",
-                          "payload": {"class": "sbus", "val": 42}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "val",
+                "payload": {"class": "sbus", "val": 42},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     coordinator.async_set_updated_data.assert_not_called()
 
 
 def test_ws_unknown_class_ignored():
     bridge, hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "x",
-                          "payload": {"class": "zigbee", "id": 5, "x": 1}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "x",
+                "payload": {"class": "zigbee", "id": 5, "x": 1},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     coordinator.async_set_updated_data.assert_not_called()
 
 
 def test_ws_lora_device_update():
     bridge, _hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "signal",
-                          "payload": {"class": "lora", "id": 7, "signal": -88}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "signal",
+                "payload": {"class": "lora", "id": 7, "signal": -88},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.lora_devices[7]["signal"] == -88
 
@@ -128,8 +176,15 @@ def test_ws_existing_device_field_not_overwritten_by_other_details():
     """Only the 'details' field in payload should be patched when details is set."""
     bridge, _hass, coordinator = _bridge()
     coordinator.sbus_devices[12] = {"id": 12, "humidity": 401, "temperature": 250}
-    payload = [{"data": {"type": "device_state_changed", "details": "humidity",
-                          "payload": {"class": "sbus", "id": 12, "humidity": 410}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"class": "sbus", "id": 12, "humidity": 410},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.sbus_devices[12]["humidity"] == 410
     assert coordinator.sbus_devices[12]["temperature"] == 250
@@ -139,12 +194,27 @@ def test_ws_multiple_events_all_processed():
     """All events in the array must be processed even if the first one succeeds."""
     bridge, _hass, coordinator = _bridge()
     payload = [
-        {"data": {"type": "device_state_changed", "details": "humidity",
-                  "payload": {"class": "sbus", "id": 1, "humidity": 100}}},
-        {"data": {"type": "device_state_changed", "details": "temperature",
-                  "payload": {"class": "sbus", "id": 2, "temperature": 200}}},
-        {"data": {"type": "device_state_changed", "details": "motion_detected",
-                  "payload": {"class": "sbus", "id": 3, "motion_detected": True}}},
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"class": "sbus", "id": 1, "humidity": 100},
+            }
+        },
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "temperature",
+                "payload": {"class": "sbus", "id": 2, "temperature": 200},
+            }
+        },
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "motion_detected",
+                "payload": {"class": "sbus", "id": 3, "motion_detected": True},
+            }
+        },
     ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.sbus_devices[1]["humidity"] == 100
@@ -154,8 +224,15 @@ def test_ws_multiple_events_all_processed():
 
 def test_ws_fires_sinum_bus_event_on_update():
     bridge, hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "humidity",
-                          "payload": {"class": "sbus", "id": 12, "humidity": 300}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"class": "sbus", "id": 12, "humidity": 300},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     hass.bus.async_fire.assert_called_once()
     call_args = hass.bus.async_fire.call_args
@@ -168,6 +245,7 @@ def test_ws_fires_sinum_bus_event_on_update():
 
 # ── Auth failure handling ─────────────────────────────────────────────────────
 
+
 def test_ws_unauthorized_event_sets_auth_failed_flag():
     bridge, _hass, coordinator = _bridge()
     payload = [{"data": {"type": "unauthorized"}}]
@@ -177,6 +255,7 @@ def test_ws_unauthorized_event_sets_auth_failed_flag():
 
 
 # ── _iter_events ──────────────────────────────────────────────────────────────
+
 
 def test_iter_events_plain_list():
     events = list(_iter_events([{"a": 1}, {"b": 2}]))
@@ -211,8 +290,10 @@ def test_iter_events_non_list_non_dict_returns_empty():
 
 # ── _normalize_ws_path ────────────────────────────────────────────────────────
 
+
 def test_normalize_ws_path_none_returns_default():
     from custom_components.sinum.const import DEFAULT_WS_PATH
+
     assert _normalize_ws_path(None) == DEFAULT_WS_PATH
 
 
@@ -226,15 +307,28 @@ def test_normalize_ws_path_keeps_valid_path():
 
 def test_normalize_ws_path_rejects_full_url():
     from custom_components.sinum.const import DEFAULT_WS_PATH
+
     assert _normalize_ws_path("ws://10.0.0.1/api/v1/ws") == DEFAULT_WS_PATH
 
 
 def test_normalize_ws_path_empty_returns_default():
     from custom_components.sinum.const import DEFAULT_WS_PATH
+
     assert _normalize_ws_path("") == DEFAULT_WS_PATH
 
 
+def test_redact_ws_url_hides_access_token():
+    url = _redact_ws_url("ws://hub/api/v1/ws?foo=bar&access_token=secret-token")
+    assert url == "ws://hub/api/v1/ws?foo=bar&access_token=<redacted>"
+    assert "secret-token" not in url
+
+
+def test_redact_ws_url_without_query_is_unchanged():
+    assert _redact_ws_url("ws://hub/api/v1/ws") == "ws://hub/api/v1/ws"
+
+
 # ── _patch_device ─────────────────────────────────────────────────────────────
+
 
 def test_patch_device_with_details_only_patches_named_field():
     store: dict[int, dict] = {1: {"id": 1, "humidity": 100, "temperature": 200}}
@@ -258,22 +352,27 @@ def test_patch_device_creates_new_entry_for_unknown_id():
 
 # ── _device_class ─────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("cls,expected", [
-    ("sbus", "sbus"),
-    ("sbus_sensor", "sbus"),
-    ("wtp", "wtp"),
-    ("virtual", "virtual"),
-    ("lora", "lora"),
-    ("modbus", "modbus"),
-    ("video", "video"),
-    ("unknown_type", ""),
-    ("", ""),
-])
+
+@pytest.mark.parametrize(
+    "cls,expected",
+    [
+        ("sbus", "sbus"),
+        ("sbus_sensor", "sbus"),
+        ("wtp", "wtp"),
+        ("virtual", "virtual"),
+        ("lora", "lora"),
+        ("modbus", "modbus"),
+        ("video", "video"),
+        ("unknown_type", ""),
+        ("", ""),
+    ],
+)
 def test_device_class_mapping(cls: str, expected: str):
     assert _device_class(cls) == expected
 
 
 # ── _ws_should_continue ───────────────────────────────────────────────────────
+
 
 def test_ws_should_continue_text_not_reached():
     assert _ws_should_continue(aiohttp.WSMsgType.BINARY) is True
@@ -294,6 +393,7 @@ def test_ws_should_continue_error_raises():
 
 # ── _filter_dicts / _find_nested_list ────────────────────────────────────────
 
+
 def test_filter_dicts_keeps_only_dicts():
     result = list(_filter_dicts([1, "x", {"a": 1}, None, {"b": 2}]))
     assert result == [{"a": 1}, {"b": 2}]
@@ -312,6 +412,7 @@ def test_find_nested_list_missing_returns_none():
 
 
 # ── Async lifecycle ───────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_ws_bridge_async_start_creates_task():
@@ -346,6 +447,7 @@ async def test_ws_bridge_async_stop_sets_stop_event():
 
     async def _noop_run():
         import contextlib
+
         with contextlib.suppress(asyncio.CancelledError):
             await asyncio.sleep(100)
 
@@ -355,6 +457,7 @@ async def test_ws_bridge_async_stop_sets_stop_event():
     assert bridge._task is None
     cancelled_task.cancel()
     import contextlib
+
     with contextlib.suppress(asyncio.CancelledError):
         await cancelled_task
 
@@ -372,6 +475,7 @@ async def test_ws_bridge_double_start_is_noop():
 
 
 # ── _dispatch_message msg type routing ───────────────────────────────────────
+
 
 def test_dispatch_message_ping_continues():
     """PING is not CLOSED/ERROR — bridge should keep the loop running."""
@@ -408,8 +512,17 @@ def test_dispatch_message_text_processes_payload():
     bridge, _hass, coordinator = _bridge()
     msg = MagicMock()
     msg.type = aiohttp.WSMsgType.TEXT
-    msg.data = json.dumps([{"data": {"type": "device_state_changed", "details": "humidity",
-                                      "payload": {"class": "sbus", "id": 12, "humidity": 500}}}])
+    msg.data = json.dumps(
+        [
+            {
+                "data": {
+                    "type": "device_state_changed",
+                    "details": "humidity",
+                    "payload": {"class": "sbus", "id": 12, "humidity": 500},
+                }
+            }
+        ]
+    )
     result = bridge._dispatch_message(msg)
     assert result is True
     assert coordinator.sbus_devices[12]["humidity"] == 500
@@ -417,24 +530,34 @@ def test_dispatch_message_text_processes_payload():
 
 # ── source field as fallback for class ───────────────────────────────────────
 
+
 def test_ws_source_field_used_when_class_absent():
     """Hub may send 'source' instead of 'class' in payload."""
     bridge, _hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "humidity",
-                          "payload": {"source": "sbus", "id": 12, "humidity": 777}}}]
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": "humidity",
+                "payload": {"source": "sbus", "id": 12, "humidity": 777},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.sbus_devices[12]["humidity"] == 777
 
 
 def test_ws_payload_without_class_and_source_ignored():
     bridge, _hass, coordinator = _bridge()
-    payload = [{"data": {"type": "device_state_changed", "details": "x",
-                          "payload": {"id": 5, "x": 1}}}]
+    payload = [
+        {"data": {"type": "device_state_changed", "details": "x", "payload": {"id": 5, "x": 1}}}
+    ]
     bridge._handle_payload(json.dumps(payload))
     coordinator.async_set_updated_data.assert_not_called()
 
 
 # ── Auth failure raises PermissionError on next message ──────────────────────
+
 
 def test_handle_text_message_raises_after_auth_failed():
     """Once auth_failed is set, the next text message must raise PermissionError."""
@@ -448,6 +571,7 @@ def test_handle_text_message_raises_after_auth_failed():
 
 
 # ── _run_one_cycle handles generic exceptions ─────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_run_one_cycle_catches_generic_exception():
@@ -498,6 +622,7 @@ async def test_run_loop_exits_when_stop_event_set():
 
 # ── _run executes cycle then stops ───────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_run_executes_one_cycle_then_stops():
     """_run() calls _run_one_cycle at least once before stop_event exits the loop."""
@@ -516,6 +641,7 @@ async def test_run_executes_one_cycle_then_stops():
 
 
 # ── _wait_reconnect ───────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_wait_reconnect_returns_immediately_when_stop_set():
@@ -555,11 +681,14 @@ async def test_run_one_cycle_calls_wait_reconnect_when_not_stopped():
 
 # ── _consume_loop ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
-async def test_consume_loop_connects_and_receives():
+async def test_consume_loop_connects_and_receives(caplog):
     bridge, _hass, _coordinator = _bridge()
     bridge._client.ensure_push_auth = AsyncMock()
-    bridge._client.websocket_url_with_access_token = MagicMock(return_value="ws://hub/ws")
+    bridge._client.websocket_url_with_access_token = MagicMock(
+        return_value="ws://hub/ws?access_token=secret-token"
+    )
 
     mock_ws = MagicMock()
     mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
@@ -567,21 +696,37 @@ async def test_consume_loop_connects_and_receives():
     bridge._client.session.ws_connect = MagicMock(return_value=mock_ws)
     bridge._receive_messages = AsyncMock()
 
-    await bridge._consume_loop()
+    with caplog.at_level(logging.INFO, logger="custom_components.sinum.websocket"):
+        await bridge._consume_loop()
 
     bridge._client.ensure_push_auth.assert_awaited_once()
+    bridge._client.session.ws_connect.assert_called_once_with(
+        "ws://hub/ws?access_token=secret-token", heartbeat=30, ssl=False
+    )
     bridge._receive_messages.assert_awaited_once_with(mock_ws)
+    assert "secret-token" not in caplog.text
+    assert "access_token=<redacted>" in caplog.text
 
 
 # ── _receive_messages ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_receive_messages_processes_text_message():
     bridge, _hass, coordinator = _bridge()
     msg = MagicMock()
     msg.type = aiohttp.WSMsgType.TEXT
-    msg.data = json.dumps([{"data": {"type": "device_state_changed", "details": "humidity",
-                                      "payload": {"class": "sbus", "id": 12, "humidity": 999}}}])
+    msg.data = json.dumps(
+        [
+            {
+                "data": {
+                    "type": "device_state_changed",
+                    "details": "humidity",
+                    "payload": {"class": "sbus", "id": 12, "humidity": 999},
+                }
+            }
+        ]
+    )
 
     async def _iter(_self=None):
         yield msg
@@ -624,6 +769,7 @@ async def test_receive_messages_exits_on_stop_event():
 
 # ── _handle_event / _apply_device_state edge cases ───────────────────────────
 
+
 def test_handle_event_non_dict_data_returns_false():
     bridge, _hass, _coordinator = _bridge()
     assert bridge._handle_event({"data": "not-a-dict"}) is False
@@ -635,6 +781,7 @@ def test_apply_device_state_non_dict_payload_returns_false():
 
 
 # ── WebRTC / video stream message handling ───────────────────────────────────
+
 
 def _video_event(msg_type: str, payload_data: dict) -> dict:
     return {
@@ -741,15 +888,19 @@ def test_full_video_stream_message_via_handle_payload():
     """Integration: full WS payload with video answer flows end-to-end."""
     bridge, _hass, coordinator = _bridge()
     coordinator.dispatch_webrtc_answer = MagicMock()
-    payload = json.dumps([{
-        "data": {
-            "type": "video_stream_message",
-            "payload": {
-                "type": "answer",
-                "data": {"session_id": "s42", "description": {"sdp": "v=0\r\n"}},
-            },
-        }
-    }])
+    payload = json.dumps(
+        [
+            {
+                "data": {
+                    "type": "video_stream_message",
+                    "payload": {
+                        "type": "answer",
+                        "data": {"session_id": "s42", "description": {"sdp": "v=0\r\n"}},
+                    },
+                }
+            }
+        ]
+    )
     bridge._handle_payload(payload)
     coordinator.dispatch_webrtc_answer.assert_called_once_with("s42", "v=0\r\n")
     coordinator.async_set_updated_data.assert_not_called()
@@ -762,11 +913,18 @@ def test_apply_device_state_updates_sbus_blind_position():
     """P5.3: device_state_changed updates SBUS blind current_opening."""
     bridge, _hass, coordinator = _bridge()
     coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
-    
-    payload = [{"data": {"type": "device_state_changed", "details": None,
-                          "payload": {"class": "sbus", "id": 15, "current_opening": 75}}}]
+
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": None,
+                "payload": {"class": "sbus", "id": 15, "current_opening": 75},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
-    
+
     assert coordinator.sbus_devices[15]["current_opening"] == 75
     coordinator.async_set_updated_data.assert_called_once()
 
@@ -795,13 +953,24 @@ def test_apply_device_state_updates_sbus_blind_position_and_tilt():
         "current_opening": 50,
         "current_tilt": 20,
     }
-    
-    payload = [{"data": {"type": "device_state_changed", "details": None,
-                          "payload": {"class": "sbus", "id": 15,
-                                      "current_opening": 80, "current_tilt": 45,
-                                      "target_opening": 80}}}]
+
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": None,
+                "payload": {
+                    "class": "sbus",
+                    "id": 15,
+                    "current_opening": 80,
+                    "current_tilt": 45,
+                    "target_opening": 80,
+                },
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
-    
+
     assert coordinator.sbus_devices[15]["current_opening"] == 80
     assert coordinator.sbus_devices[15]["current_tilt"] == 45
     coordinator.async_set_updated_data.assert_called_once()
@@ -811,13 +980,24 @@ def test_apply_device_state_updates_wtp_blind_position():
     """P5.3: device_state_changed updates WTP blind current_opening."""
     bridge, _hass, coordinator = _bridge()
     coordinator.wtp_devices[25] = {"id": 25, "type": "blind_controller", "current_opening": 30}
-    
-    payload = [{"data": {"type": "device_state_changed", "details": None,
-                          "payload": {"class": "wtp", "id": 25,
-                                      "current_opening": 60, "target_opening": 60,
-                                      "action_in_progress": False}}}]
+
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": None,
+                "payload": {
+                    "class": "wtp",
+                    "id": 25,
+                    "current_opening": 60,
+                    "target_opening": 60,
+                    "action_in_progress": False,
+                },
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
-    
+
     assert coordinator.wtp_devices[25]["current_opening"] == 60
     coordinator.async_set_updated_data.assert_called_once()
 
@@ -826,11 +1006,18 @@ def test_blind_position_updates_fire_state_event():
     """P5.3: Blind position updates fire sinum_device_state_changed event."""
     bridge, hass, coordinator = _bridge()
     coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
-    
-    payload = [{"data": {"type": "device_state_changed", "details": None,
-                          "payload": {"class": "sbus", "id": 15, "current_opening": 75}}}]
+
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "details": None,
+                "payload": {"class": "sbus", "id": 15, "current_opening": 75},
+            }
+        }
+    ]
     bridge._handle_payload(json.dumps(payload))
-    
+
     hass.bus.async_fire.assert_called_once()
     call_args = hass.bus.async_fire.call_args
     assert call_args[0][0] == "sinum_device_state_changed"
@@ -844,18 +1031,22 @@ def test_blind_position_updates_via_full_ws_payload():
     bridge, _hass, coordinator = _bridge()
     coordinator.sbus_devices[15] = {"id": 15, "type": "blind_controller", "current_opening": 50}
 
-    payload = json.dumps([{
-        "data": {
-            "type": "device_state_changed",
-            "details": None,
-            "payload": {
-                "class": "sbus",
-                "id": 15,
-                "current_opening": 85,
-                "current_tilt": 30,
+    payload = json.dumps(
+        [
+            {
+                "data": {
+                    "type": "device_state_changed",
+                    "details": None,
+                    "payload": {
+                        "class": "sbus",
+                        "id": 15,
+                        "current_opening": 85,
+                        "current_tilt": 30,
+                    },
+                }
             }
-        }
-    }])
+        ]
+    )
 
     bridge._handle_payload(payload)
 
@@ -865,6 +1056,7 @@ def test_blind_position_updates_via_full_ws_payload():
 
 
 # ─── Camera Motion Events via WebSocket (P5.2) ───────────────────────────────
+
 
 def test_handle_motion_detected_dispatches_to_coordinator():
     """P5.2: motion_detected WS event dispatches to coordinator."""
@@ -888,12 +1080,16 @@ def test_handle_motion_detected_missing_device_id_is_ignored():
 def test_dispatch_event_type_routes_motion_detected():
     """P5.2: full WS payload with type=motion_detected reaches _handle_motion_detected."""
     bridge, _hass, coordinator = _bridge()
-    payload = json.dumps([{
-        "data": {
-            "type": "motion_detected",
-            "payload": {"device_id": 7, "timestamp": "2026-07-01T09:00:00Z"},
-        }
-    }])
+    payload = json.dumps(
+        [
+            {
+                "data": {
+                    "type": "motion_detected",
+                    "payload": {"device_id": 7, "timestamp": "2026-07-01T09:00:00Z"},
+                }
+            }
+        ]
+    )
 
     bridge._handle_payload(payload)
 

@@ -205,7 +205,7 @@ STORAGE_SENSORS: tuple[tuple[str, str, str, tuple[str, ...], Any, Any, Any], ...
         "mdi:battery-plus",
         ("energy_charged_today",),
         SensorDeviceClass.ENERGY,
-        SensorStateClass.MEASUREMENT,
+        SensorStateClass.TOTAL_INCREASING,
         UnitOfEnergy.WATT_HOUR,
     ),
     (
@@ -214,7 +214,7 @@ STORAGE_SENSORS: tuple[tuple[str, str, str, tuple[str, ...], Any, Any, Any], ...
         "mdi:battery-minus",
         ("energy_discharged_today",),
         SensorDeviceClass.ENERGY,
-        SensorStateClass.MEASUREMENT,
+        SensorStateClass.TOTAL_INCREASING,
         UnitOfEnergy.WATT_HOUR,
     ),
 )

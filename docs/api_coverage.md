@@ -238,7 +238,7 @@ The following write operations require hardware validation to ensure idempotency
 ### CI Gate
 - **Gate Status**: Live-write validation run manually before each release.
 - **Last Read-Only Run**: 2026-06-30 — 5/5 hubs PASS for smoke/API/HIL checks; final smoke repeated after HA deploy/migration
-- **Last Live-Write Run**: 2026-06-25 — 5/5 PASS on hub 10.0.62.167
+- **Last Live-Write Run**: 2026-06-25 — 5/5 PASS on configured lab hub
 - **Report**: `docs/live_write_validation_latest.md`
 
 ---

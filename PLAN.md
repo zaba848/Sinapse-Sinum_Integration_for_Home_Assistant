@@ -1,7 +1,7 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-03 (released: v0.7.8 pending push)
-> Current manifest version: v0.7.8
+> Last updated: 2026-07-07 (released: v0.8.0)
+> Current manifest version: v0.8.0
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
 ---
@@ -9,7 +9,7 @@
 ## Verified Local Status
 
 ```text
-Tests:  1 890 passing, 5 skipped (~10 s)
+Tests:  1 912 passing, 5 skipped (~12 s)
 Coverage: 100% line coverage — all 32 modules
 Ruff:   0 errors
 mypy:   0 errors (errors in HA library stubs only, not our code)
@@ -94,6 +94,8 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 | v0.7.6 | FAN platform for fan_coil gear control, Energy Center flow/consumption/production sensors, climate/light refactor integration tests, real API field paths for EC sensors | 1 849 |
 | v0.7.7 | api.py mixin extraction (SceneMixin/EnergyMixin), sensor_bus DRY, switch base class, cover split, WebRTC extraction, __init__ lifecycle extraction | 1 890 |
 | v0.7.8 | sensor_virtual split (EC/hub/virtual), TYPE_CHECKING stubs, MANUFACTURER const, camera DOMAIN, binary_sensor cast | 1 890 |
+| v0.7.9 | MI quality pass for API transport/response helpers, RGB light helpers and config flow helpers | 1 890 |
+| v0.8.0 | WS log redaction, full platform setup harness, public artifact sanitization gate, release metadata gates | 1 912 |
 
 ---
 
@@ -115,7 +117,7 @@ Assessed 2026-07-02 via radon MI, CC, dependency mapping.
 | # | Issue | Notes |
 |---|---|---|
 | 5 | `sensor_bus_descriptions.py` 512 lines | 43 descriptions across WTP/SBUS/LoRa with shared keys — copy-paste between buses |
-| 6 | No integration tests | All 1743 tests are unit tests with mocked coordinator; no full `async_setup_entry → entity.native_value` cycle tested |
+| 6 | Integration-test depth | Initial coordinator/entity integration tests exist; still missing full HA `async_setup_entry → platform setup → entity registry` coverage |
 | 7 | Translation inconsistencies | `title` missing in `en.json`; 10 keys in `en.json` absent from `strings.json` |
 | 8 | `fan_coil` gear control | Gears exposed only as binary_sensor attrs; no `FAN` platform or `SELECT` for preset modes |
 | 9 | Energy center data | 8 API methods (`get_energy_center_*`) available but never exposed as HA sensors |
@@ -134,36 +136,30 @@ Assessed 2026-07-02 via radon MI, CC, dependency mapping.
 
 ## Active Work Plan (ordered by priority)
 
-### Phase A — Immediate housekeeping (now)
+### Phase A — v0.8.0 release ✅ Done (2026-07-07)
 
 | Item | Status |
 |---|---|
-| Deploy v0.7.6 to RPi | ⏳ Pending (run `SINUM_SSH_PASS=… bash scripts/deploy_rpi.sh`) |
-| Create GitHub release v0.7.6 | ⏳ Pending |
-| Tag v0.7.6 pushed | ✅ Done (4f4dd54) |
+| WS log redaction + sanitization gates | ✅ Done |
+| Full platform setup harness | ✅ Done |
+| Version bump 0.8.0 + docs sync | ✅ Done |
+| Deploy v0.8.0 to RPi | ⏳ Pending (`SINUM_SSH_PASS=… bash scripts/deploy_rpi.sh`) |
+| GitHub release v0.8.0 | ⏳ Pending |
+| Hardware smoke 6/6 hubs | ✅ 4/6 (network limits VIDEO, SBUS2) |
 
-### Phase B — Climate refactor (next)
+### Phase B — Hardware validation (now)
 
-Split `climate.py` (834 lines, MI=C) into:
-- `climate_bus.py` — `SinumFanCoil` (WTP/SBUS fan_coil, fan_coil_v2)
-- `climate_virtual.py` — `SinumThermostat` (virtual thermostat, heat_pump_manager)
-- `climate.py` — thin dispatcher calling `async_setup_entry` for each sub-module
+| Item | Hub | Status |
+|---|---|---|
+| Read-only smoke (6 hubs) | all | ✅ 4/6 PASS (WTP, SBUS, KLIMAK, LORA); VIDEO+SBUS2 unreachable (network) |
+| HIL API coverage + WebSocket | SBUS, VIDEO | ⏳ SBUS ready; VIDEO blocked by network |
+| Safe write validation | KLIMAK, SBUS | ⏳ |
+| LoRa hub → HA config entry | LORA | ⏳ |
+| VIDEO hub network diagnosis | VIDEO | ⏳ unreachable from current network (lab + internal) |
 
-Benefits: each module ≤ 350 lines, isolated test surface, MI grade improves from C → A.
-Risk: medium — requires careful refactor to not break existing tests.
-Tests: all existing climate tests must still pass; add 3 integration-style tests for sub-module setup.
+### Phase C — Climate refactor ✅ Done (v0.7.6)
 
-### Phase C — Light refactor (after B)
-
-Split `light.py` (815 lines, MI=C) into:
-- `light_rgb.py` — `SinumWtpRgbLight` + `SinumBusRgbLight` (Lua-based)
-- `light_dimmer.py` — `SinumDimmer` + `SinumPwm`
-- `light.py` — thin dispatcher
-
-Benefits: each module ≤ 300 lines. WTP vs SBUS rgb control paths clearly separated.
-Risk: medium — Lua scene management currently in `light.py`; move cleanly.
-
-### Phase D — FAN platform for fan_coil gear control ✅ Done (v0.7.6)
+### Phase D — Light refactor ✅ Done (v0.7.6)
 
 ### Phase E — Energy center sensors ✅ Done (v0.7.6)
 
@@ -181,11 +177,10 @@ Possible Phase E follow-up:
 - Add `summary.pv.value` (current PV power), `summary.grid.value` (grid import/export) sensors
 - Test against a hub with actual PV/battery (current hubs have `available: false` for these)
 
-### Phase F — Integration tests
+### Phase F — Integration tests ✅ Done (v0.8.0)
 
-Add `tests/test_integration.py` with real HA config-entry fixtures (using homeassistant-test-components):
-- Full `async_setup_entry` → coordinator `_fetch_all` → platform setup → entity attributes
-- No real hub needed — mock at HTTP level via `aioresponses`
+- `tests/test_integration.py` — coordinator → entity value paths
+- `tests/test_full_platform_setup.py` — real HA `async_setup_entry` → entity/device registry
 
 ### Phase G — api.py mixin extraction ✅ Done (v0.7.7)
 
@@ -228,23 +223,24 @@ Follows `_climate_helpers.py` pattern:
 
 ### Phase M — sensor_virtual.py split + weak point sweep ✅ Done (v0.7.8)
 
-- `lifecycle.py` — bridge lifecycle (`start_mqtt_bridge`, `start_ws_bridge`, `start_realtime_bridge`, `stop_mqtt_bridge`, `stop_ws_bridge`) + stale entity cleanup (`_stale_uid_prefixes`, `_stale_identifiers`, `_is_stale_entity`, `_remove_stale_devices`, `cleanup_stale_entities`)
-- Module-level `_MQTT_BRIDGES` / `_WS_BRIDGES` dicts now live in `lifecycle.py`
-- `__init__.py` reduced from 502 → ~390 lines, imports 4 public functions from lifecycle
-- Tests updated: patch targets and `_MQTT_BRIDGES` / `_WS_BRIDGES` imports updated to lifecycle module
-
-### Phase M — sensor_virtual.py split + weak point sweep ✅ Done (v0.7.8)
-
 - Split `sensor_virtual.py` (808 lines) into three focused modules:
   - `sensor_energy_center.py` (296 lines) — EC status/flow/data/storage sensors
   - `sensor_hub.py` (117 lines) — hub uptime/Wi-Fi/firmware sensors
   - `sensor_virtual.py` (416 lines) — weather/energy/thermostat/automation sensors
-- Added `TYPE_CHECKING` stub for `_request` in `SceneMixin` and `EnergyMixin`; removes all `# type: ignore[attr-defined]` from mixin call sites
-- Moved `_partition_energy_results` from `_api_helpers` into `_api_energy` (only consumer)
-- Added `MANUFACTURER = "TECH Sterowniki"` to `const.py`; replaced 37 literal occurrences in 21 files
-- Fixed `camera.py` hardcoded `"sinum"` → uses `DOMAIN` const
-- Fixed `binary_sensor.py` `# type: ignore[arg-type]` → `typing.cast` (no CC cost)
-- All 1890 tests passing, CC ≤ 4, 2 `type: ignore` remain (both HA-stub limitations)
+- Added `TYPE_CHECKING` stub for `_request` in `SceneMixin` and `EnergyMixin`
+- Added `MANUFACTURER = "TECH Sterowniki"` to `const.py`
+- All 1912 tests passing, CC ≤ 4
+
+### Phase N — Next code targets (v0.8.x)
+
+| Item | Priority | Notes |
+|---|---|---|
+| `sensor_modbus.py` split (640 lines) | HIGH | Largest remaining module |
+| Energy Center PV/grid/battery/daily sensors | MEDIUM | Needs hub with PV hardware |
+| LoRa relay PATCH hardware validation | MEDIUM | Code exists, write untested |
+| Bus registry pattern (reduce 15-file edits) | MEDIUM | Architectural |
+| Reconfigure flow WS path field | LOW | UX gap |
+| VIDEO hub network + motion events on live hardware | HIGH | Last smoke gap |
 
 ---
 
@@ -287,4 +283,4 @@ Deploy checklist:
 | Virtual cover integrators | Virtual | no position feedback when no physical controller linked |
 | LoRa relay PATCH | LoRa | implemented but relay test requires physical hardware present |
 | Alarm arm/disarm | alarm-system | destructive; requires explicit PIN and owner approval |
-| Energy center | all | API implemented, not yet exposed in HA |
+| Energy center | all | PV/battery sensors deferred until hub with live PV hardware |

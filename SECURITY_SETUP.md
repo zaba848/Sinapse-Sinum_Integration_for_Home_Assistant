@@ -121,22 +121,19 @@ This document provides step-by-step instructions for configuring GitHub security
 
 ---
 
-## 5. Per-Module Quality Gates — Monitoring
+## 5. Per-Module Quality Gates
 
 **Already Automated** ✅
 
-These quality gates are **already live** in your CI:
+These hard quality gates are **already live** in your CI:
 
 - **`ci.yml`**: Runs `validate_coverage_gates.py` after test suite
 - **Thresholds**:
-  - `api.py`: 90% (currently 85% — will fail until reached)
-  - `light.py`: 90% (currently 85%)
-  - `cover.py`: 90% (currently 86%)
-  - `sensor_virtual.py`: 90% (currently 87%)
-  - Global: 80% (passing ✅)
+  - Critical modules listed in `scripts/validate_coverage_gates.py`: 100%
+  - Global line coverage: 100%
 
 **How to Improve**:
-1. Add more test cases to the gap modules
+1. Add tests for any uncovered lines before merging
 2. Watch CI run: GitHub Actions → **CI** → **test** → **Validate per-module quality gates**
 
 ---
