@@ -31,7 +31,7 @@ from ._websocket_helpers import (  # noqa: F401
 )
 from ._websocket_video import _WebSocketVideoMixin
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from homeassistant.core import HomeAssistant
 
     from .api import SinumClient

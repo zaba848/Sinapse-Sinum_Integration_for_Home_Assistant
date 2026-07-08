@@ -67,6 +67,12 @@ async def _setup(hass, entry, client) -> None:
         await hass.async_block_till_done()
 
 
+async def _teardown(hass, entry) -> None:
+    if entry.state is ConfigEntryState.LOADED:
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+
 class TestFullPlatformSetup:
     """Boot the integration for real and inspect the resulting entity_registry."""
 
@@ -89,6 +95,8 @@ class TestFullPlatformSetup:
             assert entity.platform == DOMAIN
             assert entity.config_entry_id == entry.entry_id
 
+        await _teardown(hass, entry)
+
     async def test_devices_registered_with_domain_identifiers(
         self, hass, enable_custom_integrations, mock_client
     ):
@@ -105,6 +113,8 @@ class TestFullPlatformSetup:
                 assert domain == DOMAIN
                 assert identifier.startswith(entry.entry_id)
 
+        await _teardown(hass, entry)
+
     async def test_enabled_entities_have_a_state(self, hass, enable_custom_integrations, mock_client):
         entry = _build_entry()
         await _setup(hass, entry, mock_client)
@@ -116,6 +126,8 @@ class TestFullPlatformSetup:
 
         missing_state = [e.entity_id for e in enabled if hass.states.get(e.entity_id) is None]
         assert not missing_state, f"enabled entities missing a state: {missing_state}"
+
+        await _teardown(hass, entry)
 
 
 class TestPlatformSetupLifecycle:

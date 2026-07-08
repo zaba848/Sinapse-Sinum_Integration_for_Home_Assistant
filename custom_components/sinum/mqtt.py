@@ -24,7 +24,7 @@ from homeassistant.core import HomeAssistant, callback
 from ._bus_registry import BUS_REGISTRY, bus_store
 from .const import DEFAULT_MQTT_TOPIC_PREFIX
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import SinumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
