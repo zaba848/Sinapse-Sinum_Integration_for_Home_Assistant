@@ -1,5 +1,7 @@
 # v0.6.0 Post-Release Plan & Execution Guide
 
+> **ARCHIVED** — Historical document for the v0.6.0 release cycle. See [PLAN.md](PLAN.md) for current status.
+
 **Status**: v0.6.0 released to GitHub ✅  
 **Date**: 2026-07-01  
 **Version**: 0.6.0 (production ready)

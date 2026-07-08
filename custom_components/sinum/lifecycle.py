@@ -21,7 +21,7 @@ from .const import (
 from .mqtt import SinumMqttBridge
 from .websocket import SinumWebSocketBridge
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from homeassistant.config_entries import ConfigEntry
 
     from .coordinator import SinumCoordinator

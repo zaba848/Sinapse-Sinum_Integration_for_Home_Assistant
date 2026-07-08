@@ -67,6 +67,12 @@ async def _setup(hass, entry, client) -> None:
         await hass.async_block_till_done()
 
 
+async def _teardown(hass, entry) -> None:
+    if entry.state is ConfigEntryState.LOADED:
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+
 class TestFullPlatformSetup:
     """Boot the integration for real and inspect the resulting entity_registry."""
 
@@ -89,6 +95,8 @@ class TestFullPlatformSetup:
             assert entity.platform == DOMAIN
             assert entity.config_entry_id == entry.entry_id
 
+        await _teardown(hass, entry)
+
     async def test_devices_registered_with_domain_identifiers(
         self, hass, enable_custom_integrations, mock_client
     ):
@@ -105,6 +113,8 @@ class TestFullPlatformSetup:
                 assert domain == DOMAIN
                 assert identifier.startswith(entry.entry_id)
 
+        await _teardown(hass, entry)
+
     async def test_enabled_entities_have_a_state(self, hass, enable_custom_integrations, mock_client):
         entry = _build_entry()
         await _setup(hass, entry, mock_client)
@@ -116,6 +126,8 @@ class TestFullPlatformSetup:
 
         missing_state = [e.entity_id for e in enabled if hass.states.get(e.entity_id) is None]
         assert not missing_state, f"enabled entities missing a state: {missing_state}"
+
+        await _teardown(hass, entry)
 
 
 class TestPlatformSetupLifecycle:
@@ -204,6 +216,93 @@ class TestMultiHubPlatformSetup:
         uids_a = {e.unique_id for e in entities_a}
         uids_b = {e.unique_id for e in entities_b}
         assert not (uids_a & uids_b), f"unique_id collision across hubs: {uids_a & uids_b}"
+
+
+class TestUnloadReloadLifecycle:
+    """Unload then reload must restore entity states to available."""
+
+    async def test_unload_then_reload_restores_available_states(
+        self, hass, enable_custom_integrations, mock_client
+    ):
+        entry = _build_entry()
+        await _setup(hass, entry, mock_client)
+
+        registry = er.async_get(hass)
+        entities_before = [
+            e for e in er.async_entries_for_config_entry(registry, entry.entry_id) if not e.disabled
+        ]
+        assert entities_before
+
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.NOT_LOADED
+
+        with patch("custom_components.sinum.SinumClient", return_value=mock_client):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        assert entry.state is ConfigEntryState.LOADED
+        for entity in entities_before:
+            state = hass.states.get(entity.entity_id)
+            assert state is not None
+            assert state.state != "unavailable"
+
+
+class TestMultiHubLifecycle:
+    """Multi-hub unload/reload/remove must keep sibling hubs intact."""
+
+    async def test_multi_hub_unload_one_hub_leaves_other_loaded(
+        self, hass, enable_custom_integrations, mock_client
+    ):
+        entry_a = _build_entry(entry_id="hub_a_lifecycle", host="10.0.0.1")
+        entry_b = _build_entry(entry_id="hub_b_lifecycle", host="10.0.0.2")
+        await _setup(hass, entry_a, mock_client)
+        await _setup(hass, entry_b, mock_client)
+
+        assert await hass.config_entries.async_unload(entry_a.entry_id)
+        await hass.async_block_till_done()
+
+        assert entry_a.state is ConfigEntryState.NOT_LOADED
+        assert entry_b.state is ConfigEntryState.LOADED
+
+    async def test_multi_hub_reload_one_while_other_loaded(
+        self, hass, enable_custom_integrations, mock_client
+    ):
+        entry_a = _build_entry(entry_id="hub_a_reload", host="10.0.0.1")
+        entry_b = _build_entry(entry_id="hub_b_reload", host="10.0.0.2")
+        await _setup(hass, entry_a, mock_client)
+        await _setup(hass, entry_b, mock_client)
+
+        with patch("custom_components.sinum.SinumClient", return_value=mock_client):
+            assert await hass.config_entries.async_reload(entry_a.entry_id)
+            await hass.async_block_till_done()
+
+        assert entry_a.state is ConfigEntryState.LOADED
+        assert entry_b.state is ConfigEntryState.LOADED
+
+    async def test_remove_one_hub_in_multi_hub_setup(
+        self, hass, enable_custom_integrations, mock_client
+    ):
+        entry_a = _build_entry(entry_id="hub_a_remove", host="10.0.0.1")
+        entry_b = _build_entry(entry_id="hub_b_remove", host="10.0.0.2")
+        await _setup(hass, entry_a, mock_client)
+        await _setup(hass, entry_b, mock_client)
+
+        registry = er.async_get(hass)
+        ids_b_before = {
+            e.entity_id for e in er.async_entries_for_config_entry(registry, entry_b.entry_id)
+        }
+        assert ids_b_before
+
+        await hass.config_entries.async_remove(entry_a.entry_id)
+        await hass.async_block_till_done()
+
+        assert entry_b.state is ConfigEntryState.LOADED
+        ids_b_after = {
+            e.entity_id for e in er.async_entries_for_config_entry(registry, entry_b.entry_id)
+        }
+        assert ids_b_before == ids_b_after
+        assert er.async_entries_for_config_entry(registry, entry_a.entry_id) == []
 
 
 class TestDegradedDataPlatformSetup:

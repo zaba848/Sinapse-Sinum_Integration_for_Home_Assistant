@@ -1,5 +1,5 @@
 # pytest, pytest-asyncio, pytest-cov and aiohttp are pinned by pytest-homeassistant-custom-component
-pytest-homeassistant-custom-component==0.13.205
+pytest-homeassistant-custom-component==0.13.316
 aioresponses==0.7.6
 ruff==0.15.17
 mypy==1.10.0

@@ -2,7 +2,7 @@
 # Deploy Sinum integration to Home Assistant on Raspberry Pi.
 # Usage:
 #   export SINUM_SSH_PASS="<password>"
-#   export HA_HOST="10.0.63.53"   # optional; default homeassistant.local
+#   export HA_HOST="<HA_HOST_IP>"   # optional; default homeassistant.local
 #   export HA_TOKEN="<long-lived-token>"  # optional; triggers restart
 #   bash scripts/deploy_rpi.sh
 

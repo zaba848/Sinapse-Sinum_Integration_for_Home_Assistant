@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sinapse-homeassistant-sinum"
-version = "0.8.0"
+version = "0.8.1"
 description = "Sinapse - Sinum Integration for Home Assistant"
 readme = "README.md"
 license = {text = "Proprietary"}

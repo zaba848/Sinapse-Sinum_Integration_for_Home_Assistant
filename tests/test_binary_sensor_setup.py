@@ -283,3 +283,32 @@ class TestSinumParentErrorSensor:
         parent = {"id": 99, "class": "wtp", "name": "Missing"}
         entity = SinumParentErrorSensor(coordinator, parent, "test_entry")
         assert entity.is_on is None
+
+
+class TestBinarySensorStoreRouting:
+    def test_wtp_source_reads_wtp_store_not_sbus(self):
+        coordinator = _make_coordinator(
+            wtp={1: {"id": 1, "type": WTYPE_MOTION_SENSOR, "motion_detected": "true"}},
+            sbus={1: {"id": 1, "type": STYPE_MOTION_SENSOR, "motion_detected": "false"}},
+        )
+        from custom_components.sinum.binary_sensor import (
+            BINARY_SENSOR_TYPES,
+            SinumBinarySensor,
+        )
+
+        desc = next(d for d in BINARY_SENSOR_TYPES if d.key == "motion")
+        entity = SinumBinarySensor(coordinator, 1, desc, "entry")
+        assert entity.is_on is True
+
+    def test_unknown_source_returns_empty_device(self):
+        coordinator = _make_coordinator(wtp={1: {"id": 1, "state": True}})
+        from custom_components.sinum.binary_sensor import SinumBinarySensorDescription
+
+        desc = SinumBinarySensorDescription(
+            key="custom",
+            wtp_type="custom_type",
+            source="unknown_bus",
+            on_states=("true",),
+        )
+        entity = SinumBinarySensor(coordinator, 1, desc, "entry")
+        assert entity.is_on is None

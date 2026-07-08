@@ -29,6 +29,7 @@ from custom_components.sinum.sensor import (
     SinumWeatherSensor,
     async_setup_entry,
 )
+from custom_components.sinum.sensor_bus import SinumSensorDescription
 
 
 def _make_coordinator(
@@ -418,6 +419,16 @@ class TestSinumSensorNativeValue:
         coordinator.wtp_devices = {1: {"id": 1, "name": "T", desc.api_key: "bad"}}
         entity = SinumSensor(coordinator, 1, desc, "test_entry")
         assert entity.native_value is None
+
+    def test_unknown_bus_source_returns_empty_device_dict(self):
+        coordinator = MagicMock()
+        desc = SinumSensorDescription(
+            key="temperature",
+            api_key="temperature",
+            source="unknown_bus",
+        )
+        entity = SinumSensor(coordinator, 1, desc, "test_entry")
+        assert entity._device == {}
 
     def test_sentinel_returns_none(self):
         desc = next(d for d in WTP_SENSORS if d.source == "wtp" and not d.is_text)

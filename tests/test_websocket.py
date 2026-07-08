@@ -33,6 +33,7 @@ def _coordinator() -> MagicMock:
     coordinator.lora_devices = {}
     coordinator.modbus_devices = {}
     coordinator.video_devices = {}
+    coordinator.slink_devices = {}
     coordinator.data = {
         "virtual": coordinator.virtual_devices,
         "wtp": coordinator.wtp_devices,
@@ -40,6 +41,7 @@ def _coordinator() -> MagicMock:
         "lora": coordinator.lora_devices,
         "modbus": coordinator.modbus_devices,
         "video": coordinator.video_devices,
+        "slink": coordinator.slink_devices,
     }
     coordinator.async_set_updated_data = MagicMock()
     return coordinator
@@ -118,6 +120,21 @@ def test_ws_virtual_device_update():
     ]
     bridge._handle_payload(json.dumps(payload))
     assert coordinator.virtual_devices[31]["temperature"] == 354
+
+
+def test_ws_slink_device_update():
+    bridge, _hass, coordinator = _bridge()
+    payload = [
+        {
+            "data": {
+                "type": "device_state_changed",
+                "payload": {"class": "slink", "id": 9, "state": True},
+            }
+        }
+    ]
+    bridge._handle_payload(json.dumps(payload))
+    assert coordinator.slink_devices[9]["state"] is True
+    coordinator.async_set_updated_data.assert_called_once()
 
 
 def test_ws_invalid_json_ignored():
@@ -361,6 +378,7 @@ def test_patch_device_creates_new_entry_for_unknown_id():
         ("wtp", "wtp"),
         ("virtual", "virtual"),
         ("lora", "lora"),
+        ("slink", "slink"),
         ("modbus", "modbus"),
         ("video", "video"),
         ("unknown_type", ""),

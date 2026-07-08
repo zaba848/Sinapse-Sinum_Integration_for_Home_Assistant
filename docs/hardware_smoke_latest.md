@@ -1,6 +1,6 @@
 # Hardware Smoke Test (Latest)
 
-Generated: 2026-07-07 12:30:48Z
+Generated: 2026-07-08 04:46:16Z
 
 | Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual | /devices/lora | /devices/slink | /devices/modbus |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -19,21 +19,14 @@ Generated: 2026-07-07 12:30:48Z
 
 ## Result
 
-FAIL — VIDEO and SBUS2 hubs unreachable; WTP, SBUS, KLIMAK and LORA passed all endpoints.
+FAIL
 
-## HIL Summary
+## Diagnosis (2026-07-08)
 
-Generated: 2026-07-07 (post-HA-online)
+| Hub | Status | Likely cause | Remediation |
+|---|---|---|---|
+| VIDEO | ERR on all endpoints | Hub offline, IP changed, or expired `SINUM_VIDEO_TOKEN` | Verify reachability from `sinum-lan` runner; rotate token in GitHub Secrets |
+| SBUS2 | ERR on all endpoints | Hub offline, IP changed, or expired `SINUM_SBUS2_TOKEN` | Same as VIDEO — check `vars.SINUM_SMOKE_HUBS` hub URL + per-hub token secret |
 
-| Hub | Smoke | HA config entry |
-|---|---|---|
-| WTP | PASS | `tablica-wtp` loaded |
-| SBUS | PASS | `sinum-tablica-sbus-1` loaded |
-| KLIMAK | PASS | `ehome-wojtek` loaded |
-| LORA | PASS | `sinum-lora` loaded |
-| VIDEO | NOT RUN | `tablica-video-nowa` setup_retry |
-| SBUS2 | NOT RUN | `sinum-tablica-sbus2` setup_retry |
-
-## Overall
-
-Hardware validation **PASS for 4/6 hubs**. HA RPi online with v0.8.0 deployed (3937 entities). VIDEO and SBUS2 require lab-network reachability fix.
+**Note:** WTP, SBUS, KLIMAK, LORA hubs respond 200 — integration code is not implicated.
+Re-run: `gh workflow run hardware-nightly.yml` on self-hosted runner after fixing secrets.

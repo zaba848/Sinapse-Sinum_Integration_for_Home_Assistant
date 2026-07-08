@@ -28,6 +28,10 @@ MODULE_THRESHOLDS = {
     "custom_components/sinum/config_flow.py": 100,
     "custom_components/sinum/climate.py": 100,
     "custom_components/sinum/switch.py": 100,
+    "custom_components/sinum/websocket.py": 100,
+    "custom_components/sinum/lifecycle.py": 100,
+    "custom_components/sinum/sensor_modbus.py": 100,
+    "custom_components/sinum/services.py": 100,
 }
 
 GLOBAL_THRESHOLD = 100

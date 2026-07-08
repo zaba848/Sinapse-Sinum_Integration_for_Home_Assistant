@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_store
 from .binary_sensor_parent import SinumParentErrorSensor, SinumParentOnlineSensor  # noqa: F401
 from .const import (
     DOMAIN,
@@ -301,10 +302,9 @@ class SinumBinarySensor(
         )
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
-        store = {
-            "sbus": coordinator.sbus_devices,
-            "lora": coordinator.lora_devices,
-        }.get(self._source, coordinator.wtp_devices)
+        store = bus_store(coordinator, self._source)
+        if store is None:
+            return {}
         return store.get(self._device_id, {})
 
     @property

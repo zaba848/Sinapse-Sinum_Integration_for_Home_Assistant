@@ -16,6 +16,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 
+from ._bus_registry import BUS_REGISTRY, bus_store
 from ._websocket_helpers import (  # noqa: F401
     _as_int,
     _device_class,
@@ -30,7 +31,7 @@ from ._websocket_helpers import (  # noqa: F401
 )
 from ._websocket_video import _WebSocketVideoMixin
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from homeassistant.core import HomeAssistant
 
     from .api import SinumClient
@@ -215,26 +216,9 @@ class SinumWebSocketBridge(_WebSocketVideoMixin):
         )
 
     def _store_for_class(self, cls: Any) -> dict[int, dict[str, Any]] | None:
-        stores: dict[str, dict[int, dict[str, Any]]] = {
-            "virtual": self._coordinator.virtual_devices,
-            "wtp": self._coordinator.wtp_devices,
-            "sbus": self._coordinator.sbus_devices,
-            "lora": self._coordinator.lora_devices,
-            "modbus": self._coordinator.modbus_devices,
-            "video": self._coordinator.video_devices,
-        }
-        return stores.get(_device_class(cls))
+        return bus_store(self._coordinator, _device_class(cls))
 
     def _publish_coordinator_data(self) -> None:
         data = self._coordinator.data if isinstance(self._coordinator.data, dict) else {}
-        self._coordinator.async_set_updated_data(
-            {
-                **data,
-                "virtual": self._coordinator.virtual_devices,
-                "wtp": self._coordinator.wtp_devices,
-                "sbus": self._coordinator.sbus_devices,
-                "lora": self._coordinator.lora_devices,
-                "modbus": self._coordinator.modbus_devices,
-                "video": self._coordinator.video_devices,
-            }
-        )
+        bus_data = {spec.name: getattr(self._coordinator, spec.store_attr) for spec in BUS_REGISTRY}
+        self._coordinator.async_set_updated_data({**data, **bus_data})

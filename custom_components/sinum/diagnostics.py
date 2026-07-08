@@ -37,6 +37,8 @@ def _bus_snapshots(coordinator: Any) -> dict[str, Any]:
         "wtp_devices": _snapshot_store(coordinator.wtp_devices),
         "sbus_devices": _snapshot_store(coordinator.sbus_devices),
         "lora_devices": _snapshot_store(coordinator.lora_devices),
+        "slink_devices": _snapshot_store(coordinator.slink_devices),
+        "modbus_devices": _snapshot_store(coordinator.modbus_devices),
         "video_devices": _snapshot_video_store(coordinator.video_devices),
         "parent_devices": [_sanitize_device(d) for d in coordinator.parent_devices],
         "floors": _snapshot_store(coordinator.floors),
@@ -50,6 +52,8 @@ def _bus_counts(coordinator: Any) -> dict[str, Any]:
         "wtp_count": len(coordinator.wtp_devices),
         "sbus_count": len(coordinator.sbus_devices),
         "lora_count": len(coordinator.lora_devices),
+        "slink_count": len(coordinator.slink_devices),
+        "modbus_count": len(coordinator.modbus_devices),
         "video_count": len(coordinator.video_devices),
         "parent_count": len(coordinator.parent_devices),
     }
