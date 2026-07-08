@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant, callback
 
+from ._bus_registry import BUS_REGISTRY, bus_store
 from .const import DEFAULT_MQTT_TOPIC_PREFIX
 
 if TYPE_CHECKING:
@@ -96,13 +97,7 @@ class SinumMqttBridge:
             return None
 
     def _store_for_source(self, source: str) -> dict[int, dict[str, Any]] | None:
-        stores = {
-            "virtual": self._coordinator.virtual_devices,
-            "wtp": self._coordinator.wtp_devices,
-            "sbus": self._coordinator.sbus_devices,
-            "lora": self._coordinator.lora_devices,
-        }
-        return stores.get(source)
+        return bus_store(self._coordinator, source)
 
     def _apply_state_update(
         self, store: dict[int, dict[str, Any]], device_id: int, payload: dict[str, Any]
@@ -114,14 +109,8 @@ class SinumMqttBridge:
         store[device_id] = payload
 
     def _publish_coordinator_data(self) -> None:
-        self._coordinator.async_set_updated_data(
-            {
-                "virtual": self._coordinator.virtual_devices,
-                "wtp": self._coordinator.wtp_devices,
-                "sbus": self._coordinator.sbus_devices,
-                "lora": self._coordinator.lora_devices,
-            }
-        )
+        bus_data = {spec.name: getattr(self._coordinator, spec.store_attr) for spec in BUS_REGISTRY}
+        self._coordinator.async_set_updated_data(bus_data)
 
     @callback
     def _handle_state(self, msg: mqtt.ReceiveMessage) -> None:

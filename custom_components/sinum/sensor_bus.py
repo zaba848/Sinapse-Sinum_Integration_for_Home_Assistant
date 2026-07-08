@@ -16,6 +16,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_store
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 from .sensor_bus_descriptions import (  # noqa: F401  (re-export for callers)
@@ -70,13 +71,10 @@ class SinumSensor(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator]
             self._attr_native_unit_of_measurement = device_unit
 
     def _get_device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
-        if self._source == "virtual":
-            return coordinator.virtual_devices.get(self._device_id, {})
-        if self._source in ("sbus", "sbus_regulator"):
-            return coordinator.sbus_devices.get(self._device_id, {})
-        if self._source == "lora":
-            return coordinator.lora_devices.get(self._device_id, {})
-        return coordinator.wtp_devices.get(self._device_id, {})
+        store = bus_store(coordinator, self._source)
+        if store is None:
+            return {}
+        return store.get(self._device_id, {})
 
     @property
     def _device(self) -> dict[str, Any]:

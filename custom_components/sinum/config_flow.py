@@ -46,6 +46,7 @@ from .const import (
     CONF_HOST,
     CONF_PASSWORD,
     CONF_USERNAME,
+    CONF_WS_PATH,
     DOMAIN,
 )
 
@@ -59,6 +60,7 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         self._host: str = ""
         self._auth_mode: str = AUTH_MODE_TOKEN
         self._reconfigure: bool = False
+        self._ws_path: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -150,7 +152,14 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> ConfigFlowResult:
         if self._reconfigure:
             entry = self._get_reconfigure_entry()
-            return self.async_update_reload_and_abort(entry, data={**entry.data, **data})
+            options = dict(entry.options)
+            if self._ws_path is not None:
+                options[CONF_WS_PATH] = self._ws_path
+            return self.async_update_reload_and_abort(
+                entry,
+                data={**entry.data, **data},
+                options=options,
+            )
         unique_id = f"sinum_{self._host.replace('.', '_').replace(':', '_')}"
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
@@ -234,11 +243,13 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
+            self._ws_path = _websocket_path(user_input.get(CONF_WS_PATH, ""))
             next_step = await self._process_host_auth_input(user_input, errors)
             if next_step is not None:
                 return next_step
         self._host = entry.data.get(CONF_HOST, "")
         self._auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_TOKEN)
+        self._ws_path = entry.options.get(CONF_WS_PATH, entry.data.get(CONF_WS_PATH))
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=vol.Schema(
@@ -247,6 +258,10 @@ class SinumConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                     vol.Required(CONF_AUTH_MODE, default=self._auth_mode): vol.In(
                         [AUTH_MODE_TOKEN, AUTH_MODE_PASSWORD]
                     ),
+                    vol.Optional(
+                        CONF_WS_PATH,
+                        default=self._ws_path,
+                    ): _websocket_path,
                 }
             ),
             errors=errors,

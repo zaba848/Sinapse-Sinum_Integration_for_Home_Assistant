@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PRIVATE_IP_RE = re.compile(
     r"\b(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})\b"
 )
+JWT_RE = re.compile(
+    r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+)
 
 
 def _public_artifacts() -> list[Path]:
@@ -30,3 +33,14 @@ def test_public_artifacts_do_not_embed_private_lab_ips() -> None:
             offenders.append(f"{path.relative_to(ROOT)}:{line}: {match.group(0)}")
 
     assert not offenders, "Private lab IPs found in public artifacts:\n" + "\n".join(offenders)
+
+
+def test_public_artifacts_do_not_embed_jwt_tokens() -> None:
+    offenders: list[str] = []
+    for path in _public_artifacts():
+        text = path.read_text(encoding="utf-8")
+        for match in JWT_RE.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            offenders.append(f"{path.relative_to(ROOT)}:{line}: <jwt redacted>")
+
+    assert not offenders, "JWT tokens found in public artifacts:\n" + "\n".join(offenders)

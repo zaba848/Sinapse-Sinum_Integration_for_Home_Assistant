@@ -9,18 +9,17 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_patch_method, bus_store
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
 
 
 def _relay_device(coordinator: SinumCoordinator, bus: str, device_id: int) -> dict[str, Any]:
-    store = {
-        "wtp": coordinator.wtp_devices,
-        "sbus": coordinator.sbus_devices,
-        "slink": coordinator.slink_devices,
-        "lora": coordinator.lora_devices,
-    }.get(bus, coordinator.lora_devices)
-    return store.get(device_id, {})
+    store = bus_store(coordinator, bus)
+    if store is None:
+        store = coordinator.lora_devices
+    device = store.get(device_id, {})
+    return device if isinstance(device, dict) else {}
 
 
 class SinumBusRelaySwitch(
@@ -59,16 +58,13 @@ class SinumBusRelaySwitch(
         return bool(self._device.get("state"))
 
     async def _patch_state(self, state: bool) -> None:
-        _BUS_STORES = {
-            "wtp": (self.coordinator.wtp_devices, "patch_wtp_device"),
-            "sbus": (self.coordinator.sbus_devices, "patch_sbus_device"),
-            "slink": (self.coordinator.slink_devices, "patch_slink_device"),
-            "lora": (self.coordinator.lora_devices, "patch_lora_device"),
-        }
-        store, method_name = _BUS_STORES.get(self._bus, _BUS_STORES["lora"])
-        updated = await getattr(self.coordinator.client, method_name)(
-            self._device_id, {"state": state}
-        )
+        store = bus_store(self.coordinator, self._bus)
+        if store is None:
+            store = self.coordinator.lora_devices
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for relay patch: {self._bus}")
+        updated = await patch_method(self._device_id, {"state": state})
         store[self._device_id].update(updated)
 
     async def async_turn_on(self, **kwargs: Any) -> None:

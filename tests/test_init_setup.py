@@ -1257,6 +1257,156 @@ class TestRunSceneService:
         mock_client.run_scene.assert_awaited_once_with(3)
 
 
+class TestMultiHubServiceRouting:
+    """Multi-hub services must require entry_id and route to the correct hub."""
+
+    def _two_hub_setup(self):
+        client_a = MagicMock()
+        client_a.login = AsyncMock()
+        client_a.run_scene = AsyncMock(return_value=None)
+        client_a.patch_scene_lua = AsyncMock(return_value=None)
+        client_b = MagicMock()
+        client_b.login = AsyncMock()
+        client_b.run_scene = AsyncMock(return_value=None)
+        client_b.patch_scene_lua = AsyncMock(return_value=None)
+
+        coordinator_a = MagicMock()
+        coordinator_a.async_config_entry_first_refresh = AsyncMock()
+        coordinator_a.client = client_a
+        coordinator_a.hub_info = {"name": "Hub A"}
+        coordinator_a.mqtt_bridge = None
+        coordinator_a.config_entry = MagicMock()
+        coordinator_a.config_entry.options = {}
+        coordinator_a.config_entry.data = {}
+        coordinator_b = MagicMock()
+        coordinator_b.async_config_entry_first_refresh = AsyncMock()
+        coordinator_b.client = client_b
+        coordinator_b.hub_info = {"name": "Hub B"}
+        coordinator_b.mqtt_bridge = None
+        coordinator_b.config_entry = MagicMock()
+        coordinator_b.config_entry.options = {}
+        coordinator_b.config_entry.data = {}
+
+        entry_a = MagicMock()
+        entry_a.entry_id = "hub_a"
+        entry_a.title = "Sinum (Hub A)"
+        entry_a.options = {}
+        entry_a.data = {
+            "host": "10.0.0.1",
+            "auth_mode": "token",
+            "api_token": "tok-a",
+            "scan_interval": 30,
+        }
+        entry_b = MagicMock()
+        entry_b.entry_id = "hub_b"
+        entry_b.title = "Sinum (Hub B)"
+        entry_b.options = {}
+        entry_b.data = {
+            "host": "10.0.0.2",
+            "auth_mode": "token",
+            "api_token": "tok-b",
+            "scan_interval": 30,
+        }
+        return client_a, client_b, coordinator_a, coordinator_b, entry_a, entry_b
+
+    @pytest.mark.asyncio
+    async def test_run_scene_two_hubs_requires_entry_id(self, hass):
+        from custom_components.sinum import async_setup_entry
+
+        client_a, client_b, coordinator_a, coordinator_b, entry_a, entry_b = self._two_hub_setup()
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator") as mock_coordinator,
+            patch("custom_components.sinum.SinumClient") as mock_client_cls,
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            mock_client_cls.side_effect = [client_a, client_b]
+            mock_coordinator.side_effect = [coordinator_a, coordinator_b]
+            await async_setup_entry(hass, entry_a)
+            await async_setup_entry(hass, entry_b)
+
+        with pytest.raises(HomeAssistantError, match="entry_id is required"):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_RUN_SCENE,
+                {ATTR_RUN_SCENE_ID: 5},
+                blocking=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_mqtt_bridge_two_hubs_routes_entry_id(self, hass):
+        from custom_components.sinum import async_setup_entry
+
+        client_a, client_b, coordinator_a, coordinator_b, entry_a, entry_b = self._two_hub_setup()
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator") as mock_coordinator,
+            patch("custom_components.sinum.SinumClient") as mock_client_cls,
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+        ):
+            mock_client_cls.side_effect = [client_a, client_b]
+            mock_coordinator.side_effect = [coordinator_a, coordinator_b]
+            await async_setup_entry(hass, entry_a)
+            await async_setup_entry(hass, entry_b)
+
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPLOAD_MQTT_BRIDGE,
+            {
+                ATTR_ENTRY_ID: "hub_b",
+                ATTR_MQTT_SCENE_ID: 1,
+                ATTR_MQTT_CLIENT_ID: 2,
+                ATTR_MQTT_DRY_RUN: False,
+            },
+            blocking=True,
+        )
+
+        client_a.patch_scene_lua.assert_not_awaited()
+        client_b.patch_scene_lua.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_unload_one_of_two_hubs_keeps_domain_services(self, hass):
+        from custom_components.sinum import async_setup_entry, async_unload_entry
+
+        client_a, client_b, coordinator_a, coordinator_b, entry_a, entry_b = self._two_hub_setup()
+
+        with (
+            patch("custom_components.sinum.SinumCoordinator") as mock_coordinator,
+            patch("custom_components.sinum.SinumClient") as mock_client_cls,
+            patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
+            patch.object(hass.config_entries, "async_unload_platforms", new_callable=AsyncMock) as unload,
+        ):
+            mock_client_cls.side_effect = [client_a, client_b]
+            mock_coordinator.side_effect = [coordinator_a, coordinator_b]
+            unload.return_value = True
+            await async_setup_entry(hass, entry_a)
+            await async_setup_entry(hass, entry_b)
+
+        assert hass.services.has_service(DOMAIN, SERVICE_RUN_SCENE)
+        await async_unload_entry(hass, entry_a)
+        assert hass.services.has_service(DOMAIN, SERVICE_RUN_SCENE)
+
+
+class TestServicesModuleImports:
+    """Service helpers live in services.py but remain importable from the package."""
+
+    def test_services_module_exports_handlers(self):
+        from custom_components.sinum import services
+
+        assert services.register_services is not None
+        assert services.select_coordinator is not None
+        assert services.merge_schedule is not None
+
+    def test_init_reexports_service_schemas(self):
+        from custom_components.sinum import NOTIFY_SCHEMA, RUN_SCENE_SCHEMA
+
+        assert NOTIFY_SCHEMA is not None
+        assert RUN_SCENE_SCHEMA is not None
+
+
 class TestStaleDeviceRegistryCleanup:
     """Tests for device registry cleanup helpers."""
 

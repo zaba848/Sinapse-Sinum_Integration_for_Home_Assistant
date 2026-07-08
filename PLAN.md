@@ -1,6 +1,6 @@
 # Sinapse — Implementation Plan & Status
 
-> Last updated: 2026-07-07 (released: v0.8.0, deploy: HA RPi online)
+> Last updated: 2026-07-08 (released: v0.8.0, maintenance cycles 0–4 complete)
 > Current manifest version: v0.8.0
 > Credentials, API tokens, HA tokens and passwords must never be committed.
 
@@ -74,7 +74,56 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 
 ---
 
-## Completed Phases
+## Remaining Technical Debt (aktualne)
+
+Assessed 2026-07-08 — only open items; resolved issues (climate/light god objects, FAN platform, Energy Center, integration tests, api.py split) moved to Completed Phases.
+
+### High priority
+
+| # | Issue | Files |
+|---|---|---|
+| 1 | Bus extensibility — new bus still needs platform entity modules, but core routing is centralized | `_bus_registry.py`, platforms |
+| 2 | `sensor_modbus.py` further splits | entity vs descriptions (partially done v0.8.1) |
+| 3 | VIDEO + SBUS2 hubs offline in lab — HA entries `setup_retry` | hardware smoke |
+
+### Medium priority
+
+| # | Issue | Notes |
+|---|---|---|
+| 4 | LoRa relay PATCH write untested on physical hardware | code exists |
+| 5 | Energy Center PV/grid/battery/daily sensors | needs hub with live PV |
+| 6 | Translation inconsistencies | `en.json` vs `strings.json` key drift |
+| 7 | `sensor_bus_descriptions.py` size | shared keys across buses |
+
+### Low priority / backlog
+
+| # | Issue |
+|---|---|
+| 8 | `sensor_virtual.py` (416 lines) — further split candidate |
+| 9 | `camera.py` — RTSP/WebRTC/snapshot mixins |
+| 10 | `binary_sensor.py` per-bus split |
+| 11 | Missing `MEDIA_PLAYER` platform |
+| 12 | No third language beyond EN/PL |
+
+---
+
+## Maintenance Cycles
+
+| Cycle | Scope | Status | Date |
+|---|---|---|---|
+| 0 | PLAN.md rewrite — stale weak points removed, Maintenance Cycles table | ✅ Done | 2026-07-08 |
+| 1a | `services.py` extraction from `__init__.py` | ✅ Done | 2026-07-08 |
+| 1b | slink WS/MQTT routing + binary_sensor store fallback | ✅ Done | 2026-07-08 |
+| 1c | Reconfigure WS path + JWT sanitization gate + coverage gates | ✅ Done | 2026-07-08 |
+| 2 | `_bus_registry.py` — replace 6 inline store dicts | ✅ Done | 2026-07-08 |
+| 3 | Lifecycle multi-hub tests (7 scenarios) | ✅ Done | 2026-07-08 |
+| 4 | Coordinator fetch via `BUS_REGISTRY` loop | ✅ Done | 2026-07-08 |
+| HW | Smoke 6 hubs + `validate_api_writes` when lab network available | ⏳ Skipped (no lab env in session) | 2026-07-08 |
+| 5+ | Further module splits (`sensor_virtual`, `camera`, `binary_sensor`) | 📋 Backlog | — |
+
+---
+
+## Completed Phases (archive v0.1–v0.8)
 
 | Version | Summary | Tests |
 |---|---|---|
@@ -97,40 +146,26 @@ Hardware config must come from environment variables or GitHub secrets, never fr
 | v0.7.9 | MI quality pass for API transport/response helpers, RGB light helpers and config flow helpers | 1 890 |
 | v0.8.0 | WS log redaction, full platform setup harness, public artifact sanitization gate, release metadata gates | 1 912 |
 
+### Resolved in v0.7.6–v0.8.x (formerly listed as weak points)
+
+| Item | Resolution |
+|---|---|
+| `climate.py` god object (834 lines) | Split into `climate_fan_coil.py`, `climate_bus.py`, `climate_virtual.py`, `climate_heat_pump.py` |
+| `light.py` god object (815 lines) | Split into `light_rgb.py`, `light_dimmer.py`, `light_button.py`, `light_dimmer_bus.py` |
+| `api.py` god object (889 lines) | Mixin extraction: `_api_scene.py`, `_api_energy.py`, `_api_helpers.py` |
+| `fan_coil` gear / FAN platform | `fan.py` platform + gear binary_sensor attrs |
+| Energy center sensors | `sensor_energy_center.py` with flow/consumption/production |
+| Integration-test depth | `test_integration.py` + `test_full_platform_setup.py` |
+| `__init__.py` 499 lines | Lifecycle → `lifecycle.py`, services → `services.py` (~150 lines orchestration) |
+| Bus store dict duplication | `_bus_registry.py` centralizes routing |
+| Reconfigure WS path missing | WS path field added to reconfigure flow |
+| Coverage gates (9 modules) | Extended to websocket, lifecycle, sensor_modbus, services |
+
 ---
 
 ## Critical Analysis — Weak Points
 
-Assessed 2026-07-02 via radon MI, CC, dependency mapping.
-
-### 🔴 High priority (technical debt / architectural risk)
-
-| # | File | Issue | Metric |
-|---|---|---|---|
-| 1 | `api.py` | God Object — 107 methods, 28 never called by integration (only in tests). ISP/SRP violated. | MI=C (7.47) |
-| 2 | `climate.py` | 834 lines, 3 device types (fan_coil, fan_coil_v2, temperature_regulator), each with different control path | MI=C (0.00) |
-| 3 | `light.py` | 815 lines, 4 pathways (WTP-rgb REST, SBUS-rgb Lua, dimmer, PWM) mixed in one class hierarchy | MI=C (0.00) |
-| 4 | Bus extensibility | Adding a new bus requires edits in 15 files (coordinator + all 7 platform files). OCP violated systemically. | – |
-
-### 🟡 Medium priority (quality / missing features)
-
-| # | Issue | Notes |
-|---|---|---|
-| 5 | `sensor_bus_descriptions.py` 512 lines | 43 descriptions across WTP/SBUS/LoRa with shared keys — copy-paste between buses |
-| 6 | Integration-test depth | Initial coordinator/entity integration tests exist; still missing full HA `async_setup_entry → platform setup → entity registry` coverage |
-| 7 | Translation inconsistencies | `title` missing in `en.json`; 10 keys in `en.json` absent from `strings.json` |
-| 8 | `fan_coil` gear control | Gears exposed only as binary_sensor attrs; no `FAN` platform or `SELECT` for preset modes |
-| 9 | Energy center data | 8 API methods (`get_energy_center_*`) available but never exposed as HA sensors |
-| 10 | options flow missing WS path in reconfigure | WS path changeable in options but not in reconfigure step |
-
-### 🟢 Low priority (cosmetic / backlog)
-
-| # | Issue |
-|---|---|
-| 11 | `__init__.py` 499 lines — service registration + orchestration mixed |
-| 12 | `via_device_for`, `hub_prefixed_name` are global functions, not coordinator methods |
-| 13 | Missing `MEDIA_PLAYER` / `SELECT` / `FAN` platforms for fan_coil |
-| 14 | No third language beyond EN/PL |
+> **Removed 2026-07-08.** Stale items (climate/light god objects, missing FAN/EC, no integration tests) described issues fixed in v0.7.6–v0.8.x. See **Remaining Technical Debt** and **Completed Phases** above.
 
 ---
 
@@ -273,7 +308,8 @@ Deploy checklist:
 - [x] Deploy via `scripts/deploy_rpi.sh` with `HA_HOST` set to the RPi address
 - [x] HA restart confirmed (manifest 0.8.0 on RPi)
 - [x] 6 Sinum config entries present (incl. sinum-lora)
-- [ ] VIDEO + SBUS2 entries reach `loaded` state
+- [ ] VIDEO + SBUS2 entries reach `loaded` state (requires lab network)
+- [ ] LoRa relay PATCH validated on physical hardware
 - [ ] LoRa sensors reading live values in HA UI
 
 ---

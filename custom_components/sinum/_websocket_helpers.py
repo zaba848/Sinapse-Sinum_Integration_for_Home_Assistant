@@ -9,6 +9,16 @@ import aiohttp
 
 from .const import DEFAULT_WS_PATH
 
+_WS_CLASS_PREFIXES = (
+    "virtual",
+    "wtp",
+    "sbus",
+    "lora",
+    "slink",
+    "modbus",
+    "video",
+)
+
 
 def _patch_device(
     store: dict[int, dict[str, Any]],
@@ -83,7 +93,7 @@ def _as_int(value: Any) -> int | None:
 
 def _device_class(value: Any) -> str:
     cls = str(value or "").lower()
-    for prefix in ("virtual", "wtp", "sbus", "lora", "modbus", "video"):
+    for prefix in _WS_CLASS_PREFIXES:
         if cls.startswith(prefix):
             return prefix
     return ""

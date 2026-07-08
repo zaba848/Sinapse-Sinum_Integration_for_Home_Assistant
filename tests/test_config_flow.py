@@ -15,6 +15,7 @@ from custom_components.sinum.const import (
     CONF_AUTH_MODE,
     CONF_MQTT_ENABLED,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_WS_PATH,
     DEFAULT_MQTT_TOPIC_PREFIX,
 )
 
@@ -309,12 +310,14 @@ class TestReconfigureFlow:
             CONF_AUTH_MODE: AUTH_MODE_TOKEN,
             CONF_API_TOKEN: "old_token",
         }
+        mock_entry.options = {CONF_WS_PATH: "/api/v1/events"}
         flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
 
         result = await flow.async_step_reconfigure(None)
 
         assert result["type"] == "form"
         assert result["step_id"] == "reconfigure"
+        assert CONF_WS_PATH in result["data_schema"].schema
 
     @pytest.mark.asyncio
     async def test_reconfigure_token_success(self, hass, mock_aiohttp_session):

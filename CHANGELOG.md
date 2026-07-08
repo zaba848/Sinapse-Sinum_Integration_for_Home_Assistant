@@ -23,7 +23,19 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+### Added
+- **`_bus_registry.py`** — central bus routing (`bus_store`, `bus_patch_method`); replaces 6 inline store dicts across websocket, mqtt, switch_bus, binary_sensor, sensor_bus.
+- **`services.py`** — HA service handlers extracted from `__init__.py`.
+- **7 lifecycle multi-hub tests** — unload/reload/remove scenarios in `test_full_platform_setup.py` and `test_init_setup.py`.
+- **JWT sanitization gate** — public artifacts must not embed JWT tokens.
+- **Coverage gates** — extended to `websocket`, `lifecycle`, `sensor_modbus`, `services`.
+
 ### Changed
+- **Coordinator fetch** — device collection loop driven by `BUS_REGISTRY`.
+- **Reconfigure flow** — WebSocket path field editable without removing the integration.
+- **MQTT/WS routing** — `slink`, `modbus`, `video` sources routed via bus registry.
+- **binary_sensor store lookup** — explicit bus store resolution (no silent WTP fallback).
+- **PLAN.md** — stale weak points removed; Maintenance Cycles table added.
 - **Modbus sensor split** — device-type descriptions moved into `sensor_modbus_descriptions.py`; `sensor_modbus.py` now contains entity classes and builders only.
 - **`deploy_rpi.sh`** — single tar-over-SSH session (fixes intermittent auth failures); accepts `504` as valid restart response.
 

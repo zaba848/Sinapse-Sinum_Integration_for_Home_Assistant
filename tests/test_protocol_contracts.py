@@ -1089,7 +1089,7 @@ class TestMqttBridgeContracts:
         coord = self._make_coordinator()
         bridge = SinumMqttBridge(MagicMock(), coord)
 
-        msg = self._make_msg("sinum/state/5", '{"id":5,"state":true,"source":"modbus"}')
+        msg = self._make_msg("sinum/state/5", '{"id":5,"state":true,"source":"unknown_bus"}')
         bridge._handle_state(msg)
 
         coord.async_set_updated_data.assert_not_called()

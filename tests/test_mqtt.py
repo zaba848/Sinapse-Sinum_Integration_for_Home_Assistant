@@ -18,6 +18,9 @@ def coordinator_fixture() -> MagicMock:
     coordinator.wtp_devices = {}
     coordinator.sbus_devices = {}
     coordinator.lora_devices = {}
+    coordinator.slink_devices = {}
+    coordinator.modbus_devices = {}
+    coordinator.video_devices = {}
     coordinator.async_set_updated_data = MagicMock()
     return coordinator
 
@@ -204,12 +207,38 @@ class TestSinumMqttBridge:
         coordinator_a.async_set_updated_data.assert_called_once()
         coordinator_b.async_set_updated_data.assert_not_called()
 
-    def test_state_update_ignores_unsupported_source(self, coordinator):
+    def test_state_update_routes_modbus_source(self, coordinator):
         hass = MagicMock()
         bridge = SinumMqttBridge(hass, coordinator)
         msg = SimpleNamespace(
             topic="sinum/state/77",
             payload=json.dumps({"source": "modbus", "state": True}),
+        )
+
+        bridge._handle_state(msg)
+
+        assert coordinator.modbus_devices[77]["state"] is True
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_slink_state_update_is_stored_in_slink_devices(self, coordinator):
+        hass = MagicMock()
+        bridge = SinumMqttBridge(hass, coordinator)
+        msg = SimpleNamespace(
+            topic="sinum/state/88",
+            payload=json.dumps({"source": "slink", "state": True}),
+        )
+
+        bridge._handle_state(msg)
+
+        assert coordinator.slink_devices[88]["state"] is True
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_state_update_ignores_unsupported_source(self, coordinator):
+        hass = MagicMock()
+        bridge = SinumMqttBridge(hass, coordinator)
+        msg = SimpleNamespace(
+            topic="sinum/state/77",
+            payload=json.dumps({"source": "unknown_bus", "state": True}),
         )
 
         bridge._handle_state(msg)

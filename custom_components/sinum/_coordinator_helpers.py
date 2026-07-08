@@ -10,24 +10,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from ._bus_registry import ROOM_CLASSIFIED_BUSES
 from .api import SinumAuthError
 
 _LOGGER = logging.getLogger(__name__)
 
-# Device classes present in the rooms device list
+# Device classes present in the rooms device list (derived from bus registry)
 _WTP_CLASSES = {"wtp"}
 _SBUS_CLASSES = {"sbus"}
 _VIRTUAL_CLASSES = {"virtual"}
 _LORA_CLASSES = {"lora"}
 
 _CLASS_BUCKET_INDEX: dict[str, int] = {
-    **{cls: 0 for cls in _VIRTUAL_CLASSES},
-    **{cls: 1 for cls in _WTP_CLASSES},
-    **{cls: 2 for cls in _SBUS_CLASSES},
-    **{cls: 3 for cls in _LORA_CLASSES},
+    spec.name: index for index, spec in enumerate(ROOM_CLASSIFIED_BUSES)
 }
 
-_KNOWN_CLASSES = ("virtual", "wtp", "sbus", "lora")
+_KNOWN_CLASSES = tuple(spec.name for spec in ROOM_CLASSIFIED_BUSES)
 
 
 # ── Index helpers ──────────────────────────────────────────────────────────────

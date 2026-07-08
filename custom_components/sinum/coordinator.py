@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -10,6 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from ._bus_registry import BUS_REGISTRY, ROOM_CLASSIFIED_BUSES
 from ._coordinator_helpers import (
     _apply_optional_stores,
     _build_parent_maps,
@@ -27,6 +29,19 @@ from .api import SinumAuthError, SinumClient, SinumConnectionError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _DeviceStoreResults:
+    virtual: dict[int, dict[str, Any]]
+    wtp: dict[int, dict[str, Any]]
+    sbus: dict[int, dict[str, Any]]
+    lora: dict[int, dict[str, Any]]
+    alarm_list: list[Any] | None
+    modbus_list: list[Any] | None
+    video_list: list[Any] | None
+    slink_list: list[Any] | None
+
 
 # Re-export helpers so existing importers (tests, other modules) continue to work
 from ._coordinator_helpers import (  # noqa: F401, E402
@@ -184,7 +199,15 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ConfigEntryAuthFailed(str(err)) from err
 
     async def _fetch_all(self) -> dict[str, Any]:
-        # ── Group 1: metadata — all fetched in parallel ───────────────────────
+        rooms = await self._fetch_metadata()
+        prev_by_bus = self._removal_snapshots()
+        bus_ids = self._room_classified_bus_ids(rooms)
+        stores = await self._fetch_device_stores(rooms, bus_ids)
+        self._apply_device_store_results(stores, prev_by_bus)
+        self._inject_parent_models_for_buses(stores.wtp, stores.sbus, stores.lora)
+        return self._coordinator_data_payload(stores)
+
+    async def _fetch_metadata(self) -> list[dict[str, Any]]:
         meta = await asyncio.gather(
             _safe_fetch(self.client.get_hub_info, "hub info"),
             _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
@@ -198,26 +221,26 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _safe_fetch(self.client.get_automations, "automations", default=self.automations),
             _safe_fetch(self.client.get_variables, "variables", default=self.variables),
         )
-        rooms = self._apply_metadata_results(*meta)
+        return self._apply_metadata_results(*meta)
 
-        # ── Classify device IDs from rooms and parent-device trees ────────────
-        room_ids = _collect_device_ids(rooms)
-        parent_ids = _collect_device_ids(self.parent_devices)
-        virtual_ids, wtp_ids, sbus_ids, lora_ids = (
-            _unique_ids([*room_ids[0], *parent_ids[0]]),
-            _unique_ids([*room_ids[1], *parent_ids[1]]),
-            _unique_ids([*room_ids[2], *parent_ids[2]]),
-            _unique_ids([*room_ids[3], *parent_ids[3]]),
-        )
+    def _removal_snapshots(self) -> dict[str, frozenset[int]]:
+        return {
+            spec.name: frozenset(getattr(self, spec.store_attr))
+            for spec in BUS_REGISTRY
+            if spec.track_removals
+        }
 
-        # ── Snapshot IDs before fetch so we can detect removals ──────────────
-        prev_virtual = frozenset(self.virtual_devices)
-        prev_wtp = frozenset(self.wtp_devices)
-        prev_sbus = frozenset(self.sbus_devices)
-        prev_lora = frozenset(self.lora_devices)
-        prev_slink = frozenset(self.slink_devices)
+    def _room_classified_bus_ids(self, rooms: list[dict[str, Any]]) -> dict[str, list[int]]:
+        room_bucket_ids = _collect_device_ids(rooms)
+        parent_bucket_ids = _collect_device_ids(self.parent_devices)
+        return {
+            spec.name: _unique_ids([*room_bucket_ids[i], *parent_bucket_ids[i]])
+            for i, spec in enumerate(ROOM_CLASSIFIED_BUSES)
+        }
 
-        # ── Group 2: device collections — all fetched in parallel ─────────────
+    async def _fetch_device_stores(
+        self, rooms: list[dict[str, Any]], bus_ids: dict[str, list[int]]
+    ) -> _DeviceStoreResults:
         (
             virtual,
             wtp,
@@ -228,69 +251,61 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             video_list,
             slink_list,
         ) = await asyncio.gather(
-            self._fetch_device_collection(
-                "virtual",
-                self.client.get_virtual_devices,
-                self.client.get_virtual_device,
-                virtual_ids,
-                rooms,
-                self.virtual_devices,
-            ),
-            self._fetch_device_collection(
-                "WTP",
-                self.client.get_wtp_devices,
-                self.client.get_wtp_device,
-                wtp_ids,
-                rooms,
-                self.wtp_devices,
-            ),
-            self._fetch_device_collection(
-                "SBUS",
-                self.client.get_sbus_devices,
-                self.client.get_sbus_device,
-                sbus_ids,
-                rooms,
-                self.sbus_devices,
-            ),
-            self._fetch_device_collection(
-                "LoRa",
-                self.client.get_lora_devices,
-                self.client.get_lora_device,
-                lora_ids,
-                rooms,
-                self.lora_devices,
-            ),
+            *[
+                self._fetch_device_collection(
+                    spec.collection_label or spec.name,
+                    getattr(self.client, spec.list_getter),
+                    getattr(self.client, spec.item_getter),
+                    bus_ids[spec.name],
+                    rooms,
+                    getattr(self, spec.store_attr),
+                )
+                for spec in ROOM_CLASSIFIED_BUSES
+            ],
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
             _safe_fetch(self.client.get_modbus_devices, "modbus devices", default=None),
             _safe_fetch(self.client.get_video_devices, "video devices", default=None),
             _safe_fetch(self.client.get_slink_devices, "slink devices", default=None),
         )
+        return _DeviceStoreResults(
+            virtual, wtp, sbus, lora, alarm_list, modbus_list, video_list, slink_list
+        )
 
-        self.virtual_devices = virtual
-        self.wtp_devices = wtp
-        self.sbus_devices = sbus
-        self.lora_devices = lora
-        _apply_optional_stores(self, alarm_list, modbus_list, video_list, slink_list)
-
+    def _apply_device_store_results(
+        self,
+        stores: _DeviceStoreResults,
+        prev_by_bus: dict[str, frozenset[int]],
+    ) -> None:
+        self.virtual_devices = stores.virtual
+        self.wtp_devices = stores.wtp
+        self.sbus_devices = stores.sbus
+        self.lora_devices = stores.lora
+        _apply_optional_stores(
+            self, stores.alarm_list, stores.modbus_list, stores.video_list, stores.slink_list
+        )
         self.removed_ids = {
-            "virtual": prev_virtual - frozenset(virtual),
-            "wtp": prev_wtp - frozenset(wtp),
-            "sbus": prev_sbus - frozenset(sbus),
-            "lora": prev_lora - frozenset(lora),
-            "slink": prev_slink - frozenset(self.slink_devices),
+            spec.name: prev_by_bus[spec.name] - frozenset(getattr(self, spec.store_attr))
+            for spec in BUS_REGISTRY
+            if spec.track_removals
         }
 
-        # ── Enrich child devices with parent hardware model and class ─────────
+    def _inject_parent_models_for_buses(
+        self,
+        wtp: dict[int, dict[str, Any]],
+        sbus: dict[int, dict[str, Any]],
+        lora: dict[int, dict[str, Any]],
+    ) -> None:
         parent_maps, parent_class_maps = _build_parent_maps(self.parent_devices)
         _inject_parent_models(wtp, "wtp", parent_maps, parent_class_maps)
         _inject_parent_models(sbus, "sbus", parent_maps, parent_class_maps)
         _inject_parent_models(lora, "lora", parent_maps, parent_class_maps)
 
+    def _coordinator_data_payload(self, stores: _DeviceStoreResults) -> dict[str, Any]:
         return {
-            "virtual": virtual,
-            "wtp": wtp,
-            "sbus": sbus,
-            "lora": lora,
+            "virtual": stores.virtual,
+            "wtp": stores.wtp,
+            "sbus": stores.sbus,
+            "lora": stores.lora,
             "slink": self.slink_devices,
             "modbus": self.modbus_devices,
             "video": self.video_devices,

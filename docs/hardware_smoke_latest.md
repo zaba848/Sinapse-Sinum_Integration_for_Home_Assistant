@@ -2,6 +2,10 @@
 
 Generated: 2026-07-07 12:30:48Z
 
+> **2026-07-08 maintenance cycle:** Lab credentials (`SINUM_SMOKE_HUBS`, tokens) were not available in this environment. Re-run when on lab network:
+> `SINUM_SMOKE_HUBS="..." python3 scripts/hardware_smoke_check.py`
+> `python3 scripts/validate_api_writes.py` (KLIMAK + SBUS hubs)
+
 | Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual | /devices/lora | /devices/slink | /devices/modbus |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | WTP | TOKEN | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
