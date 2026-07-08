@@ -241,6 +241,20 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _fetch_device_stores(
         self, rooms: list[dict[str, Any]], bus_ids: dict[str, list[int]]
     ) -> _DeviceStoreResults:
+        room_classified_fetches = []
+        for spec in ROOM_CLASSIFIED_BUSES:
+            item_getter = spec.item_getter
+            assert item_getter is not None  # ROOM_CLASSIFIED_BUSES always define item_getter
+            room_classified_fetches.append(
+                self._fetch_device_collection(
+                    spec.collection_label or spec.name,
+                    getattr(self.client, spec.list_getter),
+                    getattr(self.client, item_getter),
+                    bus_ids[spec.name],
+                    rooms,
+                    getattr(self, spec.store_attr),
+                )
+            )
         (
             virtual,
             wtp,
@@ -251,17 +265,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             video_list,
             slink_list,
         ) = await asyncio.gather(
-            *[
-                self._fetch_device_collection(
-                    spec.collection_label or spec.name,
-                    getattr(self.client, spec.list_getter),
-                    getattr(self.client, spec.item_getter),
-                    bus_ids[spec.name],
-                    rooms,
-                    getattr(self, spec.store_attr),
-                )
-                for spec in ROOM_CLASSIFIED_BUSES
-            ],
+            *room_classified_fetches,
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
             _safe_fetch(self.client.get_modbus_devices, "modbus devices", default=None),
             _safe_fetch(self.client.get_video_devices, "video devices", default=None),
