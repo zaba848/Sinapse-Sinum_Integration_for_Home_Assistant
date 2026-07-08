@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.sinum.const import (
     STYPE_COMMON_VALVE,
@@ -304,6 +305,20 @@ class TestSinumBusRelaySwitch:
         coordinator.client.patch_sbus_device = AsyncMock(return_value={"state": False})
         await entity.async_turn_off()
         coordinator.client.patch_sbus_device.assert_awaited_once_with(20, {"state": False})
+
+    def test_unknown_bus_relay_falls_back_to_lora_store(self):
+        coordinator = _make_coordinator()
+        coordinator.lora_devices = {99: {"id": 99, "name": "LoRa Relay", "state": True}}
+        entity = SinumBusRelaySwitch(coordinator, 99, "test_entry", "unknown")
+        assert entity.is_on is True
+
+    @pytest.mark.asyncio
+    async def test_unknown_bus_patch_raises(self):
+        coordinator = _make_coordinator()
+        coordinator.lora_devices = {99: {"id": 99, "state": False}}
+        entity = _wire(SinumBusRelaySwitch(coordinator, 99, "test_entry", "unknown"))
+        with pytest.raises(HomeAssistantError, match="Unsupported bus for relay patch"):
+            await entity.async_turn_on()
 
 
 class TestSinumCommonValveSwitch:
