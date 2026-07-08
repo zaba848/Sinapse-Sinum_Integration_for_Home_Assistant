@@ -33,7 +33,10 @@ jobs:
           SINUM_API_TOKEN: ${{ secrets.SINUM_API_TOKEN }}
           SINUM_WTP_TOKEN: ${{ secrets.SINUM_WTP_TOKEN }}
           SINUM_SBUS_TOKEN: ${{ secrets.SINUM_SBUS_TOKEN }}
+          SINUM_SBUS2_TOKEN: ${{ secrets.SINUM_SBUS2_TOKEN }}
           SINUM_VIDEO_TOKEN: ${{ secrets.SINUM_VIDEO_TOKEN }}
+          SINUM_KLIMAK_TOKEN: ${{ secrets.SINUM_KLIMAK_TOKEN }}
+          SINUM_LORA_TOKEN: ${{ secrets.SINUM_LORA_TOKEN }}
         run: python3 scripts/hardware_smoke_check.py
 
       - name: Publish hardware summary

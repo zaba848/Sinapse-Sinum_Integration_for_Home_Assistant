@@ -107,11 +107,11 @@ This document provides step-by-step instructions for configuring GitHub security
 2. **Add runner secrets** (Settings → **Secrets and variables** → **Actions**):
    - Name: `SINUM_USERNAME` → Value: `admin` or your hub login
    - Name: `SINUM_PASSWORD` → Value: `<your-hub-password>`
-   - Optional per-hub tokens: `SINUM_WTP_TOKEN`, `SINUM_SBUS_TOKEN`, `SINUM_VIDEO_TOKEN`
+   - Optional per-hub tokens: `SINUM_WTP_TOKEN`, `SINUM_SBUS_TOKEN`, `SINUM_SBUS2_TOKEN`, `SINUM_VIDEO_TOKEN`, `SINUM_KLIMAK_TOKEN`, `SINUM_LORA_TOKEN`
 
 3. **Optional repository variable**:
    - Name: `SINUM_SMOKE_HUBS`
-   - Value example: `WTP=http://<WTP_HUB_IP>,SBUS=http://<SBUS_HUB_IP>,VIDEO=http://<VIDEO_HUB_IP>`
+   - Value example: `WTP=http://<WTP_HUB_IP>,SBUS=http://<SBUS_HUB_IP>,VIDEO=http://<VIDEO_HUB_IP>,KLIMAK=http://<KLIMAK_HUB_IP>,SBUS2=http://<SBUS2_HUB_IP>,LORA=http://<LORA_HUB_IP>`
 
 4. **Verify workflow** is active:
    - Go to **.github/workflows/hardware-nightly.yml** (already committed)
