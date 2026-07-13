@@ -152,6 +152,31 @@ class SinumAlarmZone(
         if bypass_zones:
             attrs["bypassed_zones"] = _format_alarm_inputs(bypass_zones)
 
+    async def _refresh_zone_state(self) -> None:
+        """Fetch this zone's fresh state directly instead of a full coordinator cycle.
+
+        `command_alarm_device` doesn't return the updated device (unlike the
+        PATCH endpoints), so a single-zone GET is the fastest way to confirm
+        the new armed/disarmed state — a full `async_request_refresh()` would
+        wait on every bus on every hub just to learn one zone's status.
+        """
+        try:
+            updated = await self.coordinator.client.get_alarm_device(self._zone_id)
+        except SinumConnectionError:
+            await self.coordinator.async_request_refresh()
+            return
+        if isinstance(updated, dict):
+            self.coordinator.alarm_zones.setdefault(self._zone_id, {}).update(updated)
+        self.async_write_ha_state()
+
+    async def _patch_zone_and_apply(self, payload: dict[str, Any], err_msg: str) -> None:
+        try:
+            updated = await self.coordinator.client.patch_alarm_device(self._zone_id, payload)
+        except SinumConnectionError as err:
+            raise HomeAssistantError(f"{err_msg}: {err}") from err
+        self.coordinator.alarm_zones.setdefault(self._zone_id, {}).update(updated)
+        self.async_write_ha_state()
+
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         if not code:
             raise HomeAssistantError("PIN code is required to arm the alarm")
@@ -161,7 +186,7 @@ class SinumAlarmZone(
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot arm alarm: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._refresh_zone_state()
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         if not code:
@@ -172,7 +197,7 @@ class SinumAlarmZone(
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot arm alarm in home mode: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._refresh_zone_state()
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         if not code:
@@ -183,7 +208,7 @@ class SinumAlarmZone(
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot arm alarm in night mode: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._refresh_zone_state()
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         if not code:
@@ -194,31 +219,21 @@ class SinumAlarmZone(
             )
         except SinumConnectionError as err:
             raise HomeAssistantError(f"Cannot disarm alarm: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._refresh_zone_state()
 
     async def async_bypass_zone(self, code: str | None = None) -> None:
         """Bypass a single zone (disable its sensors from triggering alarm)."""
         if not code:
             raise HomeAssistantError("PIN code is required to bypass zone")
-        try:
-            await self.coordinator.client.patch_alarm_device(
-                self._zone_id, {"bypassed": True, "pin": str(code)}
-            )
-        except SinumConnectionError as err:
-            raise HomeAssistantError(f"Cannot bypass zone: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._patch_zone_and_apply({"bypassed": True, "pin": str(code)}, "Cannot bypass zone")
 
     async def async_unbypass_zone(self, code: str | None = None) -> None:
         """Unbypass a zone (re-enable its sensors)."""
         if not code:
             raise HomeAssistantError("PIN code is required to unbypass zone")
-        try:
-            await self.coordinator.client.patch_alarm_device(
-                self._zone_id, {"bypassed": False, "pin": str(code)}
-            )
-        except SinumConnectionError as err:
-            raise HomeAssistantError(f"Cannot unbypass zone: {err}") from err
-        await self.coordinator.async_request_refresh()
+        await self._patch_zone_and_apply(
+            {"bypassed": False, "pin": str(code)}, "Cannot unbypass zone"
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

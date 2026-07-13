@@ -214,15 +214,23 @@ class TestAlarmModes:
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
         coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.client.get_alarm_device = AsyncMock(
+            return_value=_make_zone(zone_id=1, zone_status="armed", armed=True)
+        )
         coordinator.async_request_refresh = AsyncMock()
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
 
         await entity.async_alarm_arm_away("1234")
 
         coordinator.client.command_alarm_device.assert_called_once_with(
             1, "arm", {"arm": "1234", "mode": "away"}
         )
-        coordinator.async_request_refresh.assert_called_once()
+        # Confirms the new state via a single-zone GET, not a full coordinator refresh.
+        coordinator.client.get_alarm_device.assert_called_once_with(1)
+        coordinator.async_request_refresh.assert_not_called()
+        assert coordinator.alarm_zones[1]["zone_status"] == "armed"
+        entity.async_write_ha_state.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_alarm_arm_home_mode(self):
@@ -230,15 +238,20 @@ class TestAlarmModes:
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
         coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.client.get_alarm_device = AsyncMock(
+            return_value=_make_zone(zone_id=1, zone_status="armed", armed=True)
+        )
         coordinator.async_request_refresh = AsyncMock()
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
 
         await entity.async_alarm_arm_home("1234")
 
         coordinator.client.command_alarm_device.assert_called_once_with(
             1, "arm", {"arm": "1234", "mode": "home"}
         )
-        coordinator.async_request_refresh.assert_called_once()
+        coordinator.client.get_alarm_device.assert_called_once_with(1)
+        coordinator.async_request_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_alarm_arm_night_mode(self):
@@ -246,14 +259,37 @@ class TestAlarmModes:
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
         coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.client.get_alarm_device = AsyncMock(
+            return_value=_make_zone(zone_id=1, zone_status="armed", armed=True)
+        )
         coordinator.async_request_refresh = AsyncMock()
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
 
         await entity.async_alarm_arm_night("1234")
 
         coordinator.client.command_alarm_device.assert_called_once_with(
             1, "arm", {"arm": "1234", "mode": "night"}
         )
+        coordinator.client.get_alarm_device.assert_called_once_with(1)
+        coordinator.async_request_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_falls_back_to_full_refresh_on_confirm_error(self):
+        """If the confirmatory single-zone GET fails, fall back to a full refresh."""
+        zone = _make_zone(zone_id=1)
+        coordinator = MagicMock()
+        coordinator.alarm_zones = {1: zone}
+        coordinator.client.command_alarm_device = AsyncMock()
+        coordinator.client.get_alarm_device = AsyncMock(
+            side_effect=SinumConnectionError("transient")
+        )
+        coordinator.async_request_refresh = AsyncMock()
+        entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
+
+        await entity.async_alarm_arm_away("1234")
+
         coordinator.async_request_refresh.assert_called_once()
 
     @pytest.mark.asyncio
@@ -313,32 +349,42 @@ class TestAlarmBypass:
         zone = _make_zone(zone_id=1)
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
-        coordinator.client.patch_alarm_device = AsyncMock()
+        coordinator.client.patch_alarm_device = AsyncMock(
+            return_value=_make_zone(zone_id=1, bypassed=True)
+        )
         coordinator.async_request_refresh = AsyncMock()
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
 
         await entity.async_bypass_zone("1234")
 
         coordinator.client.patch_alarm_device.assert_called_once_with(
             1, {"bypassed": True, "pin": "1234"}
         )
-        coordinator.async_request_refresh.assert_called_once()
+        # Applies the PATCH response locally instead of a full coordinator refresh.
+        coordinator.async_request_refresh.assert_not_called()
+        assert coordinator.alarm_zones[1]["bypassed"] is True
+        entity.async_write_ha_state.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_unbypass_zone(self):
         zone = _make_zone(zone_id=1)
         coordinator = MagicMock()
         coordinator.alarm_zones = {1: zone}
-        coordinator.client.patch_alarm_device = AsyncMock()
+        coordinator.client.patch_alarm_device = AsyncMock(
+            return_value=_make_zone(zone_id=1, bypassed=False)
+        )
         coordinator.async_request_refresh = AsyncMock()
         entity = SinumAlarmZone(coordinator, zone, "test_entry")
+        entity.async_write_ha_state = MagicMock()
 
         await entity.async_unbypass_zone("1234")
 
         coordinator.client.patch_alarm_device.assert_called_once_with(
             1, {"bypassed": False, "pin": "1234"}
         )
-        coordinator.async_request_refresh.assert_called_once()
+        coordinator.async_request_refresh.assert_not_called()
+        entity.async_write_ha_state.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_bypass_zone_without_code_raises_error(self):
