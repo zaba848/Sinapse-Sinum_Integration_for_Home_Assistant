@@ -19,12 +19,14 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
     CONF_HOST,
+    CONF_MAX_CONCURRENT_REQUESTS,
     CONF_MQTT_CLIENT_ID,
     CONF_MQTT_ENABLED,
     CONF_MQTT_SCENE_ID,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_WS_ENABLED,
     CONF_WS_PATH,
+    DEFAULT_MAX_CONCURRENT_REQUESTS,
     DEFAULT_MQTT_CLIENT_ID,
     DEFAULT_MQTT_SCENE_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
@@ -225,5 +227,9 @@ def _options_schema(option_value: Callable[[str, object], object]) -> vol.Schema
                 CONF_WS_PATH,
                 default=option_value(CONF_WS_PATH, DEFAULT_WS_PATH),
             ): _websocket_path,
+            vol.Optional(
+                CONF_MAX_CONCURRENT_REQUESTS,
+                default=option_value(CONF_MAX_CONCURRENT_REQUESTS, DEFAULT_MAX_CONCURRENT_REQUESTS),
+            ): vol.All(int, vol.Range(min=1, max=20)),
         }
     )

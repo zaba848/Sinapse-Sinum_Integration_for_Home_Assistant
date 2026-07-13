@@ -47,6 +47,7 @@ class TestBuildClient:
                 CONF_AUTH_MODE: AUTH_MODE_TOKEN,
                 CONF_API_TOKEN: "my-token",
             }
+            entry.options = {}
 
             with patch("custom_components.sinum.async_get_clientsession") as mock_session:
                 mock_session.return_value = MagicMock()
@@ -64,6 +65,7 @@ class TestBuildClient:
             "username": "admin",
             "password": "secret",
         }
+        entry.options = {}
 
         with patch("custom_components.sinum.async_get_clientsession") as mock_session:
             mock_session.return_value = MagicMock()
@@ -1377,7 +1379,9 @@ class TestMultiHubServiceRouting:
             patch("custom_components.sinum.SinumClient") as mock_client_cls,
             patch("custom_components.sinum.async_get_clientsession", return_value=MagicMock()),
             patch.object(hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock),
-            patch.object(hass.config_entries, "async_unload_platforms", new_callable=AsyncMock) as unload,
+            patch.object(
+                hass.config_entries, "async_unload_platforms", new_callable=AsyncMock
+            ) as unload,
         ):
             mock_client_cls.side_effect = [client_a, client_b]
             mock_coordinator.side_effect = [coordinator_a, coordinator_b]

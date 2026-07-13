@@ -14,6 +14,7 @@ CONF_MQTT_SCENE_ID = "mqtt_scene_id"
 CONF_MQTT_CLIENT_ID = "mqtt_client_id"
 CONF_WS_ENABLED = "ws_enabled"
 CONF_WS_PATH = "ws_path"
+CONF_MAX_CONCURRENT_REQUESTS = "max_concurrent_requests"
 
 # Auth modes
 AUTH_MODE_TOKEN = "token"
@@ -24,6 +25,9 @@ DEFAULT_MQTT_TOPIC_PREFIX = "sinum"
 DEFAULT_MQTT_SCENE_ID = 1
 DEFAULT_MQTT_CLIENT_ID = 1
 DEFAULT_WS_PATH = "/api/v1/ws"
+# Conservative default — some hub embedded firmware can't handle parallel
+# request load well. Increase via the options flow for more capable hubs.
+DEFAULT_MAX_CONCURRENT_REQUESTS = 2
 
 # REST API — all paths include /api/v1 prefix
 API_LOGIN = "/api/v1/login"

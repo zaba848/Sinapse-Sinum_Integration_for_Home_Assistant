@@ -405,6 +405,7 @@ class TestVideoEndpoints:
     @pytest.mark.asyncio
     async def test_get_video_snapshot_returns_bytes(self, session):
         import base64
+
         jpeg = b"\xff\xd8\xff"
         resp = make_response(200, {"data": {"payload": base64.b64encode(jpeg).decode()}})
         session.request = AsyncMock(return_value=resp)
@@ -441,6 +442,7 @@ class TestVideoEndpoints:
     @pytest.mark.asyncio
     async def test_post_video_candidate_sends_correct_payload(self, session):
         from unittest.mock import MagicMock
+
         resp = make_response(200, {})
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
@@ -460,6 +462,7 @@ class TestVideoEndpoints:
     @pytest.mark.asyncio
     async def test_post_video_candidate_none_sdp_m_line_index_defaults_to_zero(self, session):
         from unittest.mock import MagicMock
+
         resp = make_response(200, {})
         session.request = AsyncMock(return_value=resp)
         client = SinumClient("192.168.1.1", session, api_token="tok")
@@ -615,3 +618,39 @@ class TestWtpEndpoints:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client.get_sbus_devices()
         assert result[0]["class"] == "sbus"
+
+
+class TestConcurrencyLimit:
+    """Per-hub concurrent-request cap — protects embedded hub firmware from overload."""
+
+    def test_default_limit_is_two(self, session):
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        assert client._sem._value == 2
+
+    def test_custom_limit_is_applied(self, session):
+        client = SinumClient("192.168.1.1", session, api_token="tok", max_concurrent_requests=6)
+        assert client._sem._value == 6
+
+    @pytest.mark.asyncio
+    async def test_requests_never_exceed_configured_limit(self, session):
+        """Fire more concurrent requests than the limit; peak in-flight must not exceed it."""
+        import asyncio
+
+        limit = 3
+        in_flight = 0
+        peak = 0
+
+        async def fake_request(*args, **kwargs):
+            nonlocal in_flight, peak
+            in_flight += 1
+            peak = max(peak, in_flight)
+            await asyncio.sleep(0.01)
+            in_flight -= 1
+            return make_response(200, {"data": {}})
+
+        session.request = fake_request
+        client = SinumClient("192.168.1.1", session, api_token="tok", max_concurrent_requests=limit)
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await asyncio.gather(*(client.get_hub_info() for _ in range(10)))
+
+        assert peak <= limit

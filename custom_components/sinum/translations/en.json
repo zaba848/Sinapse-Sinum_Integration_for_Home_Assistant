@@ -74,7 +74,8 @@
           "mqtt_scene_id": "MQTT bridge scene ID",
           "mqtt_client_id": "MQTT client ID (on hub)",
           "ws_enabled": "Enable WebSocket real-time transport",
-          "ws_path": "WebSocket path"
+          "ws_path": "WebSocket path",
+          "max_concurrent_requests": "Max concurrent requests to hub"
         },
         "data_description": {
           "mqtt_enabled": "Requires the Lua bridge script uploaded to the hub and a working MQTT broker in Home Assistant.",
@@ -82,7 +83,8 @@
           "mqtt_scene_id": "ID of the hub scene that holds the MQTT bridge Lua script. Upload via Developer Tools → Services → sinum.upload_mqtt_bridge.",
           "mqtt_client_id": "MQTT client index configured in the Sinum hub web UI under Settings → System → Integrations → MQTT client → Client list. Set the broker address there to your Home Assistant IP.",
           "ws_enabled": "Connect via WebSocket for instant state updates. Requires hub firmware with /api/v1/ws support.",
-          "ws_path": "Hub WebSocket endpoint path (default: /api/v1/ws)."
+          "ws_path": "Hub WebSocket endpoint path (default: /api/v1/ws).",
+          "max_concurrent_requests": "Lower default (2) is safest for small/embedded hub firmware. Increase if your hub handles parallel requests reliably, to speed up polling cycles."
         }
       }
     }

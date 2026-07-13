@@ -19,6 +19,8 @@ from .const import (
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
+    CONF_MAX_CONCURRENT_REQUESTS,
+    DEFAULT_MAX_CONCURRENT_REQUESTS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_RUN_SCENE,
@@ -126,17 +128,23 @@ async def _async_update_listener(hass: HomeAssistant, entry: SinumConfigEntry) -
 def _build_client(hass: HomeAssistant, entry: SinumConfigEntry) -> SinumClient:
     session = async_get_clientsession(hass, verify_ssl=False)
     auth_mode = entry.data.get(CONF_AUTH_MODE, "password")
+    max_concurrent = entry.options.get(
+        CONF_MAX_CONCURRENT_REQUESTS,
+        entry.data.get(CONF_MAX_CONCURRENT_REQUESTS, DEFAULT_MAX_CONCURRENT_REQUESTS),
+    )
     if auth_mode == AUTH_MODE_TOKEN:
         return SinumClient(
             entry.data[CONF_HOST],
             session,
             api_token=entry.data[CONF_API_TOKEN],
+            max_concurrent_requests=max_concurrent,
         )
     return SinumClient(
         entry.data[CONF_HOST],
         session,
         username=entry.data.get(CONF_USERNAME),
         password=entry.data.get(CONF_PASSWORD),
+        max_concurrent_requests=max_concurrent,
     )
 
 

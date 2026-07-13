@@ -22,6 +22,7 @@ from .const import (
     API_REFRESH,
     ATTR_REFRESH_TOKEN,
     ATTR_SESSION,
+    DEFAULT_MAX_CONCURRENT_REQUESTS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         api_token: str | None = None,
         username: str | None = None,
         password: str | None = None,
+        max_concurrent_requests: int = DEFAULT_MAX_CONCURRENT_REQUESTS,
     ) -> None:
         self._host = host.rstrip("/")
         self._session = session
@@ -65,8 +67,10 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         self._password = password
         self._jwt: str | None = None
         self._refresh_token: str | None = None
-        # Limit concurrent requests — hub embedded firmware can't handle parallel load
-        self._sem = asyncio.Semaphore(2)
+        # Limit concurrent requests — hub embedded firmware can't handle parallel load.
+        # Configurable via the options flow (CONF_MAX_CONCURRENT_REQUESTS) for hubs
+        # that can handle more.
+        self._sem = asyncio.Semaphore(max_concurrent_requests)
 
     @property
     def base_url(self) -> str:

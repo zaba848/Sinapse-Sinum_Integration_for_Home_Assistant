@@ -74,7 +74,8 @@
           "mqtt_scene_id": "ID sceny mostu MQTT",
           "mqtt_client_id": "ID klienta MQTT (na centrali)",
           "ws_enabled": "Włącz transport WebSocket w czasie rzeczywistym",
-          "ws_path": "Ścieżka WebSocket"
+          "ws_path": "Ścieżka WebSocket",
+          "max_concurrent_requests": "Maks. równoczesnych żądań do centrali"
         },
         "data_description": {
           "mqtt_enabled": "Wymaga skryptu Lua wgranego na centralę i działającego brokera MQTT w Home Assistant.",
@@ -82,7 +83,8 @@
           "mqtt_scene_id": "ID sceny na centrali zawierającej skrypt Lua mostu MQTT. Wgraj przez Narzędzia → Usługi → sinum.upload_mqtt_bridge.",
           "mqtt_client_id": "Indeks klienta MQTT skonfigurowanego w web UI centrali Sinum (Ustawienia → System → Integracje → Klient MQTT → Lista klientów). Tam ustaw adres brokera na IP Home Assistant.",
           "ws_enabled": "Połącz przez WebSocket dla natychmiastowych aktualizacji stanu. Wymaga firmware huba z obsługą /api/v1/ws.",
-          "ws_path": "Ścieżka WebSocket huba (domyślnie: /api/v1/ws)."
+          "ws_path": "Ścieżka WebSocket huba (domyślnie: /api/v1/ws).",
+          "max_concurrent_requests": "Niższa domyślna wartość (2) jest najbezpieczniejsza dla małego/wbudowanego firmware centrali. Zwiększ, jeśli Twoja centrala dobrze znosi równoległe żądania — przyspieszy to cykle odpytywania."
         }
       }
     }
