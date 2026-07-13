@@ -32,11 +32,11 @@
 
 | Item | Status |
 |---|---|
-| P5.2 Camera motion events | Planned — requires VIDEO hub online |
-| P5.3 SBUS blind position feedback | Planned |
+| P5.2 Camera motion events | **Done** (`event.py`, `websocket.py::_handle_motion_detected`) — verified in code + `test_event.py`; still needs a live re-check once VIDEO hub is back online |
+| P5.3 SBUS blind position feedback | **Done** — live via generic `_bus_registry` WS/MQTT routing into `sbus_devices`, not just REST poll; verified in `cover_sbus.py` + `test_cover_extended.py` |
 | LoRa relay PATCH live validation | Blocked — no relay hardware |
-| Schedule editing UI | Read-only sensors + service only |
-| Performance metrics / observability | Backlog |
+| Schedule editing UI | Not planned — `update_schedule` service + read-only sensors already cover this; a dedicated UI isn't idiomatic HA (service calls are the standard pattern) unless a concrete user ask surfaces |
+| Performance metrics / observability | Undefined scope — `diagnostics.py` already exposes bus/device counts + snapshots via HA's built-in diagnostics download; needs a concrete ask (e.g. coordinator update latency, WS reconnect counters) before this is actionable |
 
 ---
 
