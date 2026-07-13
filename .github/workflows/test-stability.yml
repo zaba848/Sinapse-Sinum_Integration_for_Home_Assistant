@@ -41,8 +41,8 @@ jobs:
           set -e
 
           # Extract summary
-          TOTAL=$(grep -c "PASSED\|FAILED" test_output.log || echo "0")
-          FAILED=$(grep -c "FAILED" test_output.log || echo "0")
+          TOTAL=$(grep -c "PASSED\|FAILED" test_output.log || true)
+          FAILED=$(grep -c "FAILED" test_output.log || true)
           PASS_RATE=$(python -c "total=int('${TOTAL}'); failed=int('${FAILED}'); print(f'{100 * (total - failed) / max(total, 1):.1f}%')")
           echo "pass_rate=${PASS_RATE}" >> $GITHUB_OUTPUT
           echo "total_tests=${TOTAL}" >> $GITHUB_OUTPUT
