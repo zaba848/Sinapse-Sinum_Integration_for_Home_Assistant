@@ -1,6 +1,6 @@
 # Hardware Smoke Test (Latest)
 
-Generated: 2026-07-08 04:46:16Z
+Generated: 2026-07-13 03:56:28Z
 
 | Hub | Login | /info | /devices/wtp | /devices/sbus | /devices/virtual | /devices/lora | /devices/slink | /devices/modbus |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -21,12 +21,13 @@ Generated: 2026-07-08 04:46:16Z
 
 FAIL
 
-## Diagnosis (2026-07-08)
+## Diagnosis (2026-07-13)
 
 | Hub | Status | Likely cause | Remediation |
 |---|---|---|---|
-| VIDEO | ERR on all endpoints | Hub offline, IP changed, or expired `SINUM_VIDEO_TOKEN` | Verify reachability from `sinum-lan` runner; rotate token in GitHub Secrets |
-| SBUS2 | ERR on all endpoints | Hub offline, IP changed, or expired `SINUM_SBUS2_TOKEN` | Same as VIDEO — check `vars.SINUM_SMOKE_HUBS` hub URL + per-hub token secret |
+| VIDEO (`<VIDEO_HUB_IP>`, alt `<VIDEO_HUB_INTERNAL_IP>`) | ERR — no TCP | Hub offline or wrong IP | Power/network check; update `SINUM_SMOKE_HUBS` if IP changed |
+| SBUS2 (`<SBUS2_HUB_IP>`) | ERR — no TCP | Hub offline | Same as VIDEO |
 
-**Note:** WTP, SBUS, KLIMAK, LORA hubs respond 200 — integration code is not implicated.
-Re-run: `gh workflow run hardware-nightly.yml` on self-hosted runner after fixing secrets.
+**Note:** Smoke run from local workstation on LAN — WTP, SBUS, KLIMAK, LORA all 200. HA entries for VIDEO/SBUS2 confirmed `setup_retry` via live HA API query. Tokens are valid and configured; issue is hub reachability, not integration code. Unchanged since 2026-07-09.
+
+**Runner:** GitHub Actions `sinum-lan` still unregistered. RPi Docker blocked by HA SSH add-on Protection Mode; backup runner host still offline.
