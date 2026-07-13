@@ -654,3 +654,63 @@ class TestConcurrencyLimit:
             await asyncio.gather(*(client.get_hub_info() for _ in range(10)))
 
         assert peak <= limit
+
+
+class TestRequestCoalescing:
+    """Overlapping callers of the same read-only GET share one real request.
+
+    Several independently-polled sensor entities (weather, energy, energy
+    storage) call the exact same endpoint every scan cycle — this dedupes
+    concurrent calls into a single HTTP round-trip instead of N.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_callers_share_one_request(self, session):
+        import asyncio
+
+        call_count = 0
+
+        async def fake_request(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            await asyncio.sleep(0.01)
+            return make_response(200, {"data": {"temperature": 210}})
+
+        session.request = fake_request
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            results = await asyncio.gather(*(client.get_weather() for _ in range(5)))
+
+        assert call_count == 1
+        assert all(r == {"temperature": 210} for r in results)
+
+    @pytest.mark.asyncio
+    async def test_sequential_calls_each_make_a_fresh_request(self, session):
+        """Coalescing must not turn into permanent caching across cycles."""
+        call_count = 0
+
+        async def fake_request(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return make_response(200, {"data": {"temperature": 210}})
+
+        session.request = fake_request
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await client.get_weather()
+            await client.get_weather()
+
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_error_propagates_to_all_coalesced_callers(self, session):
+        import asyncio
+
+        session.request = AsyncMock(side_effect=aiohttp.ClientError("unreachable"))
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            results = await asyncio.gather(
+                *(client.get_weather() for _ in range(3)), return_exceptions=True
+            )
+
+        assert all(isinstance(r, SinumConnectionError) for r in results)

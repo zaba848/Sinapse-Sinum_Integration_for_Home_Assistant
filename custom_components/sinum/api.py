@@ -71,6 +71,20 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         # Configurable via the options flow (CONF_MAX_CONCURRENT_REQUESTS) for hubs
         # that can handle more.
         self._sem = asyncio.Semaphore(max_concurrent_requests)
+        # In-flight request coalescing — several independently-polled entities
+        # (weather, energy, energy-storage sensors) call the same read-only GET
+        # every scan cycle. When callers overlap, share one real request instead
+        # of firing one per entity.
+        self._inflight: dict[str, asyncio.Task[Any]] = {}
+
+    async def _coalesced_get(self, cache_key: str, path: str) -> Any:
+        """Share a single in-flight GET across callers requesting the same path."""
+        task = self._inflight.get(cache_key)
+        if task is None:
+            task = asyncio.ensure_future(self._request("GET", path))
+            self._inflight[cache_key] = task
+            task.add_done_callback(lambda _t: self._inflight.pop(cache_key, None))
+        return await asyncio.shield(task)
 
     @property
     def base_url(self) -> str:

@@ -40,16 +40,17 @@ class EnergyMixin:
     if TYPE_CHECKING:
 
         async def _request(self, method: str, path: str, **kwargs: Any) -> Any: ...
+        async def _coalesced_get(self, cache_key: str, path: str) -> Any: ...
 
     # --------------------------------------------------------------- weather
 
     async def get_weather(self) -> dict[str, Any]:
-        return await self._request("GET", API_WEATHER)
+        return await self._coalesced_get("weather", API_WEATHER)
 
     # --------------------------------------------------------------- energy
 
     async def get_energy(self) -> dict[str, Any]:
-        return await self._request("GET", API_ENERGY)
+        return await self._coalesced_get("energy", API_ENERGY)
 
     async def get_energy_center_associations(self) -> dict[str, Any]:
         result = await self._request("GET", API_ENERGY_CENTER_ASSOCIATIONS)
@@ -72,7 +73,7 @@ class EnergyMixin:
         return _list_result(result, "sources")
 
     async def get_energy_center_storage(self) -> dict[str, Any]:
-        result = await self._request("GET", API_ENERGY_CENTER_STORAGE)
+        result = await self._coalesced_get("energy_center_storage", API_ENERGY_CENTER_STORAGE)
         return result if isinstance(result, dict) else {}
 
     async def get_energy_center_consumption(self) -> dict[str, Any]:
