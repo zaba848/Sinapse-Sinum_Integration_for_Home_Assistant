@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 .coverage
 coverage.json
+coverage.xml
 htmlcov/
 .venv/
 venv/
@@ -16,6 +17,7 @@ venv/
 # Editor
 .vscode/
 .idea/
+.cursor/
 
 # OS
 .DS_Store
