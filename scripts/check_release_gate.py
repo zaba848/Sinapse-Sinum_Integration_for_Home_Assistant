@@ -75,7 +75,7 @@ def _print_required_status(latest: dict[str, dict]) -> bool:
 
         status = run.get("status")
         conclusion = run.get("conclusion")
-        is_pending = status in {"queued", "in_progress"}
+        is_pending = status in {"queued", "in_progress", "pending", "waiting", "requested"}
         ok = status == "completed" and conclusion == "success"
         mark = "PENDING" if is_pending and ALLOW_PENDING else ("OK" if ok else "FAIL")
         print(f"- {workflow}: {mark} (status={status}, conclusion={conclusion})")
