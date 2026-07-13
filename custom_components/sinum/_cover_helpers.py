@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from homeassistant.components.cover import ATTR_CURRENT_POSITION, ATTR_CURRENT_TILT_POSITION
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, MANUFACTURER
@@ -59,3 +61,24 @@ def _compare_target_current(d: dict[str, Any]) -> int | None:
         return int(target) - int(current)
     except (TypeError, ValueError):
         return None
+
+
+async def _cover_patch_and_apply(
+    entity: Any,
+    store: dict[int, dict[str, Any]],
+    device_id: int,
+    patch: Callable[[int, dict[str, Any]], Awaitable[dict[str, Any]]],
+    payload: dict[str, Any],
+    err_msg: str,
+) -> None:
+    """Shared write pattern: PATCH the hub, apply the response locally, write state.
+
+    Every cover platform (virtual/wtp/sbus) had an identical copy of this method
+    body, differing only in which client PATCH method and device store to use.
+    """
+    try:
+        updated = await patch(device_id, payload)
+    except Exception as err:
+        raise HomeAssistantError(f"{err_msg}: {err}") from err
+    store[device_id].update(updated)
+    entity.async_write_ha_state()

@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_store as _shared_bus_store
 from ._climate_bus_mixin import _BusClimateMixin
 from ._climate_helpers import (
     _HVAC_TO_MODE,
@@ -31,6 +32,7 @@ from .const import (
     STYPE_FAN_COIL,
     WTYPE_FAN_COIL,
     WTYPE_FAN_COIL_V2,
+    WTYPE_TEMPERATURE_REGULATOR,
 )
 from .coordinator import SinumCoordinator, via_device_for
 
@@ -40,7 +42,8 @@ _WTP_FAN_COIL_TYPES = {WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2}
 
 
 def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
-    return coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.wtp_devices if store is None else store
 
 
 def _regulator_features(device: dict[str, Any]) -> ClimateEntityFeature:
@@ -85,7 +88,7 @@ def _maybe_add_climate_entity(
     dev_type = device.get("type")
     if dev_type in fan_coil_types and _has_climate_control(device, source=bus):
         entities.append(SinumFanCoilClimate(coordinator, device_id, entry_id, bus))
-    elif dev_type == "temperature_regulator":
+    elif dev_type == WTYPE_TEMPERATURE_REGULATOR:
         entities.append(SinumTemperatureRegulatorClimate(coordinator, device_id, entry_id, bus))
 
 

@@ -10,13 +10,16 @@ from homeassistant.components.cover import (
     CoverEntityFeature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
-from ._cover_helpers import _restore_cover_from_last_state, _virtual_device_info
+from ._cover_helpers import (
+    _cover_patch_and_apply,
+    _restore_cover_from_last_state,
+    _virtual_device_info,
+)
 from .const import (
     STYPE_BLIND_CONTROLLER,
     VTYPE_BLIND,
@@ -148,12 +151,14 @@ class SinumBlindCover(
         return bool(self._device.get("action_in_progress")) and bool(self.is_closed)
 
     async def _patch_and_apply(self, payload: dict[str, Any], err_msg: str) -> None:
-        try:
-            updated = await self.coordinator.client.patch_virtual_device(self._device_id, payload)
-        except Exception as err:
-            raise HomeAssistantError(f"{err_msg}: {err}") from err
-        self.coordinator.virtual_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await _cover_patch_and_apply(
+            self,
+            self.coordinator.virtual_devices,
+            self._device_id,
+            self.coordinator.client.patch_virtual_device,
+            payload,
+            err_msg,
+        )
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         await self._patch_and_apply(

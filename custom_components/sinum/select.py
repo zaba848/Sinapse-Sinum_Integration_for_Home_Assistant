@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_store as _shared_bus_store
 from .climate_fan_coil import _fan_coil_device_info
 from .const import STYPE_FAN_COIL, WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin
@@ -35,7 +36,8 @@ def _needs_select(device: dict[str, Any]) -> bool:
 
 
 def _fan_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
-    return coordinator.sbus_devices if bus == "sbus" else coordinator.wtp_devices
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.wtp_devices if store is None else store
 
 
 def _add_from_store(

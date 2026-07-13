@@ -268,7 +268,7 @@ class SinumCamera(CoordinatorEntity[SinumCoordinator], Camera):
         dev = self._device
         name = dev.get("name", f"Sinum Camera {self._device_id}")
         return {
-            "identifiers": {("sinum", f"{self._entry_id}_video_{self._device_id}")},
+            "identifiers": {(DOMAIN, f"{self._entry_id}_video_{self._device_id}")},
             "name": hub_prefixed_name(self.coordinator, name),
             "manufacturer": "Sinum",
             "model": dev.get("type", "ip_camera"),

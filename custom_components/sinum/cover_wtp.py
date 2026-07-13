@@ -10,13 +10,13 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._cover_helpers import (
     _compare_target_current,
+    _cover_patch_and_apply,
     _label,
     _restore_cover_from_last_state,
 )
@@ -89,12 +89,14 @@ class SinumWtpBlindCover(
         return delta is not None and bool(self._device.get("action_in_progress")) and delta < 0
 
     async def _patch_and_apply(self, payload: dict[str, Any], err_msg: str) -> None:
-        try:
-            updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
-        except Exception as err:
-            raise HomeAssistantError(f"{err_msg}: {err}") from err
-        self.coordinator.wtp_devices[self._device_id].update(updated)
-        self.async_write_ha_state()
+        await _cover_patch_and_apply(
+            self,
+            self.coordinator.wtp_devices,
+            self._device_id,
+            self.coordinator.client.patch_wtp_device,
+            payload,
+            err_msg,
+        )
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         await self._patch_and_apply(

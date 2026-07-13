@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_store as _shared_bus_store
 from ._light_helpers import (
     _color_mode,
     _hex_to_hs,
@@ -52,7 +53,8 @@ __all__ = [
 
 
 def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict]:
-    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.sbus_devices if store is None else store
 
 
 def _bus_types(bus: str) -> tuple[str, str, str]:

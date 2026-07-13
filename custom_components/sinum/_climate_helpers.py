@@ -4,6 +4,8 @@ from typing import Any
 
 from homeassistant.components.climate import HVACAction, HVACMode
 
+from .const import VTYPE_THERMOSTAT
+
 _MODE_TO_HVAC: dict[str, HVACMode] = {
     "heating": HVACMode.HEAT,
     "cooling": HVACMode.COOL,
@@ -102,7 +104,7 @@ def _state_action_from_text(state: str, current_mode: HVACMode) -> HVACAction:
 
 
 def _is_thermostat(device: dict[str, Any]) -> bool:
-    return device.get("type") == "thermostat" or (
+    return device.get("type") == VTYPE_THERMOSTAT or (
         "target_temperature" in device and "temperature" in device and "work_mode" not in device
     )
 

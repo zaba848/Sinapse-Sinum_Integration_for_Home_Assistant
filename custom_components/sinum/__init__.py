@@ -16,6 +16,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import SinumClient
 from .const import (
+    AUTH_MODE_PASSWORD,
     AUTH_MODE_TOKEN,
     CONF_API_TOKEN,
     CONF_AUTH_MODE,
@@ -127,7 +128,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: SinumConfigEntry) -
 
 def _build_client(hass: HomeAssistant, entry: SinumConfigEntry) -> SinumClient:
     session = async_get_clientsession(hass, verify_ssl=False)
-    auth_mode = entry.data.get(CONF_AUTH_MODE, "password")
+    auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_PASSWORD)
     max_concurrent = entry.options.get(
         CONF_MAX_CONCURRENT_REQUESTS,
         entry.data.get(CONF_MAX_CONCURRENT_REQUESTS, DEFAULT_MAX_CONCURRENT_REQUESTS),

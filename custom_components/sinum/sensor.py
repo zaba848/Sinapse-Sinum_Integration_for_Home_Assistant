@@ -8,7 +8,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SinumConfigEntry
 from ._sensor_optional import _add_optional_sensors  # noqa: F401
-from .const import STYPE_BUTTON, VTYPE_THERMOSTAT_OUTPUT_GROUP, WTYPE_BUTTON
+from .const import (
+    STYPE_BUTTON,
+    STYPE_TEMPERATURE_REGULATOR,
+    VTYPE_THERMOSTAT_OUTPUT_GROUP,
+    WTYPE_BUTTON,
+    WTYPE_TEMPERATURE_REGULATOR,
+)
 from .coordinator import SinumCoordinator
 from .sensor_bus import (
     _SENTINEL_INT16,
@@ -98,7 +104,7 @@ def _add_wtp_sensors(
     entry_id: str,
 ) -> None:
     for device_id, device in coordinator.wtp_devices.items():
-        if device.get("type") == "temperature_regulator":
+        if device.get("type") == WTYPE_TEMPERATURE_REGULATOR:
             _append_regulator_sensors(
                 coordinator,
                 entities,
@@ -125,7 +131,7 @@ def _add_sbus_sensors(
     entry_id: str,
 ) -> None:
     for device_id, device in coordinator.sbus_devices.items():
-        if device.get("type") == "temperature_regulator":
+        if device.get("type") == STYPE_TEMPERATURE_REGULATOR:
             _append_regulator_sensors(
                 coordinator,
                 entities,
