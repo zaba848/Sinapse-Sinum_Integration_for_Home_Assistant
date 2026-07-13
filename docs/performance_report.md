@@ -62,12 +62,16 @@ from `phase1 + phase2` (2616 ms) to `max(phase1, phase2)` (~1526 ms) — a
 **~42% reduction** in coordinator update latency, with zero change to what
 data is fetched.
 
-**Risk**: `coordinator.py` is the highest-blast-radius file in the
-integration — every entity depends on its output. This needs a restructure
-of `_fetch_all`/`_fetch_device_stores` (not just a config flag), validated
-against the full test suite including the real-HA `test_full_platform_setup.py`
-harness. Recommend implementing behind careful review rather than shipping
-silently.
+**Status: implemented (2026-07-13).** `_fetch_all` now runs
+`_fetch_metadata_raw()` and `_fetch_bulk_collections()` concurrently via a
+single `asyncio.gather`; `_finish_device_stores`/`_finish_device_collection`
+do the room-key-injection/fallback processing afterward once `rooms` is
+available. `_fetch_device_collection` (the old combined fetch+process method)
+is kept as a thin wrapper composing the two split steps, so the one existing
+direct unit test (`test_fetch_device_collection_skips_non_dict_item_fallback`)
+still exercises the same code path unchanged. Validated: full suite (1948
+passed, 5 skipped), 100% coverage on `coordinator.py`, `ruff`/`mypy` clean
+against the exact CI invocation.
 
 ### 2. Tiered refresh: poll quasi-static metadata less often than device state
 

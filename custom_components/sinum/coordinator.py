@@ -199,16 +199,25 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ConfigEntryAuthFailed(str(err)) from err
 
     async def _fetch_all(self) -> dict[str, Any]:
-        rooms = await self._fetch_metadata()
         prev_by_bus = self._removal_snapshots()
+        # Metadata (rooms, scenes, ...) and device-bulk-list HTTP calls are
+        # independent requests — the bulk calls only need `rooms` to process
+        # their *response*, not to fire the request — so run both rounds
+        # concurrently instead of sequentially (saves one full network
+        # round-trip per coordinator cycle).
+        meta, bulk = await asyncio.gather(
+            self._fetch_metadata_raw(),
+            self._fetch_bulk_collections(),
+        )
+        rooms = self._apply_metadata_results(*meta)
         bus_ids = self._room_classified_bus_ids(rooms)
-        stores = await self._fetch_device_stores(rooms, bus_ids)
+        stores = await self._finish_device_stores(bulk, rooms, bus_ids)
         self._apply_device_store_results(stores, prev_by_bus)
         self._inject_parent_models_for_buses(stores.wtp, stores.sbus, stores.lora)
         return self._coordinator_data_payload(stores)
 
-    async def _fetch_metadata(self) -> list[dict[str, Any]]:
-        meta = await asyncio.gather(
+    async def _fetch_metadata_raw(self) -> list[Any]:
+        return await asyncio.gather(
             _safe_fetch(self.client.get_hub_info, "hub info"),
             _safe_fetch(self.client.get_lua_hub_info, "lua hub info"),
             _safe_fetch(self.client.get_rooms, "rooms", default=[]),
@@ -221,7 +230,6 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _safe_fetch(self.client.get_automations, "automations", default=self.automations),
             _safe_fetch(self.client.get_variables, "variables", default=self.variables),
         )
-        return self._apply_metadata_results(*meta)
 
     def _removal_snapshots(self) -> dict[str, frozenset[int]]:
         return {
@@ -238,39 +246,55 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for i, spec in enumerate(ROOM_CLASSIFIED_BUSES)
         }
 
-    async def _fetch_device_stores(
-        self, rooms: list[dict[str, Any]], bus_ids: dict[str, list[int]]
-    ) -> _DeviceStoreResults:
-        room_classified_fetches = []
-        for spec in ROOM_CLASSIFIED_BUSES:
-            item_getter = spec.item_getter
-            assert item_getter is not None  # ROOM_CLASSIFIED_BUSES always define item_getter
-            room_classified_fetches.append(
-                self._fetch_device_collection(
-                    spec.collection_label or spec.name,
-                    getattr(self.client, spec.list_getter),
-                    getattr(self.client, item_getter),
-                    bus_ids[spec.name],
-                    rooms,
-                    getattr(self, spec.store_attr),
-                )
+    async def _fetch_bulk_collections(self) -> list[Any]:
+        """Fire the raw bulk device-list HTTP calls (no `rooms` dependency)."""
+        bulk_fetches = [
+            self._bulk_collection(
+                getattr(self.client, spec.list_getter), spec.collection_label or spec.name
             )
-        (
-            virtual,
-            wtp,
-            sbus,
-            lora,
-            alarm_list,
-            modbus_list,
-            video_list,
-            slink_list,
-        ) = await asyncio.gather(
-            *room_classified_fetches,
+            for spec in ROOM_CLASSIFIED_BUSES
+        ]
+        return await asyncio.gather(
+            *bulk_fetches,
             _safe_fetch(self.client.get_alarm_devices, "alarm devices", default=None),
             _safe_fetch(self.client.get_modbus_devices, "modbus devices", default=None),
             _safe_fetch(self.client.get_video_devices, "video devices", default=None),
             _safe_fetch(self.client.get_slink_devices, "slink devices", default=None),
         )
+
+    async def _finish_device_stores(
+        self,
+        bulk: list[Any],
+        rooms: list[dict[str, Any]],
+        bus_ids: dict[str, list[int]],
+    ) -> _DeviceStoreResults:
+        """Process already-fetched bulk collections into device stores.
+
+        Room-key injection and the (rare) per-device fallback both need
+        `rooms`/`bus_ids`, which are only available once metadata has
+        resolved — but the HTTP calls themselves already ran concurrently
+        with metadata in `_fetch_bulk_collections`.
+        """
+        n = len(ROOM_CLASSIFIED_BUSES)
+        room_bulk_results = bulk[:n]
+        alarm_list, modbus_list, video_list, slink_list = bulk[n:]
+
+        finish_tasks = []
+        for spec, (collection, bulk_ok) in zip(ROOM_CLASSIFIED_BUSES, room_bulk_results):
+            item_getter = spec.item_getter
+            assert item_getter is not None  # ROOM_CLASSIFIED_BUSES always define item_getter
+            finish_tasks.append(
+                self._finish_device_collection(
+                    spec.collection_label or spec.name,
+                    getattr(self.client, item_getter),
+                    bus_ids[spec.name],
+                    rooms,
+                    getattr(self, spec.store_attr),
+                    collection,
+                    bulk_ok,
+                )
+            )
+        virtual, wtp, sbus, lora = await asyncio.gather(*finish_tasks)
         return _DeviceStoreResults(
             virtual, wtp, sbus, lora, alarm_list, modbus_list, video_list, slink_list
         )
@@ -364,6 +388,33 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.warning("Failed to fetch %s device %s: %s", label, device_id, err)
         return devices
 
+    async def _finish_device_collection(
+        self,
+        label: str,
+        item_getter: Any,
+        fallback_ids: list[int],
+        rooms: list[dict[str, Any]],
+        cached: dict[int, dict[str, Any]],
+        collection: list[Any],
+        bulk_ok: bool,
+    ) -> dict[int, dict[str, Any]]:
+        """Turn an already-fetched bulk collection into a device store.
+
+        When the bulk endpoint fails (hub unreachable), return the existing
+        cached data unchanged to keep entities available during outages.
+        The per-device fallback is only used when the bulk endpoint succeeds
+        but returns an empty list (older firmware without a bulk endpoint).
+        """
+        if collection:
+            return self._process_bulk_devices(collection, label, rooms)
+
+        # Bulk failed (exception) → return cache to keep entities alive
+        if not bulk_ok:
+            return cached
+
+        # Bulk succeeded but returned empty list → old firmware without bulk endpoint
+        return await self._fallback_devices(item_getter, fallback_ids, rooms, label)
+
     async def _fetch_device_collection(
         self,
         label: str,
@@ -375,22 +426,14 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> dict[int, dict[str, Any]]:
         """Fetch a class-wide device list, falling back to per-room IDs.
 
-        When the bulk endpoint fails (hub unreachable), return the existing
-        cached data unchanged to keep entities available during outages.
-        The per-device fallback is only used when the bulk endpoint succeeds
-        but returns an empty list (older firmware without a bulk endpoint).
+        Composes `_bulk_collection` + `_finish_device_collection`; see
+        `_fetch_bulk_collections`/`_finish_device_stores` for the coordinator
+        cycle's concurrent variant of the same logic.
         """
         collection, bulk_ok = await self._bulk_collection(list_getter, label)
-
-        if collection:
-            return self._process_bulk_devices(collection, label, rooms)
-
-        # Bulk failed (exception) → return cache to keep entities alive
-        if not bulk_ok:
-            return cached
-
-        # Bulk succeeded but returned empty list → old firmware without bulk endpoint
-        return await self._fallback_devices(item_getter, fallback_ids, rooms, label)
+        return await self._finish_device_collection(
+            label, item_getter, fallback_ids, rooms, cached, collection, bulk_ok
+        )
 
 
 class SinumDeviceAvailableMixin:
