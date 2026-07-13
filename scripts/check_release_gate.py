@@ -18,13 +18,16 @@ _GH_TOKEN = os.getenv("GITHUB_TOKEN", "")
 REQUIRED = {
     "CI",
     "CodeQL Security Analysis",
-    "HACS Validation",
     "Lint",
 }
 
-# PR-only workflows are informative and should not block release on main.
+# Informative, non-blocking workflows for release readiness.
+# HACS Validation's license check can never pass for this repo's proprietary
+# LICENSE (HACS requires an OSS-recognized SPDX license) — that's a deliberate
+# licensing choice, not a code defect, so it's tracked but not gate-blocking.
 OPTIONAL = {
     "Dependency Review",
+    "HACS Validation",
 }
 
 # In push-triggered gate workflows, required runs can still be queued/in_progress.
