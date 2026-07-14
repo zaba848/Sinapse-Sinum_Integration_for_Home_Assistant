@@ -11,9 +11,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_patch_method
+from ._bus_registry import bus_store as _shared_bus_store
 from ._light_helpers import _hex_to_hs, _hs_to_hex, _label, _restore_button_light_state
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
+
+
+def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.sbus_devices if store is None else store
 
 
 class SinumButtonLight(
@@ -35,8 +42,7 @@ class SinumButtonLight(
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}_backlight"
-        store = coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
-        device = store.get(device_id, {})
+        device = _bus_store(coordinator, bus).get(device_id, {})
         label = _label(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -56,10 +62,7 @@ class SinumButtonLight(
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        return _bus_store(self.coordinator, self._bus).get(self._device_id, {})
 
     @property
     def is_on(self) -> bool:
@@ -77,7 +80,7 @@ class SinumButtonLight(
         return self._attr_hs_color
 
     def _store(self) -> dict[int, dict[str, Any]]:
-        return self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
+        return _bus_store(self.coordinator, self._bus)
 
     def _resolve_turn_on_color(self, kwargs: dict[str, Any]) -> str:
         if ATTR_HS_COLOR in kwargs:
@@ -86,15 +89,11 @@ class SinumButtonLight(
         return self._device.get("color") or "#0072c3"
 
     async def _patch_bus_color(self, color: str) -> dict[str, Any]:
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for backlight patch: {self._bus}")
         try:
-            if self._bus == "wtp":
-                result = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"color": color}
-                )
-            else:
-                result = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"color": color}
-                )
+            result = await patch_method(self._device_id, {"color": color})
             return result or {}
         except Exception as err:
             raise HomeAssistantError(f"Cannot set backlight color: {err}") from err
@@ -106,15 +105,11 @@ class SinumButtonLight(
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for backlight patch: {self._bus}")
         try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"color": "#000000"}
-                )
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"color": "#000000"}
-                )
+            updated = await patch_method(self._device_id, {"color": "#000000"})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn off backlight: {err}") from err
         self._store()[self._device_id].update({**{"color": "#000000"}, **(updated or {})})

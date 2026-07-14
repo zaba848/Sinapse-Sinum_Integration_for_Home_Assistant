@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_store as _shared_bus_store
 from .const import DOMAIN, MANUFACTURER, STYPE_BUTTON, WTYPE_BUTTON
 from .coordinator import SinumCoordinator, hub_prefixed_name
 
@@ -39,7 +40,8 @@ def _count_only_press(count: Any, prev_count: Any) -> bool:
 
 
 def _button_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
-    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.wtp_devices if store is None else store
 
 
 def _button_event_device_info(
@@ -133,10 +135,7 @@ class SinumButtonEvent(CoordinatorEntity[SinumCoordinator], EventEntity):
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        return _button_store(self.coordinator, self._bus).get(self._device_id, {})
 
     @callback
     def _handle_coordinator_update(self) -> None:

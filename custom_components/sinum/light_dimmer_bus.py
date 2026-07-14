@@ -10,9 +10,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_patch_method
+from ._bus_registry import bus_store as _shared_bus_store
 from ._light_helpers import _label, _restore_light_state
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SinumCoordinator, SinumDeviceAvailableMixin, via_device_for
+
+
+def _bus_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.sbus_devices if store is None else store
 
 
 class SinumBusDimmerLight(
@@ -33,9 +40,7 @@ class SinumBusDimmerLight(
         self._device_id = device_id
         self._bus = bus
         self._attr_unique_id = f"{entry_id}_{bus}_{device_id}"
-        device = (coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices).get(
-            device_id, {}
-        )
+        device = _bus_store(coordinator, bus).get(device_id, {})
         label = _label(device)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{bus}_{device_id}")},
@@ -54,10 +59,7 @@ class SinumBusDimmerLight(
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        return _bus_store(self.coordinator, self._bus).get(self._device_id, {})
 
     @property
     def is_on(self) -> bool:
@@ -72,33 +74,26 @@ class SinumBusDimmerLight(
             return round(raw / 100 * 255)
         return self._attr_brightness
 
+    async def _patch(self, payload: dict[str, Any]) -> None:
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for dimmer patch: {self._bus}")
+        updated = await patch_method(self._device_id, payload)
+        _bus_store(self.coordinator, self._bus)[self._device_id].update(updated)
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         payload: dict[str, Any] = {"state": True}
         if ATTR_BRIGHTNESS in kwargs:
             payload["target_level"] = round(kwargs[ATTR_BRIGHTNESS] / 255 * 100)
         try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(self._device_id, payload)
-                self.coordinator.wtp_devices[self._device_id].update(updated)
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(self._device_id, payload)
-                self.coordinator.sbus_devices[self._device_id].update(updated)
+            await self._patch(payload)
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn on: {err}") from err
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         try:
-            if self._bus == "wtp":
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"state": False}
-                )
-                self.coordinator.wtp_devices[self._device_id].update(updated)
-            else:
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"state": False}
-                )
-                self.coordinator.sbus_devices[self._device_id].update(updated)
+            await self._patch({"state": False})
         except Exception as err:
             raise HomeAssistantError(f"Cannot turn off: {err}") from err
         self.async_write_ha_state()

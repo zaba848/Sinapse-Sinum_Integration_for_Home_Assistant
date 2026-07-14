@@ -15,6 +15,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._bus_registry import bus_patch_method
+from ._bus_registry import bus_store as _shared_bus_store
 from ._light_helpers import (
     _color_mode,
     _hex_to_hs,
@@ -62,7 +64,8 @@ def _has_color_kwargs(kwargs: dict[str, Any]) -> bool:
 
 
 def _bus_store_rgb(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
-    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+    store = _shared_bus_store(coordinator, bus)
+    return coordinator.sbus_devices if store is None else store
 
 
 async def _patch_bus_rgb(
@@ -71,10 +74,10 @@ async def _patch_bus_rgb(
     device_id: int,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    client = coordinator.client
-    if bus == "wtp":
-        return await client.patch_wtp_device(device_id, payload)
-    return await client.patch_sbus_device(device_id, payload)
+    patch_method = bus_patch_method(coordinator, bus)
+    if patch_method is None:
+        raise ValueError(f"Unsupported bus for RGB patch: {bus}")
+    return await patch_method(device_id, payload)
 
 
 class SinumBusRgbLight(

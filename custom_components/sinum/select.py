@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_patch_method
 from ._bus_registry import bus_store as _shared_bus_store
 from .climate_fan_coil import _fan_coil_device_info
 from .const import STYPE_FAN_COIL, WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2
@@ -107,15 +108,11 @@ class SinumFanCoilModeSelect(
         return self._device.get("work_mode")
 
     async def async_select_option(self, option: str) -> None:
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for fan coil select: {self._bus}")
         try:
-            if self._bus == "sbus":
-                updated = await self.coordinator.client.patch_sbus_device(
-                    self._device_id, {"work_mode": option}
-                )
-            else:
-                updated = await self.coordinator.client.patch_wtp_device(
-                    self._device_id, {"work_mode": option}
-                )
+            updated = await patch_method(self._device_id, {"work_mode": option})
         except Exception as err:
             raise HomeAssistantError(f"Cannot set fan coil work mode: {err}") from err
         if updated:

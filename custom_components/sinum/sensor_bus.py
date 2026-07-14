@@ -138,7 +138,8 @@ def _button_device_info(
 
 
 def _wtp_or_sbus(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
-    return coordinator.wtp_devices if bus == "wtp" else coordinator.sbus_devices
+    store = bus_store(coordinator, bus)
+    return coordinator.wtp_devices if store is None else store
 
 
 def _model_for_source(source: str) -> str:
@@ -219,10 +220,7 @@ class SinumButtonSensor(
 
     @property
     def _device(self) -> dict[str, Any]:
-        store = (
-            self.coordinator.wtp_devices if self._bus == "wtp" else self.coordinator.sbus_devices
-        )
-        return store.get(self._device_id, {})
+        return _wtp_or_sbus(self.coordinator, self._bus).get(self._device_id, {})
 
     @property
     def native_value(self) -> str | None:

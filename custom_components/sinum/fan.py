@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SinumConfigEntry
+from ._bus_registry import bus_patch_method
 from ._bus_registry import bus_store as _shared_bus_store
 from .climate_fan_coil import _fan_coil_device_info
 from .const import (
@@ -131,9 +132,10 @@ class SinumFanCoilFan(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
         return _GEAR_TO_PRESET.get(gear)
 
     async def _patch(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if self._bus == "sbus":
-            return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
-        return await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+        patch_method = bus_patch_method(self.coordinator, self._bus)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for fan patch: {self._bus}")
+        return await patch_method(self._device_id, payload)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         gear = _PRESET_TO_GEAR.get(preset_mode)

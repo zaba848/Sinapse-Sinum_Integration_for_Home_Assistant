@@ -8,6 +8,8 @@ from homeassistant.components.climate import HVACMode
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.exceptions import HomeAssistantError
 
+from ._bus_registry import bus_patch_method
+from ._bus_registry import bus_store as _shared_bus_store
 from ._climate_helpers import _HVAC_TO_MODE, _MODE_TO_HVAC, _available_hvac_modes
 from .const import TEMP_MAX, TEMP_MIN
 
@@ -33,9 +35,10 @@ class _BusClimateMixin:
         return getattr(self, "_source", getattr(self, "_bus", "wtp"))
 
     def _device_dict(self, coordinator: SinumCoordinator) -> dict[str, Any]:
-        if self._bus_name == "sbus":
-            return coordinator.sbus_devices.get(self._device_id, {})
-        return coordinator.wtp_devices.get(self._device_id, {})
+        store = _shared_bus_store(coordinator, self._bus_name)
+        if store is None:
+            store = coordinator.wtp_devices
+        return store.get(self._device_id, {})
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -102,6 +105,7 @@ class _BusClimateMixin:
         self.async_write_ha_state()
 
     async def _patch(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if self._bus_name == "sbus":
-            return await self.coordinator.client.patch_sbus_device(self._device_id, payload)
-        return await self.coordinator.client.patch_wtp_device(self._device_id, payload)
+        patch_method = bus_patch_method(self.coordinator, self._bus_name)
+        if patch_method is None:
+            raise HomeAssistantError(f"Unsupported bus for climate patch: {self._bus_name}")
+        return await patch_method(self._device_id, payload)
