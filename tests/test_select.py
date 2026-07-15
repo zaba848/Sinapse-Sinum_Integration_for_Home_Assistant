@@ -129,6 +129,14 @@ class TestSinumFanCoilModeSelect:
         with pytest.raises(HomeAssistantError):
             await sensor.async_select_option("cooling")
 
+    @pytest.mark.asyncio
+    async def test_select_option_raises_for_unrecognized_bus(self):
+        device = {"type": STYPE_FAN_COIL, "work_mode": "automatic"}
+        sensor = _make_sensor(device, bus="unknown_bus")
+        sensor.async_write_ha_state = MagicMock()
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await sensor.async_select_option("cooling")
+
 
 # ---------------------------------------------------------------------------
 # async_setup_entry

@@ -142,6 +142,35 @@ class TestPhase7B2TemperatureRegulator:
         entity, _ = self._make_regulator(device)
         assert entity.target_temperature == 22.0
 
+    def test_device_dict_falls_back_to_wtp_store_for_unrecognized_bus(self):
+        """_BusClimateMixin._device_dict falls back to wtp_devices if bus_store() returns None."""
+        from custom_components.sinum.climate import SinumTemperatureRegulatorClimate
+
+        coordinator = MagicMock()
+        device_data = {"id": 100, "target_temperature": 220}
+        coordinator.wtp_devices = {100: device_data}
+        coordinator.sbus_devices = {}
+        coordinator.virtual_devices = {}
+        entity = SinumTemperatureRegulatorClimate(coordinator, 100, "test_entry", bus="unknown_bus")
+        entity.hass = MagicMock()
+        assert entity._device == device_data
+
+    @pytest.mark.asyncio
+    async def test_patch_raises_for_unrecognized_bus(self):
+        """_BusClimateMixin._patch raises HomeAssistantError if bus_patch_method() returns None."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.sinum.climate import SinumTemperatureRegulatorClimate
+
+        coordinator = MagicMock()
+        coordinator.wtp_devices = {100: {}}
+        coordinator.sbus_devices = {}
+        coordinator.virtual_devices = {}
+        entity = SinumTemperatureRegulatorClimate(coordinator, 100, "test_entry", bus="unknown_bus")
+        entity.hass = MagicMock()
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await entity._patch({"target_temperature": 220})
+
     def test_regulator_shows_hvac_mode(self):
         from homeassistant.components.climate import HVACMode
 

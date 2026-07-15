@@ -223,6 +223,7 @@ class TestApiRequests:
 
         assert result == {"id": 9, "mode": "heating"}
         assert session.request.call_count == 2
+        assert client.request_stats["retry_408_count"] == 1
 
     @pytest.mark.asyncio
     async def test_408_on_patch_retry_also_408_raises_connection_error(self, session):
@@ -683,6 +684,24 @@ class TestRequestCoalescing:
 
         assert call_count == 1
         assert all(r == {"temperature": 210} for r in results)
+
+    @pytest.mark.asyncio
+    async def test_coalescing_counted_as_one_miss_and_shares_hits(self, session):
+        import asyncio
+
+        async def fake_request(*args, **kwargs):
+            await asyncio.sleep(0.01)
+            return make_response(200, {"data": {"temperature": 210}})
+
+        session.request = fake_request
+        client = SinumClient("192.168.1.1", session, api_token="tok")
+        with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
+            await asyncio.gather(*(client.get_weather() for _ in range(5)))
+
+        stats = client.request_stats
+        assert stats["coalesced_miss_count"] == 1
+        assert stats["coalesced_hit_count"] == 4
+        assert stats["request_count"] == 1
 
     @pytest.mark.asyncio
     async def test_sequential_calls_each_make_a_fresh_request(self, session):

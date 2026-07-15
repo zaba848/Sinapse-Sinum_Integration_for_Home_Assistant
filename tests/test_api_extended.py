@@ -199,6 +199,7 @@ class TestRequestEdgeCases:
         with patch("custom_components.sinum.api.asyncio.timeout", _fake_timeout):
             result = await client.get_virtual_devices()
         assert result == [{"id": 1}]
+        assert client.request_stats["retry_401_count"] == 1
 
     @pytest.mark.asyncio
     async def test_request_304_returns_empty_dict(self, session):

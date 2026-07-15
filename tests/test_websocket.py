@@ -962,6 +962,33 @@ async def test_run_one_cycle_resets_reconnect_attempt_on_success():
     assert bridge._reconnect_attempt == 0
 
 
+@pytest.mark.asyncio
+async def test_connect_count_and_reconnect_count_are_lifetime_totals():
+    """connect_count/reconnect_count accumulate across cycles, unlike _reconnect_attempt."""
+    bridge, _hass, _coordinator = _bridge()
+    bridge._stop_event.set()  # prevent _wait_reconnect from blocking
+    assert bridge.connect_count == 0
+    assert bridge.reconnect_count == 0
+
+    async def _fail():
+        raise RuntimeError("connection dropped")
+
+    async def _succeed():
+        pass
+
+    bridge._consume_loop = _fail  # type: ignore[assignment]
+    await bridge._run_one_cycle()
+    await bridge._run_one_cycle()
+    assert bridge.reconnect_count == 2
+    assert bridge.connect_count == 0
+
+    bridge._consume_loop = _succeed  # type: ignore[assignment]
+    await bridge._run_one_cycle()
+    assert bridge.connect_count == 1
+    # A later success must not reset the lifetime reconnect_count (unlike _reconnect_attempt)
+    assert bridge.reconnect_count == 2
+
+
 def test_apply_device_state_updates_sbus_blind_position_and_tilt():
     """P5.3: device_state_changed updates SBUS blind position and tilt."""
     bridge, _hass, coordinator = _bridge()

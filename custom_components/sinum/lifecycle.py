@@ -69,6 +69,7 @@ async def start_ws_bridge(
         return False
 
     _WS_BRIDGES[entry.entry_id] = bridge
+    coordinator.ws_bridge = bridge
     return True
 
 

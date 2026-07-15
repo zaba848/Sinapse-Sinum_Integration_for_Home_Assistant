@@ -352,6 +352,7 @@ class TestAsyncSetupEntry:
             ws_path="/api/v1/ws",
         )
         MockMqttBridge.assert_not_called()
+        assert coordinator.ws_bridge is ws_bridge
         _WS_BRIDGES.pop("ws_entry", None)
 
     @pytest.mark.asyncio

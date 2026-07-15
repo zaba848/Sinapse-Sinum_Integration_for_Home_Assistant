@@ -41,6 +41,18 @@ def _make_coordinator(
     coord.hub_info = {"version": "1.24.0"}
     coord.rooms = []
     coord.mqtt_bridge = None
+    coord.ws_bridge = None
+    coord.last_update_duration_ms = None
+    coord.last_update_success_time = None
+    coord.fetch_failure_count = 0
+    coord.client.request_stats = {
+        "request_count": 0,
+        "retry_401_count": 0,
+        "retry_408_count": 0,
+        "coalesced_hit_count": 0,
+        "coalesced_miss_count": 0,
+        "last_request_duration_ms": None,
+    }
     return coord
 
 
@@ -153,6 +165,66 @@ class TestDiagnosticsRedaction:
         entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert result["video_count"] == 2
+
+
+class TestPerformanceMetrics:
+    @pytest.mark.asyncio
+    async def test_metrics_included(self):
+        coord = _make_coordinator()
+        coord.last_update_duration_ms = 123.4
+        coord.fetch_failure_count = 2
+        coord.client.request_stats = {
+            "request_count": 10,
+            "retry_401_count": 1,
+            "retry_408_count": 0,
+            "coalesced_hit_count": 3,
+            "coalesced_miss_count": 7,
+            "last_request_duration_ms": 45.6,
+        }
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["last_update_duration_ms"] == 123.4
+        assert result["fetch_failure_count"] == 2
+        assert result["request_count"] == 10
+        assert result["retry_401_count"] == 1
+        assert result["coalesced_hit_count"] == 3
+        assert result["coalesced_miss_count"] == 7
+        assert result["last_request_duration_ms"] == 45.6
+
+    @pytest.mark.asyncio
+    async def test_last_update_success_time_serialized(self):
+        from datetime import datetime
+
+        coord = _make_coordinator()
+        coord.last_update_success_time = datetime(2026, 7, 15, 10, 30, 0)
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["last_update_success_time"] == "2026-07-15T10:30:00"
+
+    @pytest.mark.asyncio
+    async def test_last_update_success_time_none(self):
+        coord = _make_coordinator()
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["last_update_success_time"] is None
+
+    @pytest.mark.asyncio
+    async def test_ws_stats_absent_when_no_bridge(self):
+        coord = _make_coordinator()
+        coord.ws_bridge = None
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert "ws_connect_count" not in result
+        assert "ws_reconnect_count" not in result
+
+    @pytest.mark.asyncio
+    async def test_ws_stats_present_when_bridge_active(self):
+        coord = _make_coordinator()
+        coord.ws_bridge = MagicMock(connect_count=5, reconnect_count=2)
+        entry = _make_entry({"host": "10.0.0.1"}, runtime_data=coord)
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["ws_connect_count"] == 5
+        assert result["ws_reconnect_count"] == 2
 
 
 class TestSanitizeVideoDevice:

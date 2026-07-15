@@ -360,6 +360,15 @@ class TestSinumBusDimmerLight:
         await entity.async_turn_off()
         coordinator.client.patch_sbus_device.assert_awaited_once_with(5, {"state": False})
 
+    @pytest.mark.asyncio
+    async def test_patch_raises_for_unrecognized_bus(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _make_coordinator()
+        entity = _wire(SinumBusDimmerLight(coordinator, 5, "test_entry", "unknown_bus"))
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await entity.async_turn_off()
+
 
 class TestSinumBusRgbLight:
     def _make_wtp(self, device: dict | None = None):
@@ -416,6 +425,16 @@ class TestSinumBusRgbLight:
         coordinator.client.patch_sbus_device = AsyncMock(return_value={})
         await entity.async_turn_off()
         coordinator.client.patch_sbus_device.assert_awaited_once_with(6, {"state": False})
+
+    @pytest.mark.asyncio
+    async def test_turn_off_raises_for_unrecognized_bus(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        d = {"id": 6, "type": STYPE_RGB_CONTROLLER, "name": "RGB", "state": True}
+        coordinator = _make_coordinator(sbus={6: d})
+        entity = _wire(SinumBusRgbLight(coordinator, 6, "test_entry", "unknown_bus"))
+        with pytest.raises(HomeAssistantError, match="Cannot turn off"):
+            await entity.async_turn_off()
 
     # ---- new tests to improve coverage ----
 
@@ -651,6 +670,22 @@ class TestSinumButtonLight:
         await entity.async_turn_off()
         call_args = coordinator.client.patch_sbus_device.call_args
         assert call_args[0][1] == {"color": "#000000"}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_raises_for_unrecognized_bus(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity, _coordinator = self._make(bus="unknown_bus")
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await entity.async_turn_on()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_raises_for_unrecognized_bus(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        entity, _coordinator = self._make(bus="unknown_bus")
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await entity.async_turn_off()
 
     @pytest.mark.asyncio
     async def test_turn_on_wtp_patches_wtp(self):

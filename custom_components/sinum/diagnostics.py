@@ -20,6 +20,7 @@ async def async_get_config_entry_diagnostics(
         "hub_info": _sanitize_device(coordinator.hub_info),
         **_bus_snapshots(coordinator),
         **_bus_counts(coordinator),
+        **_performance_metrics(coordinator),
         "mqtt_enabled": coordinator.mqtt_bridge is not None,
     }
 
@@ -57,6 +58,23 @@ def _bus_counts(coordinator: Any) -> dict[str, Any]:
         "video_count": len(coordinator.video_devices),
         "parent_count": len(coordinator.parent_devices),
     }
+
+
+def _performance_metrics(coordinator: Any) -> dict[str, Any]:
+    metrics: dict[str, Any] = {
+        "last_update_duration_ms": coordinator.last_update_duration_ms,
+        "last_update_success_time": (
+            coordinator.last_update_success_time.isoformat()
+            if coordinator.last_update_success_time
+            else None
+        ),
+        "fetch_failure_count": coordinator.fetch_failure_count,
+        **coordinator.client.request_stats,
+    }
+    if coordinator.ws_bridge is not None:
+        metrics["ws_connect_count"] = coordinator.ws_bridge.connect_count
+        metrics["ws_reconnect_count"] = coordinator.ws_bridge.reconnect_count
+    return metrics
 
 
 def _snapshot_store(store: dict[Any, dict[str, Any]]) -> dict[str, Any]:

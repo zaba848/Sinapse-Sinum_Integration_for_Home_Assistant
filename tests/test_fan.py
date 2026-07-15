@@ -314,6 +314,13 @@ class TestFanCoilFanCommands:
         )
 
     @pytest.mark.asyncio
+    async def test_patch_raises_for_unrecognized_bus(self):
+        entity = _make_fan_entity(bus="unknown_bus")
+        entity.async_write_ha_state = MagicMock()
+        with pytest.raises(HomeAssistantError, match="Unsupported bus"):
+            await entity.async_turn_off()
+
+    @pytest.mark.asyncio
     async def test_set_preset_mode_no_update_when_empty_response(self):
         entity = _make_fan_entity()
         entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})

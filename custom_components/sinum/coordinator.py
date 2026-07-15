@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -103,7 +104,13 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.variables: list[dict[str, Any]] = []  # global Lua/environment variables
         self.alarm_zones: dict[int, dict[str, Any]] = {}  # alarm_zone id → device dict
         self.mqtt_bridge: Any | None = None  # set by __init__ if MQTT enabled
+        self.ws_bridge: Any | None = None  # set by lifecycle.start_ws_bridge if WS enabled
         self.removed_ids: dict[str, frozenset[int]] = {}
+        # Lightweight performance counters, surfaced via diagnostics.py.
+        # Reset on integration reload — not persisted.
+        self.last_update_duration_ms: float | None = None
+        self.last_update_success_time: datetime | None = None
+        self.fetch_failure_count = 0
         self._webrtc = WebRtcSessionManager(client)
         self._motion_events: dict[int, dict[str, Any]] = {}
 
@@ -193,10 +200,14 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.rooms
 
     async def _async_update_data(self) -> dict[str, Any]:
+        start = time.monotonic()
         try:
-            return await self._fetch_all()
+            data = await self._fetch_all()
         except SinumAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
+        self.last_update_duration_ms = (time.monotonic() - start) * 1000
+        self.last_update_success_time = datetime.now()
+        return data
 
     async def _fetch_all(self) -> dict[str, Any]:
         prev_by_bus = self._removal_snapshots()
@@ -365,6 +376,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             return await list_getter(), True
         except Exception as err:
+            self.fetch_failure_count += 1
             _LOGGER.debug("Failed to fetch %s device collection: %s", label, err)
             return [], False
 
@@ -385,6 +397,7 @@ class SinumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _inject_room_keys(device, device_id, rooms, self.floors)
                 devices[device_id] = device
             except SinumConnectionError as err:
+                self.fetch_failure_count += 1
                 _LOGGER.warning("Failed to fetch %s device %s: %s", label, device_id, err)
         return devices
 

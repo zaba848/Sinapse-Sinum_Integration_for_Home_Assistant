@@ -367,6 +367,21 @@ class TestSinumCoordinator:
         # Cached data is preserved — entities remain available
         assert 10 in data["virtual"]
         assert coordinator.virtual_devices is data["virtual"]
+        # Each of the 3 failed bulk collections (virtual/wtp/sbus) counted once
+        assert coordinator.fetch_failure_count == 3
+
+    @pytest.mark.asyncio
+    async def test_update_sets_duration_and_success_time(self, mock_client):
+        coordinator = self._make_coordinator(mock_client)
+        assert coordinator.last_update_duration_ms is None
+        assert coordinator.last_update_success_time is None
+
+        with patch.object(coordinator, "async_set_updated_data"):
+            await coordinator._async_update_data()
+
+        assert coordinator.last_update_duration_ms is not None
+        assert coordinator.last_update_duration_ms >= 0
+        assert coordinator.last_update_success_time is not None
 
     def test_process_bulk_devices_skips_invalid_items(self, mock_client):
         coordinator = self._make_coordinator(mock_client)

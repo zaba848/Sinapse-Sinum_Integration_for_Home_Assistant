@@ -75,6 +75,10 @@ class SinumWebSocketBridge(_WebSocketVideoMixin):
         self._stop_event = asyncio.Event()
         self._auth_failed = False
         self._reconnect_attempt = 0
+        # Lifetime counters (unlike _reconnect_attempt, never reset) surfaced
+        # via diagnostics.py.
+        self.connect_count = 0
+        self.reconnect_count = 0
 
     async def async_start(self) -> bool:
         """Start websocket consumer task."""
@@ -107,11 +111,13 @@ class SinumWebSocketBridge(_WebSocketVideoMixin):
         try:
             await self._consume_loop()
             self._reconnect_attempt = 0  # Reset on success
+            self.connect_count += 1
         except asyncio.CancelledError:
             raise
         except Exception as err:
             _LOGGER.warning("WebSocket bridge error: %s", err)
             self._reconnect_attempt += 1
+            self.reconnect_count += 1
         if not self._stop_event.is_set():
             await self._wait_reconnect()
 

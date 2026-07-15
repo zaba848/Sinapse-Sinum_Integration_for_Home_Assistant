@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -76,14 +77,37 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         # every scan cycle. When callers overlap, share one real request instead
         # of firing one per entity.
         self._inflight: dict[str, asyncio.Task[Any]] = {}
+        # Lightweight performance counters, surfaced via `request_stats` for
+        # diagnostics.py. Reset on integration reload — not persisted.
+        self._request_count = 0
+        self._retry_401_count = 0
+        self._retry_408_count = 0
+        self._coalesced_hit_count = 0
+        self._coalesced_miss_count = 0
+        self._last_request_duration_ms: float | None = None
+
+    @property
+    def request_stats(self) -> dict[str, Any]:
+        """Snapshot of request/retry/coalescing counters for diagnostics."""
+        return {
+            "request_count": self._request_count,
+            "retry_401_count": self._retry_401_count,
+            "retry_408_count": self._retry_408_count,
+            "coalesced_hit_count": self._coalesced_hit_count,
+            "coalesced_miss_count": self._coalesced_miss_count,
+            "last_request_duration_ms": self._last_request_duration_ms,
+        }
 
     async def _coalesced_get(self, cache_key: str, path: str) -> Any:
         """Share a single in-flight GET across callers requesting the same path."""
         task = self._inflight.get(cache_key)
         if task is None:
+            self._coalesced_miss_count += 1
             task = asyncio.ensure_future(self._request("GET", path))
             self._inflight[cache_key] = task
             task.add_done_callback(lambda _t: self._inflight.pop(cache_key, None))
+        else:
+            self._coalesced_hit_count += 1
         return await asyncio.shield(task)
 
     @property
@@ -240,8 +264,13 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         await self.get_hub_info()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        async with self._sem:
-            return await self._request_inner(method, path, **kwargs)
+        start = time.monotonic()
+        try:
+            async with self._sem:
+                return await self._request_inner(method, path, **kwargs)
+        finally:
+            self._request_count += 1
+            self._last_request_duration_ms = (time.monotonic() - start) * 1000
 
     async def _do_request(self, method: str, path: str, **kwargs: Any) -> aiohttp.ClientResponse:
         """Execute a single HTTP request; raises SinumConnectionError on transport failure."""
@@ -261,12 +290,14 @@ class SinumClient(DevicesMixin, SceneMixin, EnergyMixin):
         if not await self._refresh_jwt():
             self._jwt = None
             await self.login()
+        self._retry_401_count += 1
         return await self._do_request(method, path, **kwargs)
 
     async def _handle_408(self, method: str, path: str, **kwargs: Any) -> aiohttp.ClientResponse:
         """Retry once after a 408 bus-busy response."""
         _LOGGER.debug("Bus busy (408) on %s %s, retrying in 1 s", method, path)
         await asyncio.sleep(1)
+        self._retry_408_count += 1
         return await self._do_request(method, path, **kwargs)
 
     async def _raise_for_422(self, resp: aiohttp.ClientResponse, path: str) -> None:
