@@ -6,9 +6,9 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io)
-[![Tests](https://img.shields.io/badge/tests-1940%2B%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1970%2B%20passing-brightgreen.svg)](tests/)
 [![CC Gate](https://img.shields.io/badge/CC-≤4%20everywhere-brightgreen.svg)](tests/test_code_quality.py)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](custom_components/sinum/manifest.json)
+[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](custom_components/sinum/manifest.json)
 [![License](https://img.shields.io/badge/license-Source%20Available-lightgrey.svg)](LICENSE)
 
 ---

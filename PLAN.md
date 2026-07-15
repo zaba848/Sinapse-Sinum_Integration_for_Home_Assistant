@@ -1,7 +1,7 @@
 # Sinapse — Maintenance & Release Plan
 
-**Current release:** 0.8.1  
-**Last updated:** 2026-07-08
+**Current release:** 0.8.2  
+**Last updated:** 2026-07-15
 
 ---
 
@@ -14,6 +14,12 @@
 | 2 | Coordinator fetch driven by `BUS_REGISTRY` | Done |
 | 3 | Lifecycle multi-hub tests + reconfigure WS path | Done |
 | 4 | Coverage gates extended (websocket, lifecycle, sensor_modbus, services) | Done |
+| 5 | `patch_wtp_device`/`patch_sbus_device` dispatch + store-lookup consolidation (`_bus_registry.bus_patch_method`/`bus_store`) across climate/fan/select/light/event/sensor_bus | Done — 0.8.2 |
+
+## Shipped in 0.8.2
+
+- Cycle 5 above (dispatch/store-lookup consolidation)
+- Performance metrics in `diagnostics.py`: request/retry/coalescing counters, coordinator update latency, WS reconnect counters — closes the "Performance metrics / observability" backlog item below
 
 ---
 
@@ -36,7 +42,7 @@
 | P5.3 SBUS blind position feedback | **Done** — live via generic `_bus_registry` WS/MQTT routing into `sbus_devices`, not just REST poll; verified in `cover_sbus.py` + `test_cover_extended.py` |
 | LoRa relay PATCH live validation | Blocked — no relay hardware |
 | Schedule editing UI | Not planned — `update_schedule` service + read-only sensors already cover this; a dedicated UI isn't idiomatic HA (service calls are the standard pattern) unless a concrete user ask surfaces |
-| Performance metrics / observability | Undefined scope — `diagnostics.py` already exposes bus/device counts + snapshots via HA's built-in diagnostics download; needs a concrete ask (e.g. coordinator update latency, WS reconnect counters) before this is actionable |
+| Performance metrics / observability | **Done — 0.8.2** — `diagnostics.py` now includes `last_update_duration_ms`, `last_update_success_time`, `fetch_failure_count`, HTTP request/retry/coalescing counters, and WS `ws_connect_count`/`ws_reconnect_count`; verified live on `sinum-tablica-sbus-1` |
 
 ---
 

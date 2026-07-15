@@ -23,6 +23,23 @@ All notable changes to the Sinum (Sinapse) Home Assistant integration are docume
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-07-15
+
+### Added
+- **`diagnostics.py` performance metrics** — `last_update_duration_ms`, `last_update_success_time`, `fetch_failure_count` on the coordinator; HTTP request/retry/coalescing counters (`SinumClient.request_stats`); WS `ws_connect_count`/`ws_reconnect_count` lifetime totals. All read-only, surfaced through HA's existing diagnostics download — no new entities.
+- **`coordinator.ws_bridge`** — the WS bridge is now attached to the coordinator in `lifecycle.start_ws_bridge`, mirroring the existing `coordinator.mqtt_bridge` pattern.
+
+### Changed
+- **`patch_wtp_device`/`patch_sbus_device` dispatch** — consolidated across `_climate_bus_mixin.py`, `fan.py`, `select.py`, `light_dimmer_bus.py`, `light_button.py`, `light_rgb.py` to use the shared `_bus_registry.bus_patch_method()` (the pattern `switch_bus.py` already used).
+- **Store-lookup duplication** — `light_button.py`, `light_rgb.py`, `_climate_bus_mixin.py`, `event.py`, `sensor_bus.py` now delegate to `_bus_registry.bus_store()` instead of hand-rolled `wtp_devices`/`sbus_devices` ternaries.
+
+### Fixed
+- **CI coverage gate** — closed an 8-line gap (unreachable `bus_patch_method()`/`bus_store()` None-guards, added for mypy's Optional narrowing) that had silently dropped global coverage to 99.86% in the previous release cycle.
+
+### Quality
+- 1971 tests passing, 5 skipped.
+- ruff ✅ | mypy ✅ | coverage 100% (global + all per-module gates) ✅
+
 ## [0.8.1] — 2026-07-08
 
 ### Added
