@@ -20,7 +20,9 @@ PARALLEL_UPDATES = 0
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_WORK_MODES = ["heating", "cooling", "automatic", "off"]
+# Excludes "automatic": some fan_coil_v2 firmware rejects it (422) without
+# ever declaring available_work_modes, so it can't be assumed safe.
+_DEFAULT_WORK_MODES = ["heating", "cooling", "off"]
 _WTP_FAN_COIL_TYPES = {WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2}
 
 

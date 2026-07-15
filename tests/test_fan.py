@@ -194,6 +194,92 @@ class TestFanCoilFanProperties:
 
 
 # ---------------------------------------------------------------------------
+# Analog-output devices (fan.output_type == "analog")
+#
+# On these devices the relay isn't the active output, so
+# fan.relay_fan.current_gear never reflects a manual gear change — the real
+# hub payload always reports it stuck at "first" regardless of what gear was
+# requested. fan.manual_fan_gear is the field that actually updates.
+# ---------------------------------------------------------------------------
+
+def _analog_fan_coil_device(**kwargs):
+    base = _fan_coil_device(
+        fan={
+            "output_type": "analog",
+            "manual_fan_gear": "second",
+            "relay_fan": {"current_gear": "first"},
+            "analog_fan": {
+                "manual_first_gear_percent": 30,
+                "manual_second_gear_percent": 60,
+                "manual_third_gear_percent": 90,
+            },
+        }
+    )
+    base.update(kwargs)
+    return base
+
+
+class TestFanCoilFanAnalogOutput:
+    def test_preset_mode_reads_manual_fan_gear_not_stale_relay_gear(self):
+        entity = _make_fan_entity(_analog_fan_coil_device())
+        assert entity.preset_mode == "2"
+
+    def test_relay_output_preset_mode_unaffected(self):
+        """Regression: devices without output_type (or "relay") still read current_gear."""
+        entity = _make_fan_entity(_fan_coil_device())
+        assert entity.preset_mode == "1"
+
+    def test_supported_features_includes_set_speed(self):
+        from homeassistant.components.fan import FanEntityFeature
+
+        entity = _make_fan_entity(_analog_fan_coil_device())
+        assert FanEntityFeature.SET_SPEED in entity.supported_features
+
+    def test_relay_output_excludes_set_speed(self):
+        from homeassistant.components.fan import FanEntityFeature
+
+        entity = _make_fan_entity(_fan_coil_device())
+        assert FanEntityFeature.SET_SPEED not in entity.supported_features
+
+    def test_percentage_matches_current_gear(self):
+        entity = _make_fan_entity(_analog_fan_coil_device())
+        assert entity.percentage == 60
+
+    def test_percentage_none_for_relay_output(self):
+        entity = _make_fan_entity(_fan_coil_device())
+        assert entity.percentage is None
+
+    def test_percentage_none_when_gear_missing_percent_data(self):
+        device = _analog_fan_coil_device()
+        device["fan"]["analog_fan"] = {}
+        entity = _make_fan_entity(device)
+        assert entity.percentage is None
+
+    def test_speed_count_is_three(self):
+        entity = _make_fan_entity(_analog_fan_coil_device())
+        assert entity.speed_count == 3
+
+    @pytest.mark.asyncio
+    async def test_set_percentage_picks_nearest_gear(self):
+        entity = _make_fan_entity(_analog_fan_coil_device())
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        entity.async_write_ha_state = MagicMock()
+        await entity.async_set_percentage(65)
+        entity.coordinator.client.patch_sbus_device.assert_called_once_with(
+            1, {"fan.manual_fan_gear": "second"}
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_percentage_noop_when_no_percent_data(self):
+        device = _analog_fan_coil_device()
+        device["fan"]["analog_fan"] = {}
+        entity = _make_fan_entity(device)
+        entity.coordinator.client.patch_sbus_device = AsyncMock(return_value={})
+        await entity.async_set_percentage(50)
+        entity.coordinator.client.patch_sbus_device.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # SinumFanCoilFan commands
 # ---------------------------------------------------------------------------
 

@@ -64,12 +64,22 @@ class TestWorkModeOptions:
         assert _work_mode_options(device) == ["heating", "cooling"]
 
     def test_defaults_when_no_declared(self):
+        """Undeclared capability must not assume "automatic" is safe (some
+        fan_coil_v2 firmware rejects it with a 422 without ever declaring
+        available_work_modes)."""
         opts = _work_mode_options({})
         assert "heating" in opts
-        assert "automatic" in opts
+        assert "automatic" not in opts
 
     def test_empty_list_falls_back_to_defaults(self):
         opts = _work_mode_options({"available_work_modes": []})
+        assert "heating" in opts
+
+    def test_non_list_declared_falls_back_to_safe_defaults(self):
+        """A malformed/absent available_work_modes (e.g. None) must not
+        leak "automatic" either — same real-hardware shape as no key at all."""
+        opts = _work_mode_options({"available_work_modes": None})
+        assert "automatic" not in opts
         assert "heating" in opts
 
 

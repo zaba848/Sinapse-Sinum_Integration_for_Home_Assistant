@@ -24,6 +24,7 @@ PARALLEL_UPDATES = 0
 
 _LOGGER = logging.getLogger(__name__)
 
+_GEAR_ORDER: tuple[str, ...] = ("first", "second", "third")
 _GEAR_TO_PRESET: dict[str, str] = {
     "first": "1",
     "second": "2",
@@ -37,6 +38,39 @@ _WTP_FAN_COIL_TYPES = {WTYPE_FAN_COIL, WTYPE_FAN_COIL_V2}
 
 def _has_fan_control(device: dict[str, Any]) -> bool:
     return "fan" in device and "work_mode" in device
+
+
+def _output_type(device: dict[str, Any]) -> str:
+    return device.get("fan", {}).get("output_type", "relay")
+
+
+def _current_gear(device: dict[str, Any]) -> str | None:
+    """Return the effective gear — relay_fan.current_gear for relay-output
+    devices, manual_fan_gear for analog-output ones (current_gear never
+    changes there since the relay isn't the active output)."""
+    fan = device.get("fan", {})
+    gear = (
+        fan.get("relay_fan", {}).get("current_gear")
+        if _output_type(device) == "relay"
+        else fan.get("manual_fan_gear")
+    )
+    return gear if isinstance(gear, str) else None
+
+
+def _analog_gear_percents(device: dict[str, Any]) -> dict[str, int]:
+    analog = device.get("fan", {}).get("analog_fan", {})
+    return {
+        gear: analog[f"manual_{gear}_gear_percent"]
+        for gear in _GEAR_ORDER
+        if isinstance(analog.get(f"manual_{gear}_gear_percent"), (int, float))
+    }
+
+
+def _nearest_gear_for_percentage(device: dict[str, Any], percentage: int) -> str | None:
+    percents = _analog_gear_percents(device)
+    if not percents:
+        return None
+    return min(percents, key=lambda gear: abs(percents[gear] - percentage))
 
 
 def _fan_store(coordinator: SinumCoordinator, bus: str) -> dict[int, dict[str, Any]]:
@@ -88,7 +122,8 @@ async def async_setup_entry(
 class SinumFanCoilFan(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordinator], FanEntity):
     """Fan gear control for Sinum fan_coil and fan_coil_v2 devices.
 
-    Exposes gear_1/gear_2/gear_3 relay states as HA fan preset modes.
+    Exposes gear_1/gear_2/gear_3 as HA fan preset modes. For analog-output
+    devices, also exposes each gear's calibrated percentage via SET_SPEED.
     turn_off sets work_mode=off; turn_on resumes automatic if unit was off.
     """
 
@@ -96,9 +131,19 @@ class SinumFanCoilFan(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
     _attr_translation_key = "fan_coil_fan"
     _attr_icon = "mdi:fan"
     _attr_preset_modes = _PRESETS
-    _attr_supported_features = (
-        FanEntityFeature.PRESET_MODE | FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
-    )
+
+    @property
+    def supported_features(self) -> FanEntityFeature:
+        features = (
+            FanEntityFeature.PRESET_MODE | FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
+        )
+        if _output_type(self._device) != "relay":
+            features |= FanEntityFeature.SET_SPEED
+        return features
+
+    @property
+    def speed_count(self) -> int:
+        return len(_GEAR_ORDER)
 
     def __init__(
         self,
@@ -125,11 +170,21 @@ class SinumFanCoilFan(SinumDeviceAvailableMixin, CoordinatorEntity[SinumCoordina
 
     @property
     def preset_mode(self) -> str | None:
-        relay_fan = self._device.get("fan", {}).get("relay_fan", {})
-        gear = relay_fan.get("current_gear")
-        if not isinstance(gear, str):
+        gear = _current_gear(self._device)
+        return _GEAR_TO_PRESET.get(gear) if gear else None
+
+    @property
+    def percentage(self) -> int | None:
+        if _output_type(self._device) == "relay":
             return None
-        return _GEAR_TO_PRESET.get(gear)
+        gear = _current_gear(self._device)
+        return _analog_gear_percents(self._device).get(gear) if gear else None
+
+    async def async_set_percentage(self, percentage: int) -> None:
+        gear = _nearest_gear_for_percentage(self._device, percentage)
+        if gear is None:
+            return
+        await self.async_set_preset_mode(_GEAR_TO_PRESET[gear])
 
     async def _patch(self, payload: dict[str, Any]) -> dict[str, Any]:
         patch_method = bus_patch_method(self.coordinator, self._bus)
