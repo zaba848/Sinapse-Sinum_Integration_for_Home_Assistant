@@ -1,12 +1,12 @@
 # CI Quality Dashboard
 
-Generated: 2026-07-20 11:41:50Z
+Generated: 2026-07-27 12:18:14Z
 
 ## Main Metrics (CI on main)
-- Total completed runs analyzed: 11
-- Pass rate: 90.9%
-- Average duration: 2.06 min
-- P95 duration: 2.06 min
+- Total completed runs analyzed: 7
+- Pass rate: 85.7%
+- Average duration: 2.04 min
+- P95 duration: 2.04 min
 - Flaky proxy (rerun attempts > 1): 0
 
 ## Recent CI Runs
@@ -17,6 +17,3 @@ Generated: 2026-07-20 11:41:50Z
 - completed/success | #224 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29246760712
 - completed/success | #223 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29246506303
 - completed/success | #222 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29242573018
-- completed/success | #221 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29229845793
-- completed/success | #220 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29225999666
-- completed/success | #219 | https://github.com/zaba848/Sinapse-Sinum_Integration_for_Home_Assistant/actions/runs/29224995776
